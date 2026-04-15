@@ -1,0 +1,24 @@
+{
+  "name": "@peerkit/transport-libp2p",
+  "version": "0.1.0",
+  "description": "",
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "^17.0.0",
+    "@chainsafe/libp2p-yamux": "^8.0.1",
+    "@libp2p/tcp": "^11.0.15",
+    "@logtape/logtape": "^2.0.5",
+    "libp2p": "^3.2.0"
+  }
+}

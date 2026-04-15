@@ -1,0 +1,50 @@
+{
+  "name": "peerkit",
+  "version": "0.1.0",
+  "description": "Peer-to-peer data synchronization framework",
+  "keywords": [
+    "p2p",
+    "peer-to-peer",
+    "data",
+    "sync"
+  ],
+  "author": "dev-team@holochain.org",
+  "license": "CAL-1.0",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "workspaces": [
+    "packages/transport-libp2p"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "scripts": {
+    "lint": "eslint",
+    "fmt": "prettier . --write",
+    "test": "npm test --workspaces",
+    "build:docs": "typedoc",
+    "build:dist": "tsc --build",
+    "build": "npm run build:docs && npm run build:dist"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.0",
+    "globals": "^17.5.0",
+    "prettier": "3.8.2",
+    "typedoc": "^0.28.19",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.2",
+    "vitest": "^4.1.4"
+  }
+}

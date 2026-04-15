@@ -1,0 +1,5 @@
+{
+  "entryPointStrategy": "packages",
+  "entryPoints": ["packages/transport-libp2p"],
+  "out": "docs"
+}

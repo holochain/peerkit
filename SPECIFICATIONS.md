@@ -33,7 +33,6 @@ For developers, choosing P2P should not be a painful choice. A developer new to 
 - Everything required to develop an application end-to-end is demonstrated as part of launching v1 and documented for developers.
 - Apps built with the framework can be scaled to simultaneous usage by 100s of thousands of users, given a reasonable developer-provided distribution and storage algorithm.
 
-
 ## 2. Added value over existing frameworks
 
 ### Positioning relative to low-level P2P libraries
@@ -66,7 +65,6 @@ p2panda provides a similar layer of abstraction (structured data, gossip, access
 6. **Data flexibility**: Not append-only at the protocol level. Supports destructive edits for scalability and privacy. Agnostic to data format or uses human-readable, easily exportable formats.
 7. **Compliance-tested module boundaries**: Published specifications and compliance test suites allow third parties to build compatible implementations.
 
-
 ## 3. Primary goals
 
 - **Fun to use** and easy to understand conceptually
@@ -81,7 +79,6 @@ p2panda provides a similar layer of abstraction (structured data, gossip, access
 - **Supports an ecosystem**: extensible with libraries/plugins, comes with specifications for interoperability
 - **Scalable**: effortless scalability to 10,000+ users
 - **Group sovereignty**: groups can say "this is ours" -- they have the power to keep the lights on, modify their tools, and manage membership
-
 
 ## 4. Primary constraints
 
@@ -98,12 +95,12 @@ p2panda provides a similar layer of abstraction (structured data, gossip, access
 - **Existing technology**: use existing technology wherever sensible, not reinventing transport or peer discovery.
 - **API expressiveness**: expressive enough to build features missing from core; simple enough to allow groups to vibe-code ad-hoc apps.
 
-
 ## 5. Architecture: components and layers
 
 The architecture follows a layered design where each layer builds on the one below it, making increasingly opinionated choices while providing greater ease of use and safety. Layers are fully encapsulated and interface only through public functions and hooks.
 
 Design principles:
+
 - Each layer makes more opinionated, restrictive choices
 - Each layer provides greater ease of use, safety, and fun
 - When making a restrictive choice: can it be pushed up to a higher layer?
@@ -115,6 +112,7 @@ Design principles:
 These capabilities span multiple layers and are not all reflected in this specification document yet:
 
 #### Authentication and data security
+
 - Network access management for group membership (see Layer 0: network access control)
 - With network access security in place and a single set of data per app, additional data access security isn't required.
 - Encryption of data at rest and in transit
@@ -128,7 +126,11 @@ An **agent** is a participant with a cryptographic identity: a public/private ke
 type AgentId = Uint8Array;
 
 // Verify that a signature was produced by the agent identified by agentId
-function verify(agentId: AgentId, data: Uint8Array, signature: Uint8Array): boolean
+function verify(
+  agentId: AgentId,
+  data: Uint8Array,
+  signature: Uint8Array,
+): boolean;
 ```
 
 The framework generates the agent's keypair on first run and persists it in storage. On subsequent runs it reloads the same keypair. The app does not provide or manage key material. Signing happens internally — the private key is never exposed.
@@ -145,8 +147,8 @@ const myId = p2.agent.id  // the local agent's public key (AgentId)
 ```typescript
 // Shareable, serializable descriptor of an agent — their "business card"
 interface AgentInfo {
-  id: AgentId;               // The agent's public key (their stable identity)
-  addresses: PeerAddress[];  // Known addresses (LAN, WAN, relay, etc.)
+  id: AgentId; // The agent's public key (their stable identity)
+  addresses: PeerAddress[]; // Known addresses (LAN, WAN, relay, etc.)
 }
 ```
 
@@ -157,6 +159,7 @@ Agent identity is distinct from peer identity (`PeerId`), which is a network-lev
 **Signing**: State change blobs (Layer 4) are signed by their author using the agent's private key. Peers verify the signature when integrating a blob. This ensures that only the holder of the private key can produce state changes attributed to that agent — no central authority is needed.
 
 #### Data validation
+
 - Newly received data should be considered "pending" and must be "accepted"
 - The exact validation mechanisms are not imposed by the framework
 - Apps implement custom validation functions
@@ -170,14 +173,14 @@ Therefore storage is injected as a dependency. The framework defines a storage i
 
 Storage touches every layer, because each layer persists different kinds of data:
 
-| Layer | What is stored |
-|---|---|
-| Cross-cutting | Agent table (`AgentId → AgentInfo`) |
-| 0 (transport) | Cached peer addresses |
-| 1 (networking) | Blobs and their content hashes |
-| 2 (structured data) | Schema blobs |
-| 3 (indexed data) | Metadata entries, index structures |
-| 4 (state changes) | State change blobs, causal DAG edges, tombstone records, epoch snapshots |
+| Layer               | What is stored                                                           |
+| ------------------- | ------------------------------------------------------------------------ |
+| Cross-cutting       | Agent table (`AgentId → AgentInfo`)                                      |
+| 0 (transport)       | Cached peer addresses                                                    |
+| 1 (networking)      | Blobs and their content hashes                                           |
+| 2 (structured data) | Schema blobs                                                             |
+| 3 (indexed data)    | Metadata entries, index structures                                       |
+| 4 (state changes)   | State change blobs, causal DAG edges, tombstone records, epoch snapshots |
 
 ##### Storage interface
 
@@ -186,20 +189,20 @@ The injected storage implementation must satisfy:
 ```typescript
 interface Storage {
   // Agent table (cross-cutting)
-  putAgentInfo(info: AgentInfo): Promise<void>
-  getAgentInfo(id: AgentId): Promise<AgentInfo | null>
-  deleteAgentInfo(id: AgentId): Promise<void>
+  putAgentInfo(info: AgentInfo): Promise<void>;
+  getAgentInfo(id: AgentId): Promise<AgentInfo | null>;
+  deleteAgentInfo(id: AgentId): Promise<void>;
 
   // Peer address cache (Layer 0)
-  putPeerAddress(peerAddress: PeerAddress): Promise<void>
-  getPeerAddresses(): Promise<PeerAddress[]>
-  deletePeerAddress(peerId: PeerId): Promise<void>
+  putPeerAddress(peerAddress: PeerAddress): Promise<void>;
+  getPeerAddresses(): Promise<PeerAddress[]>;
+  deletePeerAddress(peerId: PeerId): Promise<void>;
 
   // Blob storage (Layers 1-4)
-  putBlob(hash: Hash, blob: Uint8Array): Promise<void>
-  getBlob(hash: Hash): Promise<Uint8Array | null>
-  hasBlob(hash: Hash): Promise<boolean>
-  deleteBlob(hash: Hash): Promise<void>
+  putBlob(hash: Hash, blob: Uint8Array): Promise<void>;
+  getBlob(hash: Hash): Promise<Uint8Array | null>;
+  hasBlob(hash: Hash): Promise<boolean>;
+  deleteBlob(hash: Hash): Promise<void>;
 }
 ```
 
@@ -212,7 +215,6 @@ const p2 = P2.create({ storage: new SurrealDBStorage(), ... })
 ```
 
 The same storage instance is shared across all layers. Layers do not instantiate storage themselves.
-
 
 ### Layer 0: transport
 
@@ -235,10 +237,12 @@ A new node needs the address of at least one existing peer to join the network. 
 **Internet**: The app ships with or accepts a list of known peer addresses (bootstrap peers). These are ordinary nodes running the application. Practically, this means the app creator (or any committed user) runs a peer on a reachable address, and that address is shared with new users.
 
 Bootstrap peer addresses can be:
+
 - Entered manually by the user (paste an address, scan a QR code). Manual address entry is a core feature of the framework.
 - Hardcoded in the app by the app creator
 
 Possible future enhancements:
+
 - Published to a well-known location (e.g. a DNS TXT record, a web page)
 - Discovered via BitTorrent Mainline DHT (a public, infrastructure-free DHT that anyone can publish to, keyed by app identifier)
 
@@ -257,6 +261,7 @@ Most consumer devices sit behind a router that blocks incoming connections (NAT)
 No step requires dedicated infrastructure — router negotiation is local, and reachability checks and relaying use connected peers.
 
 **Resource management for relaying**: A peer acting as relay carries the bandwidth cost of forwarding traffic. The framework must:
+
 - Allow peers to opt in/out of relaying for others
 - Set bandwidth and connection limits for relay traffic
 - Prefer relaying through peers that have indicated willingness and capacity (e.g. desktop peers on broadband)
@@ -270,17 +275,18 @@ A network of only browser nodes cannot bootstrap. At least one desktop/mobile pe
 
 ##### Transport selection by platform
 
-| Platform | Transport | Capabilities |
-|---|---|---|
-| Desktop (Linux, macOS, Windows) | TCP | Full node: bootstrap, signaling, relay, direct connections |
-| Mobile (Android, iOS) | TCP | Full node with caveats: background restrictions may limit availability as bootstrap/relay |
-| Browser (Chromium) | WebRTC (post-MVP) | Lite node: cannot be bootstrapped to, always initiates connections. Can relay between peers it has connections to. |
+| Platform                        | Transport         | Capabilities                                                                                                       |
+| ------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Desktop (Linux, macOS, Windows) | TCP               | Full node: bootstrap, signaling, relay, direct connections                                                         |
+| Mobile (Android, iOS)           | TCP               | Full node with caveats: background restrictions may limit availability as bootstrap/relay                          |
+| Browser (Chromium)              | WebRTC (post-MVP) | Lite node: cannot be bootstrapped to, always initiates connections. Can relay between peers it has connections to. |
 
 All transports use encrypted channels (Noise protocol for TCP, DTLS for WebRTC). QUIC is a future upgrade for desktop/mobile once js-libp2p ships support.
 
 ##### Network access control
 
 Networks are **closed by default**. Every incoming connection must present a network access pass before any application data is exchanged. This is enforced at the transport level as part of the connection handshake:
+
 - After a connection is established and encrypted, the connecting peer must present a network access pass
 - The pass is passed to the `onConnect` hook
 - If the hook rejects, the connection is dropped immediately and the peer is blocked.
@@ -291,6 +297,7 @@ To make a network open, the app explicitly sets the network access check to acce
 ##### Module boundary
 
 **Types**:
+
 ```typescript
 // Identifier for a peer
 type PeerId = Uint8ByteArray;
@@ -315,25 +322,27 @@ Transport is injected as a dependency. The rest of the system interacts with it 
 ```typescript
 interface ITransport {
   // Establish a connection to a peer, presenting a network access pass
-  connect(peerId: PeerId, pass: NetworkAccessPass): Promise<Connection>
+  connect(peerId: PeerId, pass: NetworkAccessPass): Promise<Connection>;
 
   // Accept incoming connections (not available in browsers)
-  listen(): void
+  listen(): void;
 
   // Find peers via mDNS, bootstrap addresses, or DHT
-  discover(): Promise<PeerAddress[]>
+  discover(): Promise<PeerAddress[]>;
 
   // Send data to a peer. Each message uses a short-lived stream, avoiding
   // the need for manual message framing. Stream creation is cheap enough
   // for expected message rates (sub-minute to tens per second).
-  send(peerId: PeerId, data: Uint8Array): Promise<void>
+  send(peerId: PeerId, data: Uint8Array): Promise<void>;
 
   // Configure this peer's willingness and resource limits for relaying traffic
-  setRelayConfig(config: RelayConfig): void
+  setRelayConfig(config: RelayConfig): void;
 
   // Hook called on each incoming connection with the peer's network access pass.
   // Return true to accept, false to reject and drop the connection.
-  onConnect(handler: (peerId: PeerId, pass: NetworkAccessPass) => boolean): void
+  onConnect(
+    handler: (peerId: PeerId, pass: NetworkAccessPass) => boolean,
+  ): void;
 }
 ```
 
@@ -344,6 +353,7 @@ This interface enables replacement of js-libp2p with iroh or another transport w
 Routing opaque blobs to the right peers so that layers above can create eventually consistent shared state.
 
 **Capabilities**:
+
 - Peer responsibility coverage tracking and automatic management for adequate coverage
 - Generic data and agent identifiers (future-proofing)
 - Does not store blobs itself, but tracks what blobs have been received and integrated
@@ -357,6 +367,7 @@ Layer 1 provides blob distribution across peers. It does not prescribe how blobs
 **Core concept**: Every blob has a content hash (its identity). Layer 1 ensures blobs reach the peers that should have them, according to the active distribution strategy. Layer 1 does not define a key space or routing topology — those are concerns of the distribution strategy.
 
 **Distribution strategy interface** (injected by developer):
+
 - `willStore(peerId: PeerId, blob: Uint8Array) -> bool` — should this peer store the given blob?
 
 The strategy inspects the blob to determine routing. The caller does not specify a target — routing is entirely the strategy's responsibility.
@@ -386,12 +397,14 @@ A summary must be compact enough to exchange on every connection. The exact repr
 Each peer maintains connections to a bounded number of peers. The connection management strategy is pluggable via dependency injection, like the distribution strategy. P2 ships a default that connects to all peers.
 
 Example strategies:
+
 - **Persistent connections** (default): maintain long-lived connections to all peers.
 - **Ephemeral connections**: open connections on demand (connect-fire-close), maintaining only a small number of persistent connections. The persistent connections can rotate through neighbors to maintain coverage. Suited for large networks where holding many connections is expensive.
 
 #### Module boundary
 
 **Types**:
+
 ```typescript
 // Hash value of a data blob
 type Hash = Uint8Array;
@@ -404,19 +417,19 @@ type Blob = Uint8Array;
 ```typescript
 interface INetworking {
   // Publish a blob. The distribution strategy determines which peers receive it.
-  publish(blob: Blob): Promise<void>
+  publish(blob: Blob): Promise<void>;
 
   // Retrieve a blob by its content hash.
   // Only supported by strategies that can locate peers by hash (e.g. full replication, DHT).
   // Push-only strategies (e.g. pub-sub) cannot support this — returns null if unavailable.
-  get(hash: Hash): Promise<Blob | null>
+  get(hash: Hash): Promise<Blob | null>;
 
   // Block or unblock a peer connection
-  block(peer: PeerId): void
-  unblock(peer: PeerId): void
+  block(peer: PeerId): void;
+  unblock(peer: PeerId): void;
 
   // Send an opaque message to a peer (fire-and-forget)
-  send(peer: PeerId, data: Uint8Array): Promise<void>
+  send(peer: PeerId, data: Uint8Array): Promise<void>;
 }
 ```
 
@@ -428,14 +441,14 @@ interface INetworking {
 interface INetworkingHooks {
   // Called when a new blob arrives from the network.
   // The callee is responsible for persisting accepted blobs via injected storage.
-  onIntegrate(peerId: PeerId, blob: Blob): 'accepted' | 'rejected'
+  onIntegrate(peerId: PeerId, blob: Blob): "accepted" | "rejected";
 
   // Retrieve a blob by hash from local storage.
   // Called when a peer requests a blob this node is responsible for.
-  getBlob(hash: Hash): Promise<Uint8Array | null>
+  getBlob(hash: Hash): Promise<Uint8Array | null>;
 
   // Handle an incoming message from a peer
-  onMessage(peer: PeerId, data: Uint8Array): void
+  onMessage(peer: PeerId, data: Uint8Array): void;
 }
 ```
 
@@ -444,6 +457,7 @@ interface INetworkingHooks {
 Adds semantic meaning to blobs through schemas.
 
 **Capabilities**:
+
 - The first bytes of a blob reference a schema blob containing the blob's data structure definition (JSON Schema or similar)
 - Referenced schema blobs must be fetched to decode the data blob.
 - Blobs must decode according to their schema
@@ -454,13 +468,13 @@ Adds semantic meaning to blobs through schemas.
 ```typescript
 interface IStructuredData {
   // Publish a schema definition so peers can decode blobs that reference it
-  publishSchema(schema: Schema): Promise<Hash>
+  publishSchema(schema: Schema): Promise<Hash>;
 
   // Publish a blob whose structure conforms to the given schema
-  publishBlob(schemaId: Hash, data: Uint8Array): Promise<Hash>
+  publishBlob(schemaId: Hash, data: Uint8Array): Promise<Hash>;
 
   // New data coming in, matching a given schema
-  onNewData(schemaId: Hash, data: Uint8Array)
+  onNewData(schemaId: Hash, data: Uint8Array);
 }
 ```
 
@@ -477,12 +491,12 @@ When a blob is created, metadata is deterministically extracted according to its
 Metadata must be a separate blob because it needs to be routed independently of its source blob. In a DHT, `hash("tag:meeting-notes")` routes to different peers than the content blob itself — that's what makes index lookups efficient without scanning. If metadata were embedded in the source blob, it would be co-located with the content and distributed lookup would be impossible.
 
 **Example**: A document blob has schema fields `author`, `tags`, and `createdAt`. The schema declares `tags` and `author` as metadata fields. When the blob is published:
+
 1. The blob itself is published via `publish(blob)`
 2. A metadata entry `{ blobId, tag: "meeting-notes" }` is published via `publish(metadataBlob)`
 3. A metadata entry `{ blobId, author: "agentXyz" }` is published via `publish(metadataBlob)`
 
 To find all documents tagged "meeting-notes", a peer queries for metadata entries matching that tag and receives a list of blob IDs.
-
 
 #### Properties
 
@@ -496,13 +510,13 @@ To find all documents tagged "meeting-notes", a peer queries for metadata entrie
 ```typescript
 interface IIndexedData {
   // Get all metadata entries for a blob
-  getMetadata(blobId: Hash): Promise<Metadata[]>
+  getMetadata(blobId: Hash): Promise<Metadata[]>;
 
   // Find blobs matching field criteria (translates to Layer 1 lookups)
-  query(metadataQuery: MetadataQuery): Promise<Hash[]>
+  query(metadataQuery: MetadataQuery): Promise<Hash[]>;
 
   // Verify that a metadata entry was correctly derived from the given blob
-  verifyMetadata(blob: Blob, metadata: Metadata): boolean
+  verifyMetadata(blob: Blob, metadata: Metadata): boolean;
 }
 ```
 
@@ -517,6 +531,7 @@ Layers 1-3 deal with immutable blobs: you publish a blob, it gets distributed, i
 State changes are blobs. They use Layer 2 schemas and Layer 3 indexing. No fundamentally new storage or networking mechanism is introduced — Layer 4 adds conventions and semantics on top of what exists below.
 
 Each state change blob contains:
+
 - **Schema ID**: identifies the type of state change (e.g. CreateEntry, UpdateEntry, DeleteEntry)
 - **Target**: the blob ID of the entity being acted on (absent for creates)
 - **Causal links**: blob IDs of the state changes this one depends on (the state changes the author had seen when making this change)
@@ -543,6 +558,7 @@ When a peer receives state changes that form concurrent branches (no causal link
 **Default merge strategy (last-writer-wins)**: Compare timestamps; if equal, compare blob hashes deterministically. Simple, sufficient for many apps, and requires no custom logic.
 
 **Custom merge functions**: For richer semantics, the schema can specify a merge function. This is an open design question — options include:
+
 - A named, well-known merge strategy (e.g. "lww", "set-union") that the framework ships implementations for
 - Application-provided merge logic registered at startup.
 
@@ -553,11 +569,11 @@ The framework ships built-in merge strategies for common patterns. Custom strate
 The merge logic could also be published as part of the CRDT specification. The CRDT spec would include the actual code and the intrepreter/vm/assembler it must be run with, i.e.
 
 ```json
-{  
-  "merge": {  
-     "interpreter": "node_22.1",  
-     "exec": "function(a: AdditionStateChange, b: AdditionStateChange) -> AdditionState { return State { value: a.value + b.value }; }"  
-   }  
+{
+  "merge": {
+    "interpreter": "node_22.1",
+    "exec": "function(a: AdditionStateChange, b: AdditionStateChange) -> AdditionState { return State { value: a.value + b.value }; }"
+  }
 }
 ```
 
@@ -582,11 +598,12 @@ P2 uses **epochs** — coordinated time windows that bound tombstone retention a
 
 **Snapshot-based anti-entropy**: Peers periodically produce compact state snapshots. A returning or joining peer syncs against the snapshot. If a blob isn't in the snapshot, it doesn't exist — no tombstone needed. The snapshot is the authoritative representation of current state.
 
-This bounds tombstone storage to one epoch's worth of deletions (proportional to deletion *rate*, not deletion *history*) and shifts the cost of long absence from the network to the returning peer (a one-time full resync) rather than burdening all peers with permanent tombstones.
+This bounds tombstone storage to one epoch's worth of deletions (proportional to deletion _rate_, not deletion _history_) and shifts the cost of long absence from the network to the returning peer (a one-time full resync) rather than burdening all peers with permanent tombstones.
 
 ##### Delete flow
 
 When an entity is deleted:
+
 1. A DeleteEntry state change is published
 2. Peers that integrate the delete may prune the original CreateEntry blob, all UpdateEntry blobs, and the associated Layer 3 metadata entries
 3. The DeleteEntry is retained as a compact tombstone record for the current epoch
@@ -622,28 +639,29 @@ These operations are still blobs, published and synced through Layers 1-3. The C
 ```typescript
 interface IStateChanges {
   // Create a new entity; returns its ID (the hash of the CreateEntry blob)
-  createEntry(schemaId: Hash, data: unknown): Promise<Hash>
+  createEntry(schemaId: Hash, data: unknown): Promise<Hash>;
 
   // Update an entity; automatically includes causal links to known prior state changes
-  updateEntry(entityId: Hash, data: unknown): Promise<void>
+  updateEntry(entityId: Hash, data: unknown): Promise<void>;
 
   // Delete an entity and trigger pruning of its associated blobs
-  deleteEntry(entityId: Hash): Promise<void>
+  deleteEntry(entityId: Hash): Promise<void>;
 
   // Get the current resolved state of an entity, applying merge if concurrent branches exist
-  getEntry(entityId: Hash): Promise<unknown | null>
+  getEntry(entityId: Hash): Promise<unknown | null>;
 
   // Query entities via Layer 3 metadata
-  queryEntries(metadataQuery: MetadataQuery): Promise<Hash[]>
+  queryEntries(metadataQuery: MetadataQuery): Promise<Hash[]>;
 
   // Get the full causal history (DAG of state changes) for an entity
-  getHistory(entityId: Hash): Promise<StateChange[]>
+  getHistory(entityId: Hash): Promise<StateChange[]>;
 }
 ```
 
 ### Layer 5+: higher-level features (future)
 
 Not yet specified. Potential areas:
+
 - Data validation framework (received data is "pending" until "accepted")
 - Deletable / deduplicatable / warrantable CRDT state changes
 - Features implementable directly as CRDT types vs. requiring lower-level hooks
@@ -677,7 +695,6 @@ Target: millions of nodes over time. Scalability is addressed at three levels:
 
 **API discipline**: No "get all" methods on potentially large collections. No networking concepts requiring notification of or connection to all peers. Every query and operation must be bounded.
 
-
 ## 6. Technology decisions
 
 - **Language**: TypeScript (large ecosystem, accessible to app developers, lower resource cost than Rust development)
@@ -686,7 +703,6 @@ Target: millions of nodes over time. Scalability is addressed at three levels:
   - iroh: technically excellent, better hole-punching via relay fallback, but lacks JS wrapper and browser direct connections
 - **Storage**: SurrealDB as default (common database for browser and desktop, JS SDK available), but pluggable
 - **Architecture style**: core API covers peer discovery, transport, and agents; storage logic (data model, distribution strategy) is not built into the core API but selected per application
-
 
 ## 7. Technical principles
 
@@ -698,7 +714,6 @@ Target: millions of nodes over time. Scalability is addressed at three levels:
 - The system is not constrained by a specific data store or network protocol
 - The observable API is defined by published specifications
 
-
 ## 8. MVP definition
 
 Not every app needs all 4 layers. The layers are additive — each builds on the one below but is independently useful. The MVP ships Layer 0 + 1 to get a working P2P library as quickly as possible.
@@ -706,6 +721,7 @@ Not every app needs all 4 layers. The layers are additive — each builds on the
 ### MVP scope: Layer 0 + 1
 
 **What's included:**
+
 - js-libp2p transport with manual bootstrap address entry
 - Encrypted connections (Noise protocol)
 - Network access pass handshake (closed networks by default)
@@ -715,6 +731,7 @@ Not every app needs all 4 layers. The layers are additive — each builds on the
 - Peer messaging (signals)
 
 **What's deliberately excluded from MVP:**
+
 - Custom data distribution — **full replication** is the built-in default (every peer stores everything). The distribution interface is exposed for developers to provide their own strategy.
 - Layer 2 (schemas) — app structures its own blobs
 - Layer 3 (indexing) — app builds its own local indexes
@@ -733,7 +750,6 @@ The MVP gives developers: encrypted P2P connections, closed networks, and a shar
 - Any app where the data set is small enough for every peer to hold
 
 The app developer handles data structure, indexing, and conflict resolution in their own code. The developer experience improves as Layers 2-4 are added, but the MVP is functional.
-
 
 ## 9. Open questions
 
