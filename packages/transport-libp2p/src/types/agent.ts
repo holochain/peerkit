@@ -1,15 +1,13 @@
-// Identifier for a peer
-export type PeerId = Uint8Array;
-
-// Address to dial a peer
-export interface PeerAddress {
-  id: PeerId;
-  address: number;
-}
+/**
+ * Identifier for an agent
+ */
+export type AgentId = Uint8Array;
 
 export interface RelayConfig {
   canRelay: boolean;
 }
 
-// Byte sequence to prove access to a network has been granted
+/**
+ * Byte sequence to prove access to a network has been granted
+ */
 export type NetworkAccessPass = Uint8Array;
