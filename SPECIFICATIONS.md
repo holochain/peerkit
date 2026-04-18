@@ -1,10 +1,10 @@
 # Specification
 
-## 1. What is P2 aiming to accomplish?
+## 1. What is Peerkit aiming to accomplish?
 
-P2 is a peer-to-peer (P2P) data synchronization library. Its purpose is to enable developers to add decentralized data sharing to their applications without server infrastructure, where groups of users have full control over their data and their participation.
+Peerkit is a peer-to-peer (P2P) data synchronization library. Its purpose is to enable developers to add decentralized data sharing to their applications without server infrastructure, where groups of users have full control over their data and their participation.
 
-P2 is not a runtime or an all-or-nothing framework. It is a library that can be integrated into existing applications. An app may use P2 to synchronize only a subset of its data, while the rest of the app uses conventional storage, APIs, or other backends. P2 only manages the data that is specified through its storage hooks. This makes adoption incremental: developers can add P2P capabilities to one feature of an existing app without rewriting the rest.
+Peerkit is not a runtime or an all-or-nothing framework. It is a library that can be integrated into existing applications. An app may use Peerkit to synchronize only a subset of its data, while the rest of the app uses conventional storage, APIs, or other backends. Peerkit only manages the data that is specified through its storage hooks. This makes adoption incremental: developers can add P2P capabilities to one feature of an existing app without rewriting the rest.
 
 ### Problem statement
 
@@ -19,13 +19,13 @@ Existing P2P frameworks have not solved this problem at scale, or provide mainly
 
 ### Vision
 
-P2 enables groups to credibly say "this is ours" about their digital tools. "Credibly" means a group realistically has agency: they can use, operate, and modify their tools with only a basic level of tech savvy.
+Peerkit enables groups to credibly say "this is ours" about their digital tools. "Credibly" means a group realistically has agency: they can use, operate, and modify their tools with only a basic level of tech savvy.
 
-For developers, choosing P2P should not be a painful choice. A developer new to P2 should be able to follow documentation and build a functioning app within hours.
+For developers, choosing P2P should not be a painful choice. A developer new to Peerkit should be able to follow documentation and build a functioning app within hours.
 
 ### Definition of success
 
-- A developer new to P2 can build a functioning app within hours (e.g. at a hackathon).
+- A developer new to Peerkit can build a functioning app within hours (e.g. at a hackathon).
 - Clear, detailed technical documentation uses consistent terminology, enabling developers to communicate effectively with maintainers.
 - The framework has no fundamental limitations that would prevent maintainers from recommending it for serious production use cases.
 - Solid API documentation and compliance tests make it possible for developers to replace modules with correctly implemented alternatives of their own.
@@ -44,11 +44,11 @@ Low-level libraries like libp2p provide networking primitives: transport, encryp
 - How to manage access control, membership, and privacy
 - How to handle scalability as the network grows
 
-P2 sits above these libraries and provides an opinionated-by-default but modular framework that addresses all of the above, while using libp2p (or iroh if we find that libp2p is problematic in production usage) for the networking substrate. Where iroh's built-in protocols (gossip, blobs, docs) overlap with P2's layers, P2 may leverage them as implementations rather than rebuilding equivalent functionality.
+Peerkit sits above these libraries and provides an opinionated-by-default but modular framework that addresses all of the above, while using libp2p (or iroh if we find that libp2p is problematic in production usage) for the networking substrate. Where iroh's built-in protocols (gossip, blobs, docs) overlap with Peerkit's layers, Peerkit may leverage them as implementations rather than rebuilding equivalent functionality.
 
 ### Positioning relative to p2panda
 
-p2panda provides a similar layer of abstraction (structured data, gossip, access control) but is written in Rust, has limited documentation, unclear maturity, and its storage layer (SQLite) doesn't build to browser WASM. P2 differentiates by:
+p2panda provides a similar layer of abstraction (structured data, gossip, access control) but is written in Rust, has limited documentation, unclear maturity, and its storage layer (SQLite) doesn't build to browser WASM. Peerkit differentiates by:
 
 - Being a TypeScript framework, accessible to a much larger developer ecosystem
 - Targeting browser, mobile, and desktop from day one
@@ -138,8 +138,8 @@ The framework generates the agent's keypair on first run and persists it in stor
 The local agent's public identity is accessible after initialization:
 
 ```typescript
-const p2 = await P2.create({ storage: ..., transport: ... })
-const myId = p2.agent.id  // the local agent's public key (AgentId)
+const peerkit = await Peerkit.create({ storage: ..., transport: ... })
+const myId = peerkid.agent.id  // the local agent's public key (AgentId)
 ```
 
 `AgentInfo` is the public, shareable descriptor exchanged between peers and stored in the agent table. It contains everything needed to verify an agent's signatures and reach them on the network:
@@ -169,7 +169,7 @@ Agent identity is distinct from peer identity (`PeerId`), which is a network-lev
 
 Storage is opinionated and platform-dependent. Pluggable storage lets developers choose a backend that fits their app's constraints and deployment environment.
 
-Therefore storage is injected as a dependency. The framework defines a storage interface; applications provide an implementation. P2 ships SurrealDB as the default implementation, which runs in both Node.js and browser environments.
+Therefore storage is injected as a dependency. The framework defines a storage interface; applications provide an implementation. Peerkit ships SurrealDB as the default implementation, which runs in both Node.js and browser environments.
 
 Storage touches every layer, because each layer persists different kinds of data:
 
@@ -211,7 +211,7 @@ interface Storage {
 Storage is passed to the framework at initialization:
 
 ```
-const p2 = P2.create({ storage: new SurrealDBStorage(), ... })
+const peerkit = Peerkit.create({ storage: new SurrealDBStorage(), ... })
 ```
 
 The same storage instance is shared across all layers. Layers do not instantiate storage themselves.
@@ -224,7 +224,7 @@ Responsible for establishing connections between peers and discovering other pee
 
 #### Zero infrastructure
 
-If the transport permits it, P2 does not require dedicated infrastructure. The roles traditionally served by infrastructure (bootstrapping, signaling, relaying) are served by peers themselves. Every "server" in a P2 network is a full participant running the same application. This entails that hosted relay nodes must be part of the network, which increases the burden on the app provider. This architecture is possible with libp2p, but not with iroh as the transport.
+If the transport permits it, Peerkit does not require dedicated infrastructure. The roles traditionally served by infrastructure (bootstrapping, signaling, relaying) are served by peers themselves. Every "server" in a Peerkit network is a full participant running the same application. This entails that hosted relay nodes must be part of the network, which increases the burden on the app provider. This architecture is possible with libp2p, but not with iroh as the transport.
 
 There are three infrastructure roles that must be covered:
 
@@ -362,7 +362,7 @@ Routing opaque blobs to the right peers so that layers above can create eventual
 
 #### Data distribution interface
 
-Layer 1 provides blob distribution across peers. It does not prescribe how blobs are routed — the distribution strategy is pluggable via dependency injection. P2 ships a full replication default in the MVP.
+Layer 1 provides blob distribution across peers. It does not prescribe how blobs are routed — the distribution strategy is pluggable via dependency injection. Peerkit ships a full replication default in the MVP.
 
 **Core concept**: Every blob has a content hash (its identity). Layer 1 ensures blobs reach the peers that should have them, according to the active distribution strategy. Layer 1 does not define a key space or routing topology — those are concerns of the distribution strategy.
 
@@ -394,7 +394,7 @@ A summary must be compact enough to exchange on every connection. The exact repr
 
 #### Connection management
 
-Each peer maintains connections to a bounded number of peers. The connection management strategy is pluggable via dependency injection, like the distribution strategy. P2 ships a default that connects to all peers.
+Each peer maintains connections to a bounded number of peers. The connection management strategy is pluggable via dependency injection, like the distribution strategy. Peerkit ships a default that connects to all peers.
 
 Example strategies:
 
@@ -543,7 +543,7 @@ Causal links form a DAG (directed acyclic graph) of state changes per entity. Th
 
 #### Built-in CRDT: CRUD object
 
-P2 ships one built-in CRDT: a CRUD object. The following are the state changes it allows:
+Peerkit ships one built-in CRDT: a CRUD object. The following are the state changes it allows:
 
 - **CreateEntry**: establishes a new logical entity. The blob ID of this state change becomes the entity's identity.
 - **UpdateEntry**: targets a CreateEntry (by blob ID) and carries causal links to the previous state changes the author had seen. Payload contains the new state.
@@ -589,7 +589,7 @@ Gossip treats a missing blob as something to repair. A pruned blob also looks mi
 
 ##### Possible solution: epoch-based pruning with snapshot sync
 
-P2 uses **epochs** — coordinated time windows that bound tombstone retention and define the sync protocol:
+Peerkit uses **epochs** — coordinated time windows that bound tombstone retention and define the sync protocol:
 
 1. Peers store tombstone records (compact: hash + deletion timestamp) for the duration of one epoch.
 2. After an epoch boundary, tombstones from previous epochs are dropped.
@@ -632,7 +632,7 @@ Update chain pruning is an open problem. Two structural issues make it difficult
 
 For real-time collaborative editing (e.g. the knowledge base showcase app), the framework supports CRDT library integration. Instead of coarse-grained UpdateEntry state changes, an app can use fine-grained CRDT operations (e.g. Yjs operations for text editing).
 
-These operations are still blobs, published and synced through Layers 1-3. The CRDT library handles merge semantics — the framework just transports the operations. This keeps P2 agnostic to the specific CRDT implementation while enabling rich collaborative features.
+These operations are still blobs, published and synced through Layers 1-3. The CRDT library handles merge semantics — the framework just transports the operations. This keeps Peerkit agnostic to the specific CRDT implementation while enabling rich collaborative features.
 
 #### API
 
@@ -669,7 +669,7 @@ Not yet specified. Potential areas:
 
 #### Upgradability
 
-Upgrading apps in a P2P network is fundamentally harder than in client-server: there is no central point to deploy updates to. Peers update independently, at different times, and the network will have peers running different versions simultaneously — potentially for a long time. P2 must make this easy and smooth.
+Upgrading apps in a P2P network is fundamentally harder than in client-server: there is no central point to deploy updates to. Peers update independently, at different times, and the network will have peers running different versions simultaneously — potentially for a long time. Peerkit must make this easy and smooth.
 
 **Schema versioning**: Schemas (Layer 2) carry a version number. When a schema evolves (new fields, changed structure), the new version is published as a new schema blob. Old schema blobs remain in the network. Peers on the new version must handle data created under old schemas.
 
@@ -687,9 +687,9 @@ Target: millions of nodes over time. Scalability is addressed at three levels:
 
 **Connections**: Each peer maintains a bounded number of connections (O(log N) or a configured maximum). No operation requires contacting all peers.
 
-**Data distribution**: P2 defines a pluggable distribution strategy interface but does not prescribe a routing topology. The distribution strategy is injected by the developer. P2 ships full replication as the built-in default. See Layer 1 for the interface and example strategies (DHT, direct replication, topic-based).
+**Data distribution**: Peerkit defines a pluggable distribution strategy interface but does not prescribe a routing topology. The distribution strategy is injected by the developer. Peerkit ships full replication as the built-in default. See Layer 1 for the interface and example strategies (DHT, direct replication, topic-based).
 
-**Destructive edits**: This is critical for long-term storage scalability. P2 is not append-only at the protocol level. Data that has been superseded, deleted, or pruned can be fully removed over time. Without destructive edits, storage grows monotonically regardless of sharding, and networks eventually become unusable on constrained devices. Higher layers define the semantics of when pruning is appropriate. Tombstone storage is bounded through epoch-based compaction combined with snapshot-based anti-entropy for returning peers. See Layer 4's "Destructive edits and pruning" section for the full design.
+**Destructive edits**: This is critical for long-term storage scalability. Peerkit is not append-only at the protocol level. Data that has been superseded, deleted, or pruned can be fully removed over time. Without destructive edits, storage grows monotonically regardless of sharding, and networks eventually become unusable on constrained devices. Higher layers define the semantics of when pruning is appropriate. Tombstone storage is bounded through epoch-based compaction combined with snapshot-based anti-entropy for returning peers. See Layer 4's "Destructive edits and pruning" section for the full design.
 
 **Resource budgets** (future): Each peer advertises its capacity (storage, bandwidth, connection count). The framework respects these limits and distributes load accordingly. Constrained devices (mobile, old hardware) take on less responsibility without being excluded from the network.
 
