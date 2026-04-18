@@ -12,17 +12,17 @@ import type {
   IConnection,
   INewAddressHandler,
   ITransport,
-  NetworkAccessPass,
+  NetworkAccessBytes,
   RelayConfig,
 } from "./types/index.js";
 
 /**
- * Configuration options for the Libp2p transport.
+ * Configuration options for the Libp2p transport
  */
 export interface TransportLibp2pConfig {
-  /** The address the node should bind to. */
+  /** The address the node should bind to */
   addrs?: string[];
-  /** An identifier that is included as a log property. */
+  /** An identifier that is included as a log property */
   id?: string;
 }
 
@@ -76,7 +76,7 @@ export class TransportLibp2p implements ITransport {
 
   async connect(
     addr: Multiaddr,
-    pass: NetworkAccessPass,
+    pass: NetworkAccessBytes,
   ): Promise<IConnection> {
     this.logger.debug("connecting {*}", { addr });
     await this.libp2p.dial(addr);
@@ -95,7 +95,7 @@ export class TransportLibp2p implements ITransport {
     }
   }
 
-  onConnect(handler: (pass: NetworkAccessPass) => boolean): void {
+  onConnect(handler: (pass: NetworkAccessBytes) => boolean): void {
     handler(new Uint8Array());
   }
 
