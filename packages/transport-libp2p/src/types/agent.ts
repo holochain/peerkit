@@ -20,4 +20,4 @@ export interface RelayConfig {
 /**
  * Byte sequence to prove access to a network has been granted
  */
-export type NetworkAccessPass = Uint8Array;
+export type NetworkAccessBytes = Uint8Array;

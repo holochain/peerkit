@@ -285,12 +285,12 @@ All transports use encrypted channels (Noise protocol for TCP, DTLS for WebRTC).
 
 ##### Network access control
 
-Networks are **closed by default**. Every incoming connection must present a network access pass before any application data is exchanged. This is enforced at the transport level as part of the connection handshake:
+Networks are **closed by default**. Every incoming connection must present network access bytes before any application data is exchanged. This is enforced at the transport level as part of the connection handshake:
 
-- After a connection is established and encrypted, the connecting peer must present a network access pass
-- The pass is passed to the `onConnect` hook
+- After a connection is established and encrypted, the connecting peer must present network access bytes
+- The bytes are passed to the `onConnect` hook
 - If the hook rejects, the connection is dropped immediately and the peer is blocked.
-- No application data is sent or received before the pass is accepted
+- No application data is sent or received before the bytes are accepted
 
 To make a network open, the app explicitly sets the network access check to accept all connections. This is an opt-out, not the default.
 
@@ -313,7 +313,7 @@ interface RelayConfig {
 }
 
 // Byte sequence to prove access to a network has been granted
-type NetworkAccessPass = Uint8Array;
+type NetworkAccessBytes = Uint8Array;
 ```
 
 **API**:
@@ -321,8 +321,8 @@ Transport is injected as a dependency. The rest of the system interacts with it 
 
 ```typescript
 interface ITransport {
-  // Establish a connection to a peer, presenting a network access pass
-  connect(peerId: PeerId, pass: NetworkAccessPass): Promise<Connection>;
+  // Establish a connection to a peer, presenting network access bytes
+  connect(peerId: PeerId, pass: NetworkAccessBytes): Promise<Connection>;
 
   // Accept incoming connections (not available in browsers)
   listen(): void;
@@ -338,10 +338,10 @@ interface ITransport {
   // Configure this peer's willingness and resource limits for relaying traffic
   setRelayConfig(config: RelayConfig): void;
 
-  // Hook called on each incoming connection with the peer's network access pass.
+  // Hook called on each incoming connection with the peer's network access bytes.
   // Return true to accept, false to reject and drop the connection.
   onConnect(
-    handler: (peerId: PeerId, pass: NetworkAccessPass) => boolean,
+    handler: (peerId: PeerId, pass: NetworkAccessBytes) => boolean,
   ): void;
 }
 ```
@@ -357,7 +357,7 @@ Routing opaque blobs to the right peers so that layers above can create eventual
 - Peer responsibility coverage tracking and automatic management for adequate coverage
 - Generic data and agent identifiers (future-proofing)
 - Does not store blobs itself, but tracks what blobs have been received and integrated
-- Implements evaluation of incoming network access pass to allow or deny connections
+- Implements evaluation of incoming network access bytes to allow or deny connections
 - Resource budgets (future): each peer advertises its willingness to relay data
 
 #### Data distribution interface
@@ -724,7 +724,7 @@ Not every app needs all 4 layers. The layers are additive — each builds on the
 
 - js-libp2p transport with manual bootstrap address entry
 - Encrypted connections (Noise protocol)
-- Network access pass handshake (closed networks by default)
+- Network access bytes handshake (closed networks by default)
 - Publish and get opaque blobs (full replication — every peer stores everything)
 - Block/unblock peers
 - Gossip to propagate new blobs to connected peers
