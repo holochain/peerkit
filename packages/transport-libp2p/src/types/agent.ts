@@ -16,8 +16,3 @@ export interface IAgentInfo {
 export interface RelayConfig {
   canRelay: boolean;
 }
-
-/**
- * Byte sequence to prove access to a network has been granted
- */
-export type NetworkAccessBytes = Uint8Array;
