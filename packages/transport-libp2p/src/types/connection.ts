@@ -1,3 +1,5 @@
 export interface IConnection {
-  send(): void;
+  isClosed(): boolean;
+
+  send(data: Uint8Array): void;
 }

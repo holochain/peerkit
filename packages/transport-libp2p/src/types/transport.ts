@@ -1,8 +1,16 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
-import type { AgentId, NetworkAccessBytes, RelayConfig } from "./agent.js";
+import type { AgentId, RelayConfig } from "./agent.js";
 import type { IConnection } from "./connection.js";
 
-export type INewAddressHandler = (addrs: Multiaddr[]) => void;
+/**
+ * Interface of a handler for new listening addresses.
+ */
+export type NewAddressHandler = (addrs: Multiaddr[]) => void;
+
+/**
+ * Byte sequence to prove access to a network has been granted
+ */
+export type NetworkAccessBytes = Uint8Array;
 
 export interface ITransport {
   /**
@@ -14,13 +22,15 @@ export interface ITransport {
    * Hook called when the node observes a new address it can be contacted
    * at.
    */
-  onNewAddress(handler: INewAddressHandler): void;
+  setNewAddressesHandler(handler: NewAddressHandler): void;
 
   /**
    * Hook called on each incoming connection with the peer's network access bytes.
    * Return true to accept, false to reject and drop the connection.
    */
-  onConnect(handler: (bytes: NetworkAccessBytes) => boolean): void;
+  setNetworkAccessHandler(
+    handler: (bytes: NetworkAccessBytes) => boolean,
+  ): void;
 
   /**
    * Send data to a peer. Each message uses a short-lived stream, avoiding
