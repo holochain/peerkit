@@ -1,3 +1,7 @@
+import getPort from "get-port";
+import { TransportLibp2p } from "../src";
+import { INetworkAccessHandler, IMessageHandler } from "../src/types";
+
 /**
  * Sleep for the provided duration.
  *
@@ -35,4 +39,32 @@ export const retryFnUntilTimeout = async (
 
     await sleep(sleepMs);
   }
+};
+
+/**
+ * Creates a test transport.
+ *
+ * @param id Optional string to identify the node in logs
+ * @param networkAccessHandler Optional handler for network access checks. Defaults to denying all access.
+ * @param messageHandler Optional message handler. Defaults to no-op.
+ * @returns A Peerkit transport
+ */
+export const createTransport = async (
+  id?: string,
+  networkAccessHandler?: INetworkAccessHandler,
+  messageHandler?: IMessageHandler,
+) => {
+  const port = await getPort({ port: [30_000, 40_000] });
+  const address = `/ip4/0.0.0.0/tcp/${port}`;
+  networkAccessHandler = networkAccessHandler ?? (() => false);
+  messageHandler = messageHandler ?? (() => {});
+  const node = await TransportLibp2p.create(
+    networkAccessHandler,
+    messageHandler,
+    {
+      addrs: [address],
+      id,
+    },
+  );
+  return { node, address };
 };

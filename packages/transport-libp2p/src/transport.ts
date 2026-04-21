@@ -5,12 +5,18 @@ import { tcp } from "@libp2p/tcp";
 import { getLogger, type Logger } from "@logtape/logtape";
 import { type Multiaddr } from "@multiformats/multiaddr";
 import type { Libp2p } from "libp2p";
-import type { Stream, Connection as Libp2pConnection } from "@libp2p/interface";
+import type {
+  Stream,
+  Connection as Libp2pConnection,
+  PeerId,
+} from "@libp2p/interface";
 import { createLibp2p } from "libp2p";
 import { Connection } from "./connection.js";
 import type {
   AgentId,
+  INetworkAccessHandler,
   IConnection,
+  IMessageHandler,
   NewAddressHandler,
   ITransport,
   NetworkAccessBytes,
@@ -27,9 +33,22 @@ export interface TransportLibp2pConfig {
   id?: string;
 }
 
-type IConnectHandler = (bytes: NetworkAccessBytes) => boolean;
+type PeerAccessMap = Map<PeerId, boolean>;
 
-const ACCESS_PROTOCOL = "/peerkit/access/v1";
+/**
+ * Identifier for the current network access protocol in Peerkit.
+ * This protocol expects the network access bytes to be transmitted as
+ * the only message. Based on validity of the bytes, access is granted
+ * or denied.
+ */
+export const CURRENT_ACCESS_PROTOCOL = "/peerkit/access/v1";
+
+/**
+ * Identifier for the current messaging protocol in Peerkit.
+ * Once access has been granted through a stream with the access protocol,
+ * a new stream with this protocol can be opened to start sending messages.
+ */
+export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
 
 /**
  * The official peerkit transport based on Libp2p.
@@ -37,16 +56,30 @@ const ACCESS_PROTOCOL = "/peerkit/access/v1";
 export class TransportLibp2p implements ITransport {
   private libp2p: Libp2p;
   private logger: Logger;
+  private networkAccessHandler: INetworkAccessHandler;
+  private messageHandler: IMessageHandler;
   private newAddressesHandler?: NewAddressHandler;
-  private networkAccessHandler?: IConnectHandler;
+  // White list of peers that were granted access to the network.
+  // This could also use the remote's address instead of the ID.
+  private peerAccessMap: PeerAccessMap;
 
-  constructor(libp2p: Libp2p, options?: TransportLibp2pConfig) {
+  constructor(
+    libp2p: Libp2p,
+    networkAccessHandler: INetworkAccessHandler,
+    messageHandler: IMessageHandler,
+    options?: TransportLibp2pConfig,
+  ) {
     libp2p.addEventListener("peer:identify", (event) =>
       this.onNewAddresses(event.detail.listenAddrs),
     );
 
-    // Handle incoming connections with the access protocol first.
-    libp2p.handle(ACCESS_PROTOCOL, this.onConnect);
+    // Handle streams with the access protocol.
+    // This must happen first on new connections.
+    libp2p.handle(CURRENT_ACCESS_PROTOCOL, this.onAccessConnect);
+
+    // Handle streams with the message protocol.
+    // After getting granted access, streams with this protocol are allowed.
+    libp2p.handle(CURRENT_MESSAGE_PROTOCOL, this.onMessageConnect);
 
     this.libp2p = libp2p;
 
@@ -60,9 +93,33 @@ export class TransportLibp2p implements ITransport {
       addresses: libp2p.getMultiaddrs(),
       id: options?.id,
     });
+
+    this.networkAccessHandler = networkAccessHandler;
+    this.messageHandler = messageHandler;
+
+    this.peerAccessMap = new Map();
   }
 
-  static async create(options?: TransportLibp2pConfig) {
+  /**
+   * Create a new Peerkit transport based on libp2p.
+   *
+   * The transport uses the TCP protocol for connections. Connections are
+   * encrypted and multiplexed for use with multiple streams.
+   *
+   * The transport binds to an available port on the local host.
+   *
+   * @param networkAccessHandler Hook called when a remote provides Network
+   * Access Bytes to prove access to the network. Return true to accept,
+   * false to reject and drop the connection.
+   * @param messageHandler Hook called on each incoming messsage.
+   * @param options {@link TransportLibp2pConfig}
+   * @returns An instance of a Peerkit transport
+   */
+  static async create(
+    networkAccessHandler: INetworkAccessHandler,
+    messageHandler: IMessageHandler,
+    options?: TransportLibp2pConfig,
+  ) {
     const libp2pNode = await createLibp2p({
       transports: [tcp()],
       connectionEncrypters: [noise()],
@@ -74,7 +131,12 @@ export class TransportLibp2p implements ITransport {
     });
     await libp2pNode.start();
 
-    return new TransportLibp2p(libp2pNode, options);
+    return new TransportLibp2p(
+      libp2pNode,
+      networkAccessHandler,
+      messageHandler,
+      options,
+    );
   }
 
   async connect(
@@ -83,9 +145,16 @@ export class TransportLibp2p implements ITransport {
   ): Promise<IConnection> {
     this.logger.debug("connecting {*}", { addr });
     const connection = await this.libp2p.dial(addr);
-    const stream = await connection.newStream(ACCESS_PROTOCOL);
-    stream.send(bytes);
-    return new Connection(connection, stream);
+
+    // Prove access to network by sending Network Access Bytes over access stream.
+    const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+    accessStream.send(bytes);
+    await accessStream.close();
+
+    // Open message stream to start exchanging messages with peer.
+    const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+
+    return new Connection(connection, messageStream);
   }
 
   setNewAddressesHandler(handler: NewAddressHandler): void {
@@ -104,45 +173,99 @@ export class TransportLibp2p implements ITransport {
     }
   }
 
-  setNetworkAccessHandler(handler: IConnectHandler): void {
-    this.networkAccessHandler = handler;
-  }
-
+  /*
+   * Handler that expects the Network Access Bytes as the first and only message.
+   * Closes connection if access is denied.
+   */
   // Method directly used as a callback, so an arrow class field must be used to
   // preserve the `this` reference.
-  private onConnect = async (stream: Stream, connection: Libp2pConnection) => {
-    this.logger.info("Incoming stream {*}", {
-      stream,
-      connection,
-      ACCESS_PROTOCOL,
+  private onAccessConnect = async (
+    stream: Stream,
+    connection: Libp2pConnection,
+  ) => {
+    this.logger.info(`Incoming stream {*}`, {
+      CURRENT_ACCESS_PROTOCOL,
+      remoteId: connection.remotePeer,
     });
     stream.addEventListener(
       "message",
       async (message) => {
-        this.logger.info("Incoming message {*}", { message });
+        this.logger.info(`Incoming message {*}`, {
+          remoteId: connection.remotePeer,
+          CURRENT_ACCESS_PROTOCOL,
+        });
         if (this.networkAccessHandler) {
           const bytes =
             message.data instanceof Uint8Array
               ? message.data
               : message.data.subarray(); // In case the incoming bytes are an array of chunks of bytes.
-          // Check if network access is granted.
-          if (!this.networkAccessHandler(bytes)) {
+
+          // Check if network access is granted and update access map.
+          const accessGranted = this.networkAccessHandler(bytes);
+          this.peerAccessMap.set(connection.remotePeer, accessGranted);
+          this.logger.info("Access {*}", {
+            remoteId: connection.remotePeer,
+            accessGranted,
+          });
+          if (!accessGranted) {
             // Network access denied. Close connection.
             this.logger.warn(
               "Invalid network access bytes. Closing connection.",
             );
             await connection.close();
           }
-        } else {
-          // No network connection handler set. Close connection.
-          this.logger.error(
-            "No connection handler set. If connections should be unrestricted, set a connection handler that always returns `true`. Closing connection.",
-          );
-          await connection.close();
         }
       },
       { once: true },
     );
+  };
+
+  /*
+   * Handler to exchange all messages with peers.
+   *
+   * If network access bytes have not been provided yet or access has been denied,
+   * connection is closed.
+   */
+  // Method directly used as a callback, so an arrow class field must be used to
+  // preserve the `this` reference.
+  private onMessageConnect = async (
+    stream: Stream,
+    connection: Libp2pConnection,
+  ) => {
+    this.logger.info(`Incoming stream {*}`, {
+      CURRENT_MESSAGE_PROTOCOL,
+      remoteId: connection.remotePeer,
+    });
+    // Strictly this should check if `.get()` is `undefined`. The access check closes
+    // connections so fast that the remote cannot open a message stream, so this case
+    // can never happen.
+    //
+    // But it doesn't harm to handle all falsy values here.
+    if (!this.peerAccessMap.get(connection.remotePeer)) {
+      // Peer has not requested access to the network. Close connection.
+      this.logger.warn(
+        "Remote peer tried to open a message stream without requesting access. Closing connection. {*}",
+        { remotePeerId: connection.remotePeer },
+      );
+      await connection.close();
+      return;
+    }
+
+    stream.addEventListener("message", async (message) => {
+      this.logger.debug(
+        `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
+        { message },
+      );
+      console.log("message is instance of", message.data.constructor);
+      if (!(message.data instanceof Uint8Array)) {
+        console.log("message.data arraylist is", message.data);
+      }
+      const data =
+        message.data instanceof Uint8Array
+          ? message.data
+          : message.data.subarray(); // In case the incoming message is an array of chunks of bytes.
+      this.messageHandler(data);
+    });
   };
 
   async send(agentId: AgentId, data: Uint8Array): Promise<void> {
@@ -151,7 +274,7 @@ export class TransportLibp2p implements ITransport {
   }
 
   setRelayConfig(config: RelayConfig): void {
-    this.logger.debug("setting relay config {*}", { config });
+    this.logger.info("setting relay config {*}", { config });
   }
 
   async stop() {
