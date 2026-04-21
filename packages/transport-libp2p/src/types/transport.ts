@@ -12,6 +12,20 @@ export type INewAddressHandler = (addrs: Multiaddr[]) => void;
  */
 export type NetworkAccessBytes = Uint8Array;
 
+/**
+ * Interface to handle incoming access streams.
+ *
+ * An access stream uses the {@link CURRENT_ACCESS_PROTOCOL} and expects
+ * the Network Access Bytes as the first and only message, to check if
+ * a peer has access to the network or not.
+ */
+export type INetworkAccessHandler = (bytes: NetworkAccessBytes) => boolean;
+
+/**
+ * Interface to handle incoming messages from a message stream.
+ */
+export type IMessageHandler = (message: Uint8Array) => void;
+
 export interface ITransport {
   /**
    * Establish a connection to a peer, presenting a network access pass.
@@ -23,14 +37,6 @@ export interface ITransport {
    * at.
    */
   setNewAddressesHandler(handler: INewAddressHandler): void;
-
-  /**
-   * Hook called on each incoming connection with the peer's network access bytes.
-   * Return true to accept, false to reject and drop the connection.
-   */
-  setNetworkAccessHandler(
-    handler: (bytes: NetworkAccessBytes) => boolean,
-  ): void;
 
   /**
    * Send data to a peer. Each message uses a short-lived stream, avoiding
