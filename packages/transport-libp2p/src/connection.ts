@@ -1,5 +1,6 @@
 import type { IConnection } from "./types/connection.js";
 import type { Stream, Connection as Libp2pConnection } from "@libp2p/interface";
+import { encodeFrame } from "./frame.js";
 
 export class Connection implements IConnection {
   private connection: Libp2pConnection;
@@ -15,6 +16,6 @@ export class Connection implements IConnection {
   }
 
   send(data: Uint8Array): void {
-    this.stream.send(data);
+    this.stream.send(encodeFrame(data));
   }
 }
