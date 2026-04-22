@@ -158,7 +158,39 @@ test("Send a message after having been granted access", async () => {
   connection.send(encoder.encode("hello"));
 
   await retryFnUntilTimeout(async () => receivedMessages.length === 1);
-  assert.equal(receivedMessages[0].toString(), "hello");
+  assert.equal(new TextDecoder().decode(receivedMessages[0]), "hello");
+
+  await node2.stop();
+  await node1.stop();
+});
+
+test("Large messages are chunked and received correctly", async () => {
+  // Define an access handler
+  const VALID_ACCESS_BYTES = "pass";
+  const networkAccessHandler: INetworkAccessHandler = (bytes) =>
+    bytes.toString() === VALID_ACCESS_BYTES;
+  // Define a message handler that stores received message for later assertion
+  const receivedMessages: Uint8Array[] = [];
+  const messageHandler: IMessageHandler = (message) =>
+    receivedMessages.push(message);
+  // Create a node that will receive the message
+  const { node: node1, address: address1 } = await createTransport(
+    "node1",
+    networkAccessHandler,
+    messageHandler,
+  );
+
+  // Node 2 connects to node 1 and sends a large message.
+  const encoder = new TextEncoder();
+  const { node: node2 } = await createTransport("node2");
+  const connection = await node2.connect(
+    multiaddr(address1),
+    encoder.encode(VALID_ACCESS_BYTES),
+  );
+  connection.send(new Uint8Array(1024 * 300));
+
+  await retryFnUntilTimeout(async () => receivedMessages.length === 1, 2000);
+  assert.deepEqual(receivedMessages[0], new Uint8Array(1024 * 300));
 
   await node2.stop();
   await node1.stop();
