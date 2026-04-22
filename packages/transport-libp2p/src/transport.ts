@@ -12,6 +12,7 @@ import type {
 } from "@libp2p/interface";
 import { createLibp2p } from "libp2p";
 import { Connection } from "./connection.js";
+import { FrameDecoder } from "./frame.js";
 import type {
   AgentId,
   INetworkAccessHandler,
@@ -37,6 +38,7 @@ type PeerAccessMap = Map<PeerId, boolean>;
 
 /**
  * Identifier for the current network access protocol in Peerkit.
+ *
  * This protocol expects the network access bytes to be transmitted as
  * the only message. Based on validity of the bytes, access is granted
  * or denied.
@@ -45,6 +47,7 @@ export const CURRENT_ACCESS_PROTOCOL = "/peerkit/access/v1";
 
 /**
  * Identifier for the current messaging protocol in Peerkit.
+ *
  * Once access has been granted through a stream with the access protocol,
  * a new stream with this protocol can be opened to start sending messages.
  */
@@ -251,20 +254,19 @@ export class TransportLibp2p implements ITransport {
       return;
     }
 
+    const decoder = new FrameDecoder();
     stream.addEventListener("message", async (message) => {
-      this.logger.debug(
-        `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
-        { message },
-      );
-      console.log("message is instance of", message.data.constructor);
-      if (!(message.data instanceof Uint8Array)) {
-        console.log("message.data arraylist is", message.data);
-      }
-      const data =
+      const chunk =
         message.data instanceof Uint8Array
           ? message.data
-          : message.data.subarray(); // In case the incoming message is an array of chunks of bytes.
-      this.messageHandler(data);
+          : message.data.subarray();
+      for (const msg of decoder.feed(chunk)) {
+        this.logger.debug(
+          `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
+          { byteLength: msg.byteLength },
+        );
+        this.messageHandler(msg);
+      }
     });
   };
 
