@@ -42,6 +42,15 @@ Run from repo root unless noted.
 
 Vitest runs with `--run` by default (CI-style, no watch).
 
+### CI checks
+
+Before declaring work done, run the same checks CI runs (`.github/workflows/test.yml`). All four must pass:
+
+- `npm run lint`
+- `npx prettier . --check`
+- `npm run build`
+- `npm test`
+
 ## Architecture — transport layer
 
 `ITransport` (`packages/transport-libp2p/src/types/transport.ts`) is the contract a transport must satisfy. `TransportLibp2p` is the reference implementation.

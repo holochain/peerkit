@@ -14,5 +14,5 @@ export class Connection implements IConnection {
     return this.connection.status === "closed";
   }
 
-  send(data: Uint8Array): void {}
+  send(_data: Uint8Array): void {}
 }
