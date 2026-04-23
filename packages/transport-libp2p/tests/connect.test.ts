@@ -10,7 +10,10 @@ import {
 import { Multiaddr, multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test } from "vitest";
-import { CURRENT_MESSAGE_PROTOCOL } from "../src/index.js";
+import {
+  CURRENT_ACCESS_PROTOCOL,
+  CURRENT_MESSAGE_PROTOCOL,
+} from "../src/index.js";
 import {
   IMessageHandler,
   INetworkAccessHandler,
@@ -62,7 +65,11 @@ test("A node can connect to a bootstrap node and identify its own listening addr
     node.setNewAddressesHandler((addrs) => resolve(addrs));
     setTimeout(reject, 1000);
   });
-  await node.connect(multiaddr(bootstrapNodeAddress), new Uint8Array(1));
+  await node.connect(
+    multiaddr(bootstrapNodeAddress),
+    new Uint8Array(32),
+    new Uint8Array(1),
+  );
 
   // Wait for the new listening addresses to have been identified.
   const newAddresses = await newAddressPromise;
@@ -84,6 +91,7 @@ test("Invalid network access bytes closes connection", async () => {
   await expect(
     invalidNode.connect(
       multiaddr(validNodeAddress),
+      new Uint8Array(32),
       new TextEncoder().encode("invalid"),
     ),
   ).rejects.toThrow();
@@ -106,6 +114,27 @@ test("Opening a stream with an unknown protocol fails", async () => {
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   await expect(connection.newStream("/unknown/protocol")).rejects.toThrow();
+
+  await libp2pNode.stop();
+  await node.stop();
+});
+
+test("Sending malformed bytes on the access stream closes the connection", async () => {
+  const { node, address } = await createTransport("valid", () => true);
+
+  const libp2pNode = await createLibp2p({
+    transports: [tcp()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+  });
+  const connection = await libp2pNode.dial(multiaddr(address));
+  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+  accessStream.send(new Uint8Array([0xff, 0xff, 0xff, 0xff]));
+  await accessStream.close();
+
+  // Connection should be closed after the malformed handshake.
+  await retryFnUntilTimeout(async () => connection.status === "closed");
 
   await libp2pNode.stop();
   await node.stop();
@@ -153,6 +182,7 @@ test("Send a message after having been granted access", async () => {
   const { node: node2 } = await createTransport("node2");
   const connection = await node2.connect(
     multiaddr(address1),
+    new Uint8Array(32),
     encoder.encode(VALID_ACCESS_BYTES),
   );
   connection.send(encoder.encode("hello"));
@@ -185,6 +215,7 @@ test("Large messages are chunked and received correctly", async () => {
   const { node: node2 } = await createTransport("node2");
   const connection = await node2.connect(
     multiaddr(address1),
+    new Uint8Array(32),
     encoder.encode(VALID_ACCESS_BYTES),
   );
   connection.send(new Uint8Array(1024 * 300));

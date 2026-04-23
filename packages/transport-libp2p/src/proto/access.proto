@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+message NetworkAccessHandshake {
+  bytes agent_id = 1;
+  bytes network_access_bytes = 2;
+}
