@@ -13,6 +13,7 @@ import type {
 import { createLibp2p } from "libp2p";
 import { Connection } from "./connection.js";
 import { FrameDecoder } from "./frame.js";
+import { NetworkAccessHandshake } from "./proto/access.js";
 import type {
   AgentId,
   INetworkAccessHandler,
@@ -152,14 +153,17 @@ export class TransportLibp2p implements ITransport {
 
   async connect(
     addr: Multiaddr,
-    bytes: NetworkAccessBytes,
+    agentId: AgentId,
+    networkAccessBytes: NetworkAccessBytes,
   ): Promise<IConnection> {
     this.logger.debug("connecting {*}", { addr });
     const connection = await this.libp2p.dial(addr);
 
-    // Prove access to network by sending Network Access Bytes over access stream.
+    // Send handshake with agent ID and network access bytes over access stream.
     const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-    accessStream.send(bytes);
+    accessStream.send(
+      NetworkAccessHandshake.encode({ agentId, networkAccessBytes }),
+    );
     await accessStream.close();
 
     // Open message stream to start exchanging messages with peer.
@@ -205,26 +209,36 @@ export class TransportLibp2p implements ITransport {
           remoteId: connection.remotePeer,
           CURRENT_ACCESS_PROTOCOL,
         });
-        if (this.networkAccessHandler) {
-          const bytes =
-            message.data instanceof Uint8Array
-              ? message.data
-              : message.data.subarray(); // In case the incoming bytes are an array of chunks of bytes.
+        const raw =
+          message.data instanceof Uint8Array
+            ? message.data
+            : message.data.subarray();
 
-          // Check if network access is granted and update access map.
-          const accessGranted = this.networkAccessHandler(bytes);
-          this.peerAccessMap.set(connection.remotePeer, accessGranted);
-          this.logger.info("Access {*}", {
-            remoteId: connection.remotePeer,
-            accessGranted,
-          });
-          if (!accessGranted) {
-            // Network access denied. Close connection.
-            this.logger.warn(
-              "Invalid network access bytes. Closing connection.",
-            );
-            await connection.close();
-          }
+        let handshake: NetworkAccessHandshake;
+        try {
+          handshake = NetworkAccessHandshake.decode(raw);
+        } catch {
+          // Catch malformed handshake errors
+          this.logger.error(
+            "Failed to decode access handshake. Closing connection.",
+          );
+          await connection.close();
+          return;
+        }
+
+        // Check if network access is granted and update access map.
+        const accessGranted = this.networkAccessHandler(
+          handshake.networkAccessBytes,
+        );
+        this.peerAccessMap.set(connection.remotePeer, accessGranted);
+        this.logger.info("Access {*}", {
+          remoteId: connection.remotePeer,
+          accessGranted,
+        });
+        if (!accessGranted) {
+          // Network access denied. Close connection.
+          this.logger.warn("Invalid network access bytes. Closing connection.");
+          await connection.close();
         }
       },
       { once: true },
