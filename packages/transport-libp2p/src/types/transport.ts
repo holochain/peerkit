@@ -28,9 +28,14 @@ export type IMessageHandler = (message: Uint8Array) => void;
 
 export interface ITransport {
   /**
-   * Establish a connection to a peer, presenting a network access pass.
+   * Establish a connection to a peer, presenting this node's agent ID and
+   * network access bytes.
    * */
-  connect(addr: Multiaddr, pass: NetworkAccessBytes): Promise<IConnection>;
+  connect(
+    addr: Multiaddr,
+    agentId: AgentId,
+    networkAccessBytes: NetworkAccessBytes,
+  ): Promise<IConnection>;
 
   /**
    * Hook called when the node observes a new address it can be contacted
