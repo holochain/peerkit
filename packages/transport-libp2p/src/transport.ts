@@ -96,7 +96,7 @@ export class TransportLibp2p implements ITransport {
   }
 
   private async onNewAddresses(addrs: Multiaddr[]) {
-    this.logger.info("New listening addresses: {addr}", { addrs });
+    this.logger.info("New listening addresses: {addrs}", { addrs });
     if (this.newAddressesHandler) {
       this.newAddressesHandler(addrs);
     } else {
@@ -116,27 +116,33 @@ export class TransportLibp2p implements ITransport {
       connection,
       ACCESS_PROTOCOL,
     });
-    stream.addEventListener("message", async (message) => {
-      this.logger.info("Incoming message {*}", { message });
-      if (this.networkAccessHandler) {
-        const bytes =
-          message.data instanceof Uint8Array
-            ? message.data
-            : message.data.subarray(); // In case the incoming bytes are an array of chunks of bytes.
-        // Check if network access is granted.
-        if (!this.networkAccessHandler(bytes)) {
-          // Network access denied. Close connection.
-          this.logger.warn("Invalid network access bytes. Closing connection.");
+    stream.addEventListener(
+      "message",
+      async (message) => {
+        this.logger.info("Incoming message {*}", { message });
+        if (this.networkAccessHandler) {
+          const bytes =
+            message.data instanceof Uint8Array
+              ? message.data
+              : message.data.subarray(); // In case the incoming bytes are an array of chunks of bytes.
+          // Check if network access is granted.
+          if (!this.networkAccessHandler(bytes)) {
+            // Network access denied. Close connection.
+            this.logger.warn(
+              "Invalid network access bytes. Closing connection.",
+            );
+            await connection.close();
+          }
+        } else {
+          // No network connection handler set. Close connection.
+          this.logger.error(
+            "No connection handler set. If connections should be unrestricted, set a connection handler that always returns `true`. Closing connection.",
+          );
           await connection.close();
         }
-      } else {
-        // No network connection handler set. Close connection.
-        this.logger.error(
-          "No connection handler set. If connections should be unrestricted, set a connection handler that always returns `true`. Closing connection.",
-        );
-        await connection.close();
-      }
-    });
+      },
+      { once: true },
+    );
   };
 
   async send(agentId: AgentId, data: Uint8Array): Promise<void> {
