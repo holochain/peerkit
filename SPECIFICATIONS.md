@@ -318,12 +318,6 @@ interface ITransport {
   // Establish a connection to a peer, presenting network access bytes
   connect(peerId: PeerId, pass: NetworkAccessBytes): Promise<Connection>;
 
-  // Accept incoming connections (not available in browsers)
-  listen(): void;
-
-  // Find peers via mDNS, bootstrap addresses, or DHT
-  discover(): Promise<PeerAddress[]>;
-
   // Send data to a peer. Each message uses a short-lived stream, avoiding
   // the need for manual message framing. Stream creation is cheap enough
   // for expected message rates (sub-minute to tens per second).
