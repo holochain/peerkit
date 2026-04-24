@@ -139,7 +139,7 @@ The local agent's public identity is accessible after initialization:
 
 ```typescript
 const peerkit = await Peerkit.create({ storage: ..., transport: ... })
-const myId = peerkid.agent.id  // the local agent's public key (AgentId)
+const myId = peerkit.agent.id  // the local agent's public key (AgentId)
 ```
 
 `AgentInfo` is the public, shareable descriptor exchanged between peers and stored in the agent table. It contains everything needed to verify an agent's signatures and reach them on the network:
@@ -153,8 +153,6 @@ interface AgentInfo {
 ```
 
 Address selection among multiple addresses is handled internally by the transport (`ITransport.connect`) — callers do not need to pick.
-
-Agent identity is distinct from peer identity (`PeerId`), which is a network-level address. Both may be derived from the same keypair, but they serve different purposes: `PeerId` identifies a network endpoint, `AgentId` identifies an author across all their devices and sessions.
 
 **Signing**: State change blobs (Layer 4) are signed by their author using the agent's private key. Peers verify the signature when integrating a blob. This ensures that only the holder of the private key can produce state changes attributed to that agent — no central authority is needed.
 
@@ -299,14 +297,8 @@ To make a network open, the app explicitly sets the network access check to acce
 **Types**:
 
 ```typescript
-// Identifier for a peer
-type PeerId = Uint8ByteArray;
-
-// Address to dial a peer
-interface PeerAddress {
-  id: PeerId;
-  address: to be defined
-}
+// Identifier for an agent
+type AgentId = Uint8Array;
 
 interface RelayConfig {
   canRelay: boolean;
@@ -324,12 +316,6 @@ interface ITransport {
   // Establish a connection to a peer, presenting network access bytes
   connect(peerId: PeerId, pass: NetworkAccessBytes): Promise<Connection>;
 
-  // Accept incoming connections (not available in browsers)
-  listen(): void;
-
-  // Find peers via mDNS, bootstrap addresses, or DHT
-  discover(): Promise<PeerAddress[]>;
-
   // Send data to a peer. Each message uses a short-lived stream, avoiding
   // the need for manual message framing. Stream creation is cheap enough
   // for expected message rates (sub-minute to tens per second).
@@ -341,7 +327,7 @@ interface ITransport {
   // Hook called on each incoming connection with the peer's network access bytes.
   // Return true to accept, false to reject and drop the connection.
   onConnect(
-    handler: (peerId: PeerId, pass: NetworkAccessBytes) => boolean,
+    handler: (agentId: AgentId, bytes: NetworkAccessBytes) => boolean,
   ): void;
 }
 ```
