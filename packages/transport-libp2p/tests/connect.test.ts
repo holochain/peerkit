@@ -17,10 +17,7 @@ beforeEach(async () => {
         formatter: getAnsiColorFormatter({
           format({ timestamp, level, category, message, record }) {
             let output = `${timestamp} ${level} ${category}`;
-            if (
-              "id" in record.properties &&
-              typeof record.properties.id === "string"
-            ) {
+            if (typeof record.properties.id === "string") {
               output = output + ` ${record.properties.id}`;
             }
             output = output + `: ${message}`;
