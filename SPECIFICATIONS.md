@@ -154,8 +154,6 @@ interface AgentInfo {
 
 Address selection among multiple addresses is handled internally by the transport (`ITransport.connect`) — callers do not need to pick.
 
-Agent identity is distinct from peer identity (`PeerId`), which is a network-level address. Both may be derived from the same keypair, but they serve different purposes: `PeerId` identifies a network endpoint, `AgentId` identifies an author across all their devices and sessions.
-
 **Signing**: State change blobs (Layer 4) are signed by their author using the agent's private key. Peers verify the signature when integrating a blob. This ensures that only the holder of the private key can produce state changes attributed to that agent — no central authority is needed.
 
 #### Data validation
