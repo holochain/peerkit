@@ -299,14 +299,8 @@ To make a network open, the app explicitly sets the network access check to acce
 **Types**:
 
 ```typescript
-// Identifier for a peer
-type PeerId = Uint8ByteArray;
-
-// Address to dial a peer
-interface PeerAddress {
-  id: PeerId;
-  address: to be defined
-}
+// Identifier for an agent
+type AgentId = Uint8ByteArray;
 
 interface RelayConfig {
   canRelay: boolean;
@@ -341,7 +335,7 @@ interface ITransport {
   // Hook called on each incoming connection with the peer's network access bytes.
   // Return true to accept, false to reject and drop the connection.
   onConnect(
-    handler: (peerId: PeerId, pass: NetworkAccessBytes) => boolean,
+    handler: (agentId: AgentId, bytes: NetworkAccessBytes) => boolean,
   ): void;
 }
 ```
