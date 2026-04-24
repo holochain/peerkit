@@ -96,7 +96,7 @@ export class TransportLibp2p implements ITransport {
   }
 
   private async onNewAddresses(addrs: Multiaddr[]) {
-    this.logger.info("New listening addresses: {addr}", { addrs });
+    this.logger.info("New listening addresses: {addrs}", { addrs });
     if (this.newAddressesHandler) {
       this.newAddressesHandler(addrs);
     } else {
