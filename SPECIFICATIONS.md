@@ -298,7 +298,7 @@ To make a network open, the app explicitly sets the network access check to acce
 
 ```typescript
 // Identifier for an agent
-type AgentId = Uint8ByteArray;
+type AgentId = Uint8Array;
 
 interface RelayConfig {
   canRelay: boolean;
