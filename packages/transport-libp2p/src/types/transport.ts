@@ -31,7 +31,7 @@ export type IMessageHandler = (fromAgent: AgentId, message: Uint8Array) => void;
 /**
  * Callback to call when agents have been received from other nodes.
  */
-export type IAgentsReceivedHandler = (
+export type IAgentsReceivedCallback = (
   fromAgent: AgentId,
   bytes: Uint8Array,
 ) => void;
@@ -43,9 +43,5 @@ export interface ITransport {
   connect(agentId: AgentId): Promise<void>;
   send(agentId: AgentId, data: Uint8Array): Promise<void>;
   sendAgents(agentId: AgentId, data: Uint8Array): Promise<void>;
-  setNetworkAccessHandler(handler: INetworkAccessHandler): void;
-  setMessageHandler(handler: IMessageHandler): void;
-  setAgentsReceivedHandler(handler: IAgentsReceivedHandler): void;
-  setRelayConfig(config: RelayConfig): void;
   stop(): Promise<void>;
 }
