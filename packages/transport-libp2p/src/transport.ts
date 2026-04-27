@@ -15,6 +15,7 @@ import type {
   IMessageHandler,
   INetworkAccessHandler,
   ITransport,
+  NetworkAccessBytes,
 } from "./types/index.js";
 
 export interface TransportOptions {
@@ -135,7 +136,7 @@ export class TransportLibp2p implements ITransport {
     );
   }
 
-  async connect(_agentId: AgentId): Promise<void> {
+  async connect(_agentId: AgentId, _bytes: NetworkAccessBytes): Promise<void> {
     // Phase 3
     throw new Error("Not implemented");
   }

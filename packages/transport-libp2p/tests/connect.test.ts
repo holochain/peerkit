@@ -118,13 +118,15 @@ test("Opening a message stream without being granted access closes the connectio
 });
 
 test("Send a message after having been granted access", async () => {
+  // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
   const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
     bytes.toString() === VALID_ACCESS_BYTES;
   const receivedMessages: Uint8Array[] = [];
+  // Define a message handler that stores received message for later assertion
   const messageHandler: IMessageHandler = (_fromAgent, message) =>
     receivedMessages.push(message);
-
+  // Create a node that will receive the message
   const { node, address } = await createNode(
     "node1",
     undefined,
@@ -132,6 +134,7 @@ test("Send a message after having been granted access", async () => {
     messageHandler,
   );
 
+  // Create a node that will receive the message
   const encoder = new TextEncoder();
   const libp2pNode = await createLibp2p({
     transports: [tcp()],
@@ -139,6 +142,7 @@ test("Send a message after having been granted access", async () => {
     streamMuxers: [yamux()],
     addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
   });
+  // Connect to the first node, perform access handshake and send message
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
   accessStream.send(
@@ -160,13 +164,15 @@ test("Send a message after having been granted access", async () => {
 });
 
 test("Large messages are chunked and received correctly", async () => {
+  // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
   const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
     bytes.toString() === VALID_ACCESS_BYTES;
+  // Define a message handler that stores received message for later assertion
   const receivedMessages: Uint8Array[] = [];
   const messageHandler: IMessageHandler = (_fromAgent, message) =>
     receivedMessages.push(message);
-
+  // Create anode that will receive the message
   const { node, address } = await createNode(
     "node1",
     undefined,
@@ -192,6 +198,7 @@ test("Large messages are chunked and received correctly", async () => {
   await accessStream.close();
 
   const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+  // Send message that exceeds yamux message limit of 256 KiB.
   messageStream.send(encodeFrame(new Uint8Array(1024 * 300)));
 
   await retryFnUntilTimeout(async () => receivedMessages.length === 1, 2000);
