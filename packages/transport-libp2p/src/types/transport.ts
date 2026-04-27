@@ -40,7 +40,7 @@ export type IAgentsReceivedCallback = (
  * Interface that defines the methods a peerkit transport needs to implement.
  */
 export interface ITransport {
-  connect(agentId: AgentId): Promise<void>;
+  connect(agentId: AgentId, bytes: NetworkAccessBytes): Promise<void>;
   send(agentId: AgentId, data: Uint8Array): Promise<void>;
   sendAgents(agentId: AgentId, data: Uint8Array): Promise<void>;
   stop(): Promise<void>;
