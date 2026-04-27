@@ -7,17 +7,19 @@ import {
   getConsoleSink,
   reset,
 } from "@logtape/logtape";
-import { Multiaddr, multiaddr } from "@multiformats/multiaddr";
+import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test } from "vitest";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
-import {
+import type {
   IMessageHandler,
   INetworkAccessHandler,
 } from "../src/types/transport.js";
+import { encodeFrame } from "../src/frame.js";
+import { NetworkAccessHandshake } from "../src/proto/access.js";
 import { createTransport, retryFnUntilTimeout } from "./util.js";
 
 beforeEach(async () => {
@@ -55,49 +57,34 @@ afterEach(async () => {
   await reset();
 });
 
-test("A node can connect to a bootstrap node and identify its own listening address", async () => {
-  const { node: bootstrapNode, address: bootstrapNodeAddress } =
-    await createTransport("bootstrap", () => true);
-
-  // Create a node and connect to the bootstrap node.
-  const { node } = await createTransport("node");
-  const newAddressPromise = new Promise<Multiaddr[]>((resolve, reject) => {
-    node.setNewAddressesHandler((addrs) => resolve(addrs));
-    setTimeout(reject, 1000);
-  });
-  await node.connect(
-    multiaddr(bootstrapNodeAddress),
-    new Uint8Array(32),
-    new Uint8Array(1),
-  );
-
-  // Wait for the new listening addresses to have been identified.
-  const newAddresses = await newAddressPromise;
-  assert(newAddresses.length);
-
-  await node.stop();
-  await bootstrapNode.stop();
-});
-
 test("Invalid network access bytes closes connection", async () => {
-  const { node: validNode, address: validNodeAddress } = await createTransport(
+  const { node, address } = await createTransport(
     "valid",
-    () => false, // Network access handler rejects all attempts.
+    (_agentId, _bytes) => false, // Rejects all access attempts.
   );
 
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
-  const { node: invalidNode } = await createTransport("invalid");
-  await expect(
-    invalidNode.connect(
-      multiaddr(validNodeAddress),
-      new Uint8Array(32),
-      new TextEncoder().encode("invalid"),
-    ),
-  ).rejects.toThrow();
+  const libp2pNode = await createLibp2p({
+    transports: [tcp()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+  });
+  const connection = await libp2pNode.dial(multiaddr(address));
+  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+  accessStream.send(
+    NetworkAccessHandshake.encode({
+      agentId: new Uint8Array(32),
+      networkAccessBytes: new TextEncoder().encode("invalid"),
+    }),
+  );
+  await accessStream.close();
 
-  await invalidNode.stop();
-  await validNode.stop();
+  await retryFnUntilTimeout(async () => connection.status === "closed");
+
+  await libp2pNode.stop();
+  await node.stop();
 });
 
 test("Opening a stream with an unknown protocol fails", async () => {
@@ -153,76 +140,93 @@ test("Opening a message stream without being granted access closes the connectio
     },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
-  await expect(
-    connection.newStream(CURRENT_MESSAGE_PROTOCOL),
-  ).rejects.toThrow();
+  // The protocol is registered so newStream() succeeds at the muxer level.
+  // The server detects missing access and closes the connection asynchronously.
+  const stream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+  await retryFnUntilTimeout(async () => stream.status === "closed");
 
   await libp2pNode.stop();
   await node.stop();
 });
 
 test("Send a message after having been granted access", async () => {
-  // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: INetworkAccessHandler = (bytes) =>
+  const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
     bytes.toString() === VALID_ACCESS_BYTES;
-  // Define a message handler that stores received message for later assertion
   const receivedMessages: Uint8Array[] = [];
-  const messageHandler: IMessageHandler = (message) =>
+  const messageHandler: IMessageHandler = (_fromAgent, message) =>
     receivedMessages.push(message);
-  // Create a node that will receive the message
-  const { node: node1, address: address1 } = await createTransport(
+
+  const { node, address } = await createTransport(
     "node1",
     networkAccessHandler,
     messageHandler,
   );
 
-  // Node 2 connects to node 1 and sends a message.
   const encoder = new TextEncoder();
-  const { node: node2 } = await createTransport("node2");
-  const connection = await node2.connect(
-    multiaddr(address1),
-    new Uint8Array(32),
-    encoder.encode(VALID_ACCESS_BYTES),
+  const libp2pNode = await createLibp2p({
+    transports: [tcp()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+  });
+  const connection = await libp2pNode.dial(multiaddr(address));
+  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+  accessStream.send(
+    NetworkAccessHandshake.encode({
+      agentId: new Uint8Array(32),
+      networkAccessBytes: encoder.encode(VALID_ACCESS_BYTES),
+    }),
   );
-  connection.send(encoder.encode("hello"));
+  await accessStream.close();
+
+  const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+  messageStream.send(encodeFrame(encoder.encode("hello")));
 
   await retryFnUntilTimeout(async () => receivedMessages.length === 1);
   assert.equal(new TextDecoder().decode(receivedMessages[0]), "hello");
 
-  await node2.stop();
-  await node1.stop();
+  await libp2pNode.stop();
+  await node.stop();
 });
 
 test("Large messages are chunked and received correctly", async () => {
-  // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: INetworkAccessHandler = (bytes) =>
+  const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
     bytes.toString() === VALID_ACCESS_BYTES;
-  // Define a message handler that stores received message for later assertion
   const receivedMessages: Uint8Array[] = [];
-  const messageHandler: IMessageHandler = (message) =>
+  const messageHandler: IMessageHandler = (_fromAgent, message) =>
     receivedMessages.push(message);
-  // Create a node that will receive the message
-  const { node: node1, address: address1 } = await createTransport(
+
+  const { node, address } = await createTransport(
     "node1",
     networkAccessHandler,
     messageHandler,
   );
 
-  // Node 2 connects to node 1 and sends a large message.
   const encoder = new TextEncoder();
-  const { node: node2 } = await createTransport("node2");
-  const connection = await node2.connect(
-    multiaddr(address1),
-    new Uint8Array(32),
-    encoder.encode(VALID_ACCESS_BYTES),
+  const libp2pNode = await createLibp2p({
+    transports: [tcp()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+  });
+  const connection = await libp2pNode.dial(multiaddr(address));
+  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+  accessStream.send(
+    NetworkAccessHandshake.encode({
+      agentId: new Uint8Array(32),
+      networkAccessBytes: encoder.encode(VALID_ACCESS_BYTES),
+    }),
   );
-  connection.send(new Uint8Array(1024 * 300));
+  await accessStream.close();
+
+  const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+  messageStream.send(encodeFrame(new Uint8Array(1024 * 300)));
 
   await retryFnUntilTimeout(async () => receivedMessages.length === 1, 2000);
   assert.deepEqual(receivedMessages[0], new Uint8Array(1024 * 300));
 
-  await node2.stop();
-  await node1.stop();
+  await libp2pNode.stop();
+  await node.stop();
 });

@@ -17,6 +17,7 @@
   "dependencies": {
     "@chainsafe/libp2p-noise": "^17.0.0",
     "@chainsafe/libp2p-yamux": "^8.0.1",
+    "@libp2p/circuit-relay-v2": "^4.2.3",
     "@libp2p/identify": "^4.1.0",
     "@libp2p/tcp": "^11.0.15",
     "@logtape/logtape": "^2.0.5",
