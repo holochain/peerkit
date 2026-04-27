@@ -1,12 +1,10 @@
 import getPort from "get-port";
-import { TransportLibp2p } from "../src";
-import { INetworkAccessHandler, IMessageHandler } from "../src/types";
+import { TransportLibp2p } from "../src/index.js";
+import type {
+  IMessageHandler,
+  INetworkAccessHandler,
+} from "../src/types/transport.js";
 
-/**
- * Sleep for the provided duration.
- *
- * @param durationMs Duration in milliseconds
- */
 export const sleep = async (durationMs: number) =>
   new Promise((resolve) => setTimeout(resolve, durationMs));
 
@@ -17,8 +15,8 @@ export const sleep = async (durationMs: number) =>
  * If the timeout elapses, the promise will be rejected.
  *
  * @param fn The function to call
- * @param timeoutMs The timeout to retry for. Defaults to 1000 ms.
- * @param sleepMs How long to sleep between retries. Defaults to 100 ms.
+ * @param timeoutMs The timeout to retry for. Defaults to 1000 ms
+ * @param sleepMs How long to sleep between retries. Defaults to 100 ms
  */
 export const retryFnUntilTimeout = async (
   fn: () => Promise<boolean>,
@@ -36,18 +34,17 @@ export const retryFnUntilTimeout = async (
     if (performance.now() - start > timeoutMs) {
       return Promise.reject("timeout");
     }
-
     await sleep(sleepMs);
   }
 };
 
 /**
- * Creates a test transport.
+ * Creates a test transport (regular node).
  *
  * @param id Optional string to identify the node in logs
- * @param networkAccessHandler Optional handler for network access checks. Defaults to denying all access.
- * @param messageHandler Optional message handler. Defaults to no-op.
- * @returns A Peerkit transport
+ * @param networkAccessHandler Optional handler for network access checks. Defaults to denying all access
+ * @param messageHandler Optional message handler
+ * @returns A Peerkit transport and its listening address (for raw libp2p dials in tests)
  */
 export const createTransport = async (
   id?: string,
@@ -56,15 +53,12 @@ export const createTransport = async (
 ) => {
   const port = await getPort({ port: [30_000, 40_000] });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
-  networkAccessHandler = networkAccessHandler ?? (() => false);
-  messageHandler = messageHandler ?? (() => {});
-  const node = await TransportLibp2p.create(
-    networkAccessHandler,
-    messageHandler,
-    {
-      addrs: [address],
-      id,
-    },
+  const node = await TransportLibp2p.create({ addrs: [address], id });
+  node.setNetworkAccessHandler(
+    networkAccessHandler ?? ((_agentId, _bytes) => false),
   );
+  if (messageHandler) {
+    node.setMessageHandler(messageHandler);
+  }
   return { node, address };
 };

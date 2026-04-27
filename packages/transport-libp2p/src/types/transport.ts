@@ -1,11 +1,10 @@
-import type { Multiaddr } from "@multiformats/multiaddr";
-import type { AgentId, RelayConfig } from "./agent.js";
-import type { IConnection } from "./connection.js";
+import type { AgentId } from "./agent.js";
 
-/**
- * Interface of a handler for new listening addresses.
- */
-export type NewAddressHandler = (addrs: Multiaddr[]) => void;
+export type RelayAddress = string;
+
+export interface RelayConfig {
+  canRelay: boolean;
+}
 
 /**
  * Byte sequence to prove access to a network has been granted
@@ -19,39 +18,34 @@ export type NetworkAccessBytes = Uint8Array;
  * the Network Access Bytes as the first and only message, to check if
  * a peer has access to the network or not.
  */
-export type INetworkAccessHandler = (bytes: NetworkAccessBytes) => boolean;
+export type INetworkAccessHandler = (
+  agentId: AgentId,
+  bytes: NetworkAccessBytes,
+) => boolean;
 
 /**
  * Interface to handle incoming messages from a message stream.
  */
-export type IMessageHandler = (message: Uint8Array) => void;
+export type IMessageHandler = (fromAgent: AgentId, message: Uint8Array) => void;
 
+/**
+ * Callback to call when agents have been received from other nodes.
+ */
+export type IAgentsReceivedHandler = (
+  fromAgent: AgentId,
+  bytes: Uint8Array,
+) => void;
+
+/**
+ * Interface that defines the methods a peerkit transport needs to implement.
+ */
 export interface ITransport {
-  /**
-   * Establish a connection to a peer, presenting this node's agent ID and
-   * network access bytes.
-   * */
-  connect(
-    addr: Multiaddr,
-    agentId: AgentId,
-    networkAccessBytes: NetworkAccessBytes,
-  ): Promise<IConnection>;
-
-  /**
-   * Hook called when the node observes a new address it can be contacted
-   * at.
-   */
-  setNewAddressesHandler(handler: NewAddressHandler): void;
-
-  /**
-   * Send data to a peer. Each message uses a short-lived stream, avoiding
-   * the need for manual message framing. Stream creation is cheap enough
-   * for expected message rates (sub-minute to tens per second).
-   */
+  connect(agentId: AgentId): Promise<void>;
   send(agentId: AgentId, data: Uint8Array): Promise<void>;
-
-  /**
-   * Configure this peer's willingness and resource limits for relaying traffic
-   */
+  sendAgents(agentId: AgentId, data: Uint8Array): Promise<void>;
+  setNetworkAccessHandler(handler: INetworkAccessHandler): void;
+  setMessageHandler(handler: IMessageHandler): void;
+  setAgentsReceivedHandler(handler: IAgentsReceivedHandler): void;
   setRelayConfig(config: RelayConfig): void;
+  stop(): Promise<void>;
 }
