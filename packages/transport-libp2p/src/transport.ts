@@ -11,14 +11,13 @@ import { FrameDecoder } from "./frame.js";
 import { NetworkAccessHandshake } from "./proto/access.js";
 import type {
   AgentId,
-  IAgentsReceivedHandler,
+  IAgentsReceivedCallback,
   IMessageHandler,
   INetworkAccessHandler,
   ITransport,
-  RelayConfig,
 } from "./types/index.js";
 
-export interface NodeOptions {
+export interface TransportOptions {
   addrs?: string[];
   id?: string;
 }
@@ -52,7 +51,7 @@ export class TransportLibp2p implements ITransport {
   private logger: Logger;
   private networkAccessHandler?: INetworkAccessHandler;
   private messageHandler?: IMessageHandler;
-  private _agentsReceivedHandler?: IAgentsReceivedHandler;
+  private _agentsReceivedHandler?: IAgentsReceivedCallback;
 
   // AgentId-keyed state (populated in Phase 2).
   private peerToAgent: Map<PeerId, AgentId> = new Map();
@@ -62,9 +61,16 @@ export class TransportLibp2p implements ITransport {
   // Kept for the message-gate until Phase 2 rewires access handling.
   private peerAccessMap: Map<PeerId, boolean> = new Map();
 
-  constructor(libp2p: Libp2p, isRelay: boolean, options?: NodeOptions) {
+  constructor(
+    libp2p: Libp2p,
+    agentsReceivedCallback: IAgentsReceivedCallback,
+    networkAccessHandler: INetworkAccessHandler,
+    messageHandler?: IMessageHandler,
+    options?: TransportOptions,
+  ) {
     libp2p.handle(CURRENT_ACCESS_PROTOCOL, this.onAccessConnect);
-    if (!isRelay) {
+    if (messageHandler) {
+      // Regular node that will handle messages. Relay nodes don't handle messages.
       libp2p.handle(CURRENT_MESSAGE_PROTOCOL, this.onMessageConnect);
     }
 
@@ -79,7 +85,12 @@ export class TransportLibp2p implements ITransport {
     });
   }
 
-  static async create(options?: NodeOptions): Promise<TransportLibp2p> {
+  static async create(
+    agentsReceivedCallback: IAgentsReceivedCallback,
+    networkAccessHandler: INetworkAccessHandler,
+    messageHandler: IMessageHandler,
+    options?: TransportOptions,
+  ): Promise<TransportLibp2p> {
     const libp2pNode = await createLibp2p({
       transports: [tcp()],
       connectionEncrypters: [noise()],
@@ -90,10 +101,20 @@ export class TransportLibp2p implements ITransport {
       },
     });
     await libp2pNode.start();
-    return new TransportLibp2p(libp2pNode, false, options);
+    return new TransportLibp2p(
+      libp2pNode,
+      agentsReceivedCallback,
+      networkAccessHandler,
+      messageHandler,
+      options,
+    );
   }
 
-  static async createRelay(options?: NodeOptions): Promise<TransportLibp2p> {
+  static async createRelay(
+    agentsReceivedCallback: IAgentsReceivedCallback,
+    networkAccessHandler: INetworkAccessHandler,
+    options?: TransportOptions,
+  ): Promise<TransportLibp2p> {
     const libp2pNode = await createLibp2p({
       transports: [tcp()],
       connectionEncrypters: [noise()],
@@ -104,23 +125,14 @@ export class TransportLibp2p implements ITransport {
       },
     });
     await libp2pNode.start();
-    return new TransportLibp2p(libp2pNode, true, options);
-  }
-
-  setNetworkAccessHandler(handler: INetworkAccessHandler): void {
-    this.networkAccessHandler = handler;
-  }
-
-  setMessageHandler(handler: IMessageHandler): void {
-    this.messageHandler = handler;
-  }
-
-  setAgentsReceivedHandler(handler: IAgentsReceivedHandler): void {
-    this._agentsReceivedHandler = handler;
-  }
-
-  setRelayConfig(_config: RelayConfig): void {
-    // Phase 5
+    // Relay nodes don't handle messages
+    return new TransportLibp2p(
+      libp2pNode,
+      agentsReceivedCallback,
+      networkAccessHandler,
+      undefined,
+      options,
+    );
   }
 
   async connect(_agentId: AgentId): Promise<void> {
@@ -187,6 +199,13 @@ export class TransportLibp2p implements ITransport {
   };
 
   private onMessageConnect = async (stream: Stream, connection: Connection) => {
+    if (!this.messageHandler) {
+      throw new Error(
+        "Handling message protocol without a message handler configured",
+      );
+    }
+    // Assign to another variable to preserve that `messageHandler` is defined.
+    const messageHandler = this.messageHandler;
     this.logger.info(`Incoming stream {*}`, {
       CURRENT_MESSAGE_PROTOCOL,
       remoteId: connection.remotePeer,
@@ -211,13 +230,10 @@ export class TransportLibp2p implements ITransport {
           `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
           { byteLength: msg.byteLength },
         );
-        const handler = this.messageHandler;
-        if (handler) {
-          // Phase 2 will supply the real AgentId from peerToAgent.
-          const fromAgent =
-            this.peerToAgent.get(connection.remotePeer) ?? new Uint8Array(0);
-          handler(fromAgent, msg);
-        }
+        // Phase 2 will supply the real AgentId from peerToAgent.
+        const fromAgent =
+          this.peerToAgent.get(connection.remotePeer) ?? new Uint8Array(0);
+        messageHandler(fromAgent, msg);
       }
     });
   };

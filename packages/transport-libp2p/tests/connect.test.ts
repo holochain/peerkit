@@ -1,12 +1,7 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { tcp } from "@libp2p/tcp";
-import {
-  configure,
-  getAnsiColorFormatter,
-  getConsoleSink,
-  reset,
-} from "@logtape/logtape";
+import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test } from "vitest";
@@ -20,37 +15,9 @@ import type {
 } from "../src/types/transport.js";
 import { encodeFrame } from "../src/frame.js";
 import { NetworkAccessHandshake } from "../src/proto/access.js";
-import { createTransport, retryFnUntilTimeout } from "./util.js";
+import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
-beforeEach(async () => {
-  await configure({
-    sinks: {
-      console: getConsoleSink({
-        formatter: getAnsiColorFormatter({
-          format({ timestamp, level, category, message, record }) {
-            let output = `${timestamp} ${level} ${category}`;
-            // If `id` is included in record properties, print it in every
-            // log before the message and other properties.
-            // This makes it easier in interleaved logs to know which node is
-            // emitting the log.
-            if (typeof record.properties.id === "string") {
-              output = output + ` ${record.properties.id}`;
-            }
-            output = output + `: ${message}`;
-            return output;
-          },
-        }),
-      }),
-    },
-    loggers: [
-      {
-        category: "peerkit",
-        lowestLevel: "info",
-        sinks: ["console"],
-      },
-    ],
-  });
-});
+beforeEach(setupTestLogger);
 
 afterEach(async () => {
   // Reset logger configuration
@@ -58,8 +25,9 @@ afterEach(async () => {
 });
 
 test("Invalid network access bytes closes connection", async () => {
-  const { node, address } = await createTransport(
+  const { node, address } = await createNode(
     "valid",
+    undefined,
     (_agentId, _bytes) => false, // Rejects all access attempts.
   );
 
@@ -88,7 +56,7 @@ test("Invalid network access bytes closes connection", async () => {
 });
 
 test("Opening a stream with an unknown protocol fails", async () => {
-  const { node, address } = await createTransport("valid");
+  const { node, address } = await createNode("valid");
 
   // Create a node and try to open a stream with an unknown protocol.
   const libp2pNode = await createLibp2p({
@@ -107,7 +75,7 @@ test("Opening a stream with an unknown protocol fails", async () => {
 });
 
 test("Sending malformed bytes on the access stream closes the connection", async () => {
-  const { node, address } = await createTransport("valid", () => true);
+  const { node, address } = await createNode("valid", undefined, () => true);
 
   const libp2pNode = await createLibp2p({
     transports: [tcp()],
@@ -128,7 +96,7 @@ test("Sending malformed bytes on the access stream closes the connection", async
 });
 
 test("Opening a message stream without being granted access closes the connection", async () => {
-  const { node, address } = await createTransport("valid");
+  const { node, address } = await createNode("valid");
 
   // Create a node and try to open a stream with an unknown protocol.
   const libp2pNode = await createLibp2p({
@@ -157,8 +125,9 @@ test("Send a message after having been granted access", async () => {
   const messageHandler: IMessageHandler = (_fromAgent, message) =>
     receivedMessages.push(message);
 
-  const { node, address } = await createTransport(
+  const { node, address } = await createNode(
     "node1",
+    undefined,
     networkAccessHandler,
     messageHandler,
   );
@@ -198,8 +167,9 @@ test("Large messages are chunked and received correctly", async () => {
   const messageHandler: IMessageHandler = (_fromAgent, message) =>
     receivedMessages.push(message);
 
-  const { node, address } = await createTransport(
+  const { node, address } = await createNode(
     "node1",
+    undefined,
     networkAccessHandler,
     messageHandler,
   );
