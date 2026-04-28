@@ -1,5 +1,10 @@
 {
   "entryPointStrategy": "packages",
   "entryPoints": ["packages/transport-libp2p"],
-  "out": "docs"
+  "out": "docs",
+  "externalSymbolLinkMappings": {
+    "@multiformats/multiaddr": {
+      "Multiaddr": "https://multiformats.github.io/js-multiaddr/interfaces/Multiaddr.html"
+    }
+  }
 }

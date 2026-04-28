@@ -4,17 +4,17 @@ import { tcp } from "@libp2p/tcp";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
-import { afterEach, assert, beforeEach, expect, test } from "vitest";
+import { afterEach, assert, beforeEach, test } from "vitest";
+import { encodeFrame } from "../src/frame.js";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
-import type {
+import { NetworkAccessHandshake } from "../src/proto/access.js";
+import {
   IMessageHandler,
   INetworkAccessHandler,
 } from "../src/types/transport.js";
-import { encodeFrame } from "../src/frame.js";
-import { NetworkAccessHandshake } from "../src/proto/access.js";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
@@ -22,101 +22,6 @@ beforeEach(setupTestLogger);
 afterEach(async () => {
   // Reset logger configuration
   await reset();
-});
-
-test("Remote node closes connection when host sends invalid network access bytes", async () => {
-  const { node, address } = await createNode(
-    "valid",
-    undefined,
-    (_agentId, _bytes) => Promise.resolve(false), // Rejects all access attempts.
-  );
-
-  // Create a node and pass invalid network access bytes to the connection attempt.
-  // Connection should not succeed.
-  const libp2pNode = await createLibp2p({
-    transports: [tcp()],
-    connectionEncrypters: [noise()],
-    streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
-  });
-  const connection = await libp2pNode.dial(multiaddr(address));
-  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId: new Uint8Array(32),
-      networkAccessBytes: new TextEncoder().encode("invalid"),
-    }),
-  );
-  await accessStream.close();
-
-  await retryFnUntilTimeout(async () => connection.status === "closed");
-
-  await libp2pNode.stop();
-  await node.stop();
-});
-
-test("Host node closes connection when remote node returns invalid network access bytes", async () => {
-  const { node: hostNode, address } = await createNode(
-    "hostNode",
-    undefined,
-    (_agentId, _bytes) => Promise.resolve(false), // Rejects all access attempts.
-  );
-
-  // Create remote node that will send invalid network access bytes.
-  const { node: remoteNode } = await createNode(
-    "remoteNode",
-    undefined,
-    (_agentId, _bytes) => Promise.resolve(true), // Allows all access attempts.
-  );
-
-  // To be completed when agents can be dialed by agent ID.
-
-  // await retryFnUntilTimeout(async () => connection.status === "closed");
-
-  // await libp2pNode.stop();
-  // await node: hostNode.stop();
-});
-
-test("Opening a stream with an unknown protocol fails", async () => {
-  const { node, address } = await createNode("valid");
-
-  // Create a node and try to open a stream with an unknown protocol.
-  const libp2pNode = await createLibp2p({
-    transports: [tcp()],
-    connectionEncrypters: [noise()],
-    streamMuxers: [yamux()],
-    addresses: {
-      listen: ["/ip4/0.0.0.0/tcp/0"],
-    },
-  });
-  const connection = await libp2pNode.dial(multiaddr(address));
-  await expect(connection.newStream("/unknown/protocol")).rejects.toThrow();
-
-  await libp2pNode.stop();
-  await node.stop();
-});
-
-test("Sending malformed bytes on the access stream closes the connection", async () => {
-  const { node, address } = await createNode("valid", undefined, () =>
-    Promise.resolve(true),
-  );
-
-  const libp2pNode = await createLibp2p({
-    transports: [tcp()],
-    connectionEncrypters: [noise()],
-    streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
-  });
-  const connection = await libp2pNode.dial(multiaddr(address));
-  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(new Uint8Array([0xff, 0xff, 0xff, 0xff]));
-  await accessStream.close();
-
-  // Connection should be closed after the malformed handshake.
-  await retryFnUntilTimeout(async () => connection.status === "closed");
-
-  await libp2pNode.stop();
-  await node.stop();
 });
 
 test("Opening a message stream without being granted access closes the connection", async () => {

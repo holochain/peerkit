@@ -2,6 +2,7 @@ import { reset } from "@logtape/logtape";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import {
   CURRENT_ACCESS_PROTOCOL,
+  CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
 import { createRelay, retryFnUntilTimeout, setupTestLogger } from "./util.js";
@@ -44,6 +45,24 @@ test("Invalid network access bytes closes connection to relay", async () => {
   await accessStream.close();
 
   await retryFnUntilTimeout(async () => connection.status === "closed");
+
+  await libp2pNode.stop();
+  await relay.stop();
+});
+
+test("Opening an agents stream without being granted access closes the connection", async () => {
+  const { relay, address } = await createRelay("relay");
+
+  const libp2pNode = await createLibp2p({
+    transports: [tcp()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+  });
+  const connection = await libp2pNode.dial(multiaddr(address));
+  const stream = await connection.newStream(CURRENT_AGENTS_PROTOCOL);
+
+  await retryFnUntilTimeout(async () => stream.status === "closed");
 
   await libp2pNode.stop();
   await relay.stop();
