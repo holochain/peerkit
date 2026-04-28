@@ -1,11 +1,5 @@
 import type { AgentId } from "./agent.js";
 
-export type RelayAddress = string;
-
-export interface RelayConfig {
-  canRelay: boolean;
-}
-
 /**
  * Byte sequence to prove access to a network has been granted
  */
@@ -21,12 +15,15 @@ export type NetworkAccessBytes = Uint8Array;
 export type INetworkAccessHandler = (
   agentId: AgentId,
   bytes: NetworkAccessBytes,
-) => boolean;
+) => Promise<boolean>;
 
 /**
  * Interface to handle incoming messages from a message stream.
  */
-export type IMessageHandler = (fromAgent: AgentId, message: Uint8Array) => void;
+export type IMessageHandler = (
+  fromAgent: AgentId,
+  message: Uint8Array,
+) => Promise<void>;
 
 /**
  * Callback to call when agents have been received from other nodes.
@@ -34,7 +31,7 @@ export type IMessageHandler = (fromAgent: AgentId, message: Uint8Array) => void;
 export type IAgentsReceivedCallback = (
   fromAgent: AgentId,
   bytes: Uint8Array,
-) => void;
+) => Promise<void>;
 
 /**
  * Interface that defines the methods a peerkit transport needs to implement.

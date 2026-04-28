@@ -87,9 +87,9 @@ export const createRelay = async (
   const port = await getPort({ port: [30_000, 40_000] });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   agentsReceivedCallback =
-    agentsReceivedCallback ?? ((_fromAgent, _bytes) => {});
+    agentsReceivedCallback ?? ((_fromAgent, _bytes) => Promise.resolve());
   networkAccessHandler =
-    networkAccessHandler ?? ((_fromAgent, _bytes) => false);
+    networkAccessHandler ?? ((_fromAgent, _bytes) => Promise.resolve(false));
   const relay = await TransportLibp2p.createRelay(
     agentsReceivedCallback,
     networkAccessHandler,
@@ -116,10 +116,11 @@ export const createNode = async (
   const port = await getPort({ port: [30_000, 40_000] });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   agentsReceivedCallback =
-    agentsReceivedCallback ?? ((_fromAgent, _bytes) => {});
+    agentsReceivedCallback ?? ((_fromAgent, _bytes) => Promise.resolve());
   networkAccessHandler =
-    networkAccessHandler ?? ((_fromAgent, _bytes) => false);
-  messageHandler = messageHandler ?? ((_fromAgent, _agentList) => {});
+    networkAccessHandler ?? ((_fromAgent, _bytes) => Promise.resolve(false));
+  messageHandler =
+    messageHandler ?? ((_fromAgent, _agentList) => Promise.resolve());
   const node = await TransportLibp2p.create(
     agentsReceivedCallback,
     networkAccessHandler,
