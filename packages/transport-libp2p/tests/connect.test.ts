@@ -24,11 +24,11 @@ afterEach(async () => {
   await reset();
 });
 
-test("Invalid network access bytes closes connection", async () => {
+test("Remote node closes connection when host sends invalid network access bytes", async () => {
   const { node, address } = await createNode(
     "valid",
     undefined,
-    (_agentId, _bytes) => false, // Rejects all access attempts.
+    (_agentId, _bytes) => Promise.resolve(false), // Rejects all access attempts.
   );
 
   // Create a node and pass invalid network access bytes to the connection attempt.
@@ -55,6 +55,28 @@ test("Invalid network access bytes closes connection", async () => {
   await node.stop();
 });
 
+test("Host node closes connection when remote node returns invalid network access bytes", async () => {
+  const { node: hostNode, address } = await createNode(
+    "hostNode",
+    undefined,
+    (_agentId, _bytes) => Promise.resolve(false), // Rejects all access attempts.
+  );
+
+  // Create remote node that will send invalid network access bytes.
+  const { node: remoteNode } = await createNode(
+    "remoteNode",
+    undefined,
+    (_agentId, _bytes) => Promise.resolve(true), // Allows all access attempts.
+  );
+
+  // To be completed when agents can be dialed by agent ID.
+
+  // await retryFnUntilTimeout(async () => connection.status === "closed");
+
+  // await libp2pNode.stop();
+  // await node: hostNode.stop();
+});
+
 test("Opening a stream with an unknown protocol fails", async () => {
   const { node, address } = await createNode("valid");
 
@@ -75,7 +97,9 @@ test("Opening a stream with an unknown protocol fails", async () => {
 });
 
 test("Sending malformed bytes on the access stream closes the connection", async () => {
-  const { node, address } = await createNode("valid", undefined, () => true);
+  const { node, address } = await createNode("valid", undefined, () =>
+    Promise.resolve(true),
+  );
 
   const libp2pNode = await createLibp2p({
     transports: [tcp()],
@@ -108,7 +132,7 @@ test("Opening a message stream without being granted access closes the connectio
     },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
-  // The protocol is registered so newStream() succeeds at the muxer level.
+  // The protocol is registered so newStream() succeeds.
   // The server detects missing access and closes the connection asynchronously.
   const stream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
   await retryFnUntilTimeout(async () => stream.status === "closed");
@@ -121,11 +145,13 @@ test("Send a message after having been granted access", async () => {
   // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
   const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
-    bytes.toString() === VALID_ACCESS_BYTES;
+    Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
   const receivedMessages: Uint8Array[] = [];
   // Define a message handler that stores received message for later assertion
-  const messageHandler: IMessageHandler = (_fromAgent, message) =>
+  const messageHandler: IMessageHandler = (_fromAgent, message) => {
     receivedMessages.push(message);
+    return Promise.resolve();
+  };
   // Create a node that will receive the message
   const { node, address } = await createNode(
     "node1",
@@ -167,11 +193,13 @@ test("Large messages are chunked and received correctly", async () => {
   // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
   const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
-    bytes.toString() === VALID_ACCESS_BYTES;
+    Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
   // Define a message handler that stores received message for later assertion
   const receivedMessages: Uint8Array[] = [];
-  const messageHandler: IMessageHandler = (_fromAgent, message) =>
+  const messageHandler: IMessageHandler = (_fromAgent, message) => {
     receivedMessages.push(message);
+    return Promise.resolve();
+  };
   // Create anode that will receive the message
   const { node, address } = await createNode(
     "node1",
