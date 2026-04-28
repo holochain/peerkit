@@ -6,6 +6,12 @@ import type { AgentId } from "./agent.js";
 export type NetworkAccessBytes = Uint8Array;
 
 /**
+ * Peerkit-native address for a relay node. Parsed internally by the transport.
+ * Format: `tcp://host:port` with an optional `#agentId` fragment for identity pinning.
+ */
+export type RelayAddress = string;
+
+/**
  * Interface to handle incoming access streams.
  *
  * An access stream uses the {@link CURRENT_ACCESS_PROTOCOL} and expects
