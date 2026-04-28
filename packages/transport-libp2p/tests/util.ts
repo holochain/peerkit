@@ -1,15 +1,23 @@
-import getPort from "get-port";
-import { TransportLibp2p } from "../src/index.js";
-import type {
-  IAgentsReceivedCallback,
-  IMessageHandler,
-  INetworkAccessHandler,
-} from "../src/types/transport.js";
 import {
   configure,
   getAnsiColorFormatter,
   getConsoleSink,
 } from "@logtape/logtape";
+import getPort from "get-port";
+import { TransportLibp2p } from "../src/index.js";
+import type {
+  AgentId,
+  IAgentsReceivedCallback,
+  IMessageHandler,
+  INetworkAccessHandler,
+} from "../src/types/index.js";
+
+export const makeAgentId = (id: string): AgentId => {
+  const bytes = new Uint8Array(32);
+  const encoded = new TextEncoder().encode(id);
+  bytes.set(encoded.subarray(0, 32));
+  return bytes;
+};
 
 export const setupTestLogger = async () => {
   await configure({
@@ -93,7 +101,7 @@ export const createRelay = async (
   const relay = await TransportLibp2p.createRelay(
     agentsReceivedCallback,
     networkAccessHandler,
-    { addrs: [address], id },
+    { addrs: [address], id, agentId: makeAgentId(id ?? "relay") },
   );
   return { relay, address };
 };
@@ -125,7 +133,7 @@ export const createNode = async (
     agentsReceivedCallback,
     networkAccessHandler,
     messageHandler,
-    { addrs: [address], id },
+    { addrs: [address], id, agentId: makeAgentId(id ?? "node") },
   );
   return { node, address };
 };
