@@ -84,13 +84,14 @@ export const retryFnUntilTimeout = async (
  * @param id Optional string to identify the node in logs
  * @param agentsReceivedCallback Optional handler for receiving agents
  * @param networkAccessHandler Optional handler for network access checks. Defaults to denying all access
- * @param messageHandler Optional message handler
+ * @param networkAccessBytes Optional network access bytes included in counter-handshake responses
  * @returns A Peerkit transport and its listening address (for raw libp2p dials in tests)
  */
 export const createRelay = async (
   id?: string,
   agentsReceivedCallback?: IAgentsReceivedCallback,
   networkAccessHandler?: INetworkAccessHandler,
+  networkAccessBytes?: Uint8Array,
 ) => {
   const port = await getPort({ port: [30_000, 40_000] });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
@@ -101,7 +102,12 @@ export const createRelay = async (
   const relay = await TransportLibp2p.createRelay(
     agentsReceivedCallback,
     networkAccessHandler,
-    { addrs: [address], id, agentId: makeAgentId(id ?? "relay") },
+    {
+      addrs: [address],
+      id,
+      agentId: makeAgentId(id ?? "relay"),
+      networkAccessBytes,
+    },
   );
   return { relay, address };
 };
@@ -113,6 +119,8 @@ export const createRelay = async (
  * @param agentsReceivedCallback Optional handler for receiving agents
  * @param networkAccessHandler Optional handler for network access checks. Defaults to denying all access
  * @param messageHandler Optional message handler
+ * @param bootstrapRelays Optional relay addresses to connect to at startup
+ * @param handshakeTimeoutMs Optional timeout for the outbound access handshake response
  * @returns A Peerkit transport and its listening address (for raw libp2p dials in tests)
  */
 export const createNode = async (
@@ -120,6 +128,8 @@ export const createNode = async (
   agentsReceivedCallback?: IAgentsReceivedCallback,
   networkAccessHandler?: INetworkAccessHandler,
   messageHandler?: IMessageHandler,
+  bootstrapRelays?: string[],
+  handshakeTimeoutMs?: number,
 ) => {
   const port = await getPort({ port: [30_000, 40_000] });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
@@ -133,7 +143,13 @@ export const createNode = async (
     agentsReceivedCallback,
     networkAccessHandler,
     messageHandler,
-    { addrs: [address], id, agentId: makeAgentId(id ?? "node") },
+    {
+      addrs: [address],
+      id,
+      agentId: makeAgentId(id ?? "node"),
+      bootstrapRelays,
+      handshakeTimeoutMs,
+    },
   );
   return { node, address };
 };
