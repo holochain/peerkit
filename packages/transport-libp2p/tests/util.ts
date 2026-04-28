@@ -47,7 +47,7 @@ export const sleep = async (durationMs: number) =>
  * If the timeout elapses, the promise will be rejected.
  *
  * @param fn The function to call
- * @param timeoutMs The timeout to retry for. Defaults to 1000 ms
+ * @param timeoutMs The timeout to retry for. Defaults to 2000 ms
  * @param sleepMs How long to sleep between retries. Defaults to 100 ms
  */
 export const retryFnUntilTimeout = async (
@@ -55,7 +55,7 @@ export const retryFnUntilTimeout = async (
   timeoutMs?: number,
   sleepMs?: number,
 ) => {
-  timeoutMs = timeoutMs ?? 1000;
+  timeoutMs = timeoutMs ?? 2000;
   sleepMs = sleepMs ?? 100;
   const start = performance.now();
   for (;;) {
@@ -64,7 +64,7 @@ export const retryFnUntilTimeout = async (
       return Promise.resolve();
     }
     if (performance.now() - start > timeoutMs) {
-      return Promise.reject("timeout");
+      return Promise.reject("retryFnUntilTimeout timed out");
     }
     await sleep(sleepMs);
   }
