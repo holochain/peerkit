@@ -24,7 +24,7 @@ export interface TransportOptions {
 }
 
 // Stable string key for an AgentId (Uint8Array has no value equality in JS).
-export const agentIdKey = (agentId: AgentId): string =>
+const agentIdToKey = (agentId: AgentId) =>
   agentId.reduce((acc, byte) => acc + byte.toString(16).padStart(2, "0"), "");
 
 /**
@@ -50,14 +50,15 @@ export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
 export class TransportLibp2p implements ITransport {
   private libp2p: Libp2p;
   private logger: Logger;
-  private networkAccessHandler?: INetworkAccessHandler;
+  private _agentsReceivedCallback: IAgentsReceivedCallback;
+  private networkAccessHandler: INetworkAccessHandler;
   private messageHandler?: IMessageHandler;
-  private _agentsReceivedHandler?: IAgentsReceivedCallback;
 
   // AgentId-keyed state (populated in Phase 2).
   private peerToAgent: Map<PeerId, AgentId> = new Map();
+  // Map is keyed by a string, because objects are compared by reference, not by value.
   // true = granted, false = denied. Both entries are sticky for the session.
-  private _agentAccess: Map<string, boolean> = new Map();
+  private agentAccess: Map<string, boolean> = new Map();
 
   // Kept for the message-gate until Phase 2 rewires access handling.
   private peerAccessMap: Map<PeerId, boolean> = new Map();
@@ -69,10 +70,14 @@ export class TransportLibp2p implements ITransport {
     messageHandler?: IMessageHandler,
     options?: TransportOptions,
   ) {
+    this._agentsReceivedCallback = agentsReceivedCallback;
+    this.networkAccessHandler = networkAccessHandler;
+
     libp2p.handle(CURRENT_ACCESS_PROTOCOL, this.onAccessConnect);
     if (messageHandler) {
       // Regular node that will handle messages. Relay nodes don't handle messages.
       libp2p.handle(CURRENT_MESSAGE_PROTOCOL, this.onMessageConnect);
+      this.messageHandler = messageHandler;
     }
 
     this.libp2p = libp2p;
@@ -180,12 +185,27 @@ export class TransportLibp2p implements ITransport {
           await connection.close();
           return;
         }
+        const agentIdKey = agentIdToKey(handshake.agentId);
 
-        const handler = this.networkAccessHandler;
-        const accessGranted = handler
-          ? handler(handshake.agentId, handshake.networkAccessBytes)
-          : false;
+        this.logger.debug("Network access message {*}", {
+          agentId: handshake.agentId,
+          access: this.agentAccess.get(agentIdKey),
+        });
+        // Check if this agent has been denied access before
+        if (this.agentAccess.get(agentIdKey) === false) {
+          this.logger.warn(
+            "Previously rejected agent is trying to access network again. Closing connection without network access check. {*}",
+            { agentId: handshake.agentId },
+          );
+          return await connection.close();
+        }
+
+        const accessGranted = await this.networkAccessHandler(
+          handshake.agentId,
+          handshake.networkAccessBytes,
+        );
         this.peerAccessMap.set(connection.remotePeer, accessGranted);
+        this.agentAccess.set(agentIdKey, accessGranted);
         this.logger.info("Access {*}", {
           remoteId: connection.remotePeer,
           accessGranted,

@@ -22,7 +22,7 @@ test("Invalid network access bytes closes connection to relay", async () => {
   const { relay, address } = await createRelay(
     "relay",
     undefined,
-    (_fromAgent, _bytes) => false, // Rejects all access
+    (_fromAgent, _bytes) => Promise.resolve(false), // Rejects all access
   );
 
   // Create a node and pass invalid network access bytes to the connection attempt.
@@ -53,7 +53,7 @@ test("Relay rejects message protocol streams", async () => {
   const { relay, address } = await createRelay(
     "relay",
     undefined,
-    (_fromAgent, _bytes) => true, // Allow all access
+    (_fromAgent, _bytes) => Promise.resolve(true), // Allow all access
   );
 
   // Create a node, connect to relay, perform access handshake and check that opening a message stream fails.
