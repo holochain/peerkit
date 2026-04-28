@@ -28,6 +28,10 @@ export interface RelayOptions {
   id?: string;
   /** The AgentId of this relay node */
   agentId: AgentId;
+  /**
+   * Network access bytes sent in the counter-handshake response to connecting peers.
+   */
+  networkAccessBytes?: NetworkAccessBytes;
 }
 
 export interface NodeOptions {
@@ -40,9 +44,13 @@ export interface NodeOptions {
    */
   bootstrapRelays?: RelayAddress[];
   /**
-   * Network access bytes sent to relays during bootstrap handshake
+   * Network access bytes sent to relays during bootstrap handshake and in counter-handshake responses.
    */
   networkAccessBytes?: NetworkAccessBytes;
+  /**
+   * Timeout in milliseconds for the outbound access handshake response. Defaults to 10 000 ms.
+   */
+  handshakeTimeoutMs?: number;
 }
 
 // Stable string key for an AgentId (Uint8Array has no value equality in JS).
@@ -82,6 +90,8 @@ export class TransportLibp2p implements ITransport {
   private libp2p: Libp2p;
   private logger: Logger;
   private localAgentId: AgentId;
+  private localNetworkAccessBytes: NetworkAccessBytes;
+  private handshakeTimeoutMs: number;
   private agentsReceivedCallback: IAgentsReceivedCallback;
   private networkAccessHandler: INetworkAccessHandler;
   private messageHandler?: IMessageHandler;
@@ -102,6 +112,13 @@ export class TransportLibp2p implements ITransport {
     options?: NodeOptions | RelayOptions,
   ) {
     this.localAgentId = options?.agentId ?? new Uint8Array(32);
+    this.localNetworkAccessBytes =
+      options?.networkAccessBytes ?? new Uint8Array(0);
+    this.handshakeTimeoutMs =
+      (options &&
+        "handshakeTimeoutMs" in options &&
+        options.handshakeTimeoutMs) ||
+      10_000;
     this.agentsReceivedCallback = agentsReceivedCallback;
     this.networkAccessHandler = networkAccessHandler;
 
@@ -124,6 +141,11 @@ export class TransportLibp2p implements ITransport {
     });
   }
 
+  /**
+   * Create a regular node. Handles all three protocols: access, agents, and messages.
+   * The caller must invoke {@link sendAgents} explicitly to distribute agent-info
+   * (e.g. after bootstrap or when local agent-info changes).
+   */
   static async create(
     agentsReceivedCallback: IAgentsReceivedCallback,
     networkAccessHandler: INetworkAccessHandler,
@@ -148,14 +170,16 @@ export class TransportLibp2p implements ITransport {
       options,
     );
     if (options?.bootstrapRelays?.length) {
-      await transport.connectToRelays(
-        options.bootstrapRelays,
-        options.networkAccessBytes ?? new Uint8Array(0),
-      );
+      await transport.connectToRelays(options.bootstrapRelays);
     }
     return transport;
   }
 
+  /**
+   * Create a relay node. Handles access and agents protocols; does not handle messages.
+   * The orchestrator wires {@link sendAgents} into {@link IAgentsReceivedCallback} to
+   * fan out agent-info automatically as peers connect.
+   */
   static async createRelay(
     agentsReceivedCallback: IAgentsReceivedCallback,
     networkAccessHandler: INetworkAccessHandler,
@@ -171,12 +195,11 @@ export class TransportLibp2p implements ITransport {
       },
     });
     await libp2pNode.start();
-    // Relay nodes don't handle messages
     return new TransportLibp2p(
       libp2pNode,
       agentsReceivedCallback,
       networkAccessHandler,
-      undefined,
+      undefined, // Relay nodes don't handle messages
       options,
     );
   }
@@ -218,31 +241,88 @@ export class TransportLibp2p implements ITransport {
     return this.libp2p.stop();
   }
 
-  private async connectToRelays(
-    relays: RelayAddress[],
-    networkAccessBytes: NetworkAccessBytes,
-  ) {
-    return await Promise.all(
-      relays.map((relay) => this.connectToRelay(relay, networkAccessBytes)),
+  private async connectToRelays(relays: RelayAddress[]) {
+    const results = await Promise.allSettled(
+      relays.map((relay) => this.connectToRelay(relay)),
     );
+    for (const [i, result] of results.entries()) {
+      if (result.status === "rejected") {
+        this.logger.error("Failed to connect to relay {*}", {
+          relay: relays[i],
+          reason: result.reason,
+        });
+      }
+    }
   }
 
-  private async connectToRelay(
-    relay: RelayAddress,
-    networkAccessBytes: NetworkAccessBytes,
-  ): Promise<void> {
+  private async connectToRelay(relay: RelayAddress): Promise<void> {
     const addr = multiaddr(relay);
     this.logger.info("Connecting to relay {*}", { relay });
     const connection = await this.libp2p.dial(addr);
+
+    // Perform outbound access handshake.
     const stream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
     stream.send(
       NetworkAccessHandshake.encode({
         agentId: this.localAgentId,
-        networkAccessBytes,
+        networkAccessBytes: this.localNetworkAccessBytes,
       }),
     );
+
+    // Await access handshake response with a timeout.
+    const accessHandshakeResponse = await new Promise<Uint8Array>(
+      (resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error("Access handshake response timed out")),
+          this.handshakeTimeoutMs,
+        );
+        stream.addEventListener(
+          "message",
+          (message) => {
+            clearTimeout(timer);
+            const data =
+              message.data instanceof Uint8Array
+                ? message.data
+                : message.data.subarray();
+            resolve(data);
+          },
+          { once: true },
+        );
+      },
+    );
+
     await stream.close();
-    this.logger.info("Access handshake sent to relay {*}", { relay });
+
+    let handshake: NetworkAccessHandshake;
+    try {
+      handshake = NetworkAccessHandshake.decode(accessHandshakeResponse);
+    } catch {
+      this.logger.error(
+        "Failed to decode access handshake response. Closing connection.",
+      );
+      await connection.close();
+      return;
+    }
+
+    const agentIdKey = agentIdToKey(handshake.agentId);
+    const accessGranted = await this.networkAccessHandler(
+      handshake.agentId,
+      handshake.networkAccessBytes,
+    );
+    this.agentAccess.set(agentIdKey, accessGranted);
+    if (accessGranted) {
+      this.peerToAgent.set(connection.remotePeer, handshake.agentId);
+      this.agentToPeer.set(agentIdKey, connection.remotePeer);
+      this.logger.info("Outbound access granted {*}", {
+        agentId: handshake.agentId,
+      });
+    } else {
+      this.logger.warn(
+        "Outbound access denied by remote. Closing connection. {*}",
+        { agentId: handshake.agentId },
+      );
+      await connection.close();
+    }
   }
 
   private onAccessConnect = async (stream: Stream, connection: Connection) => {
@@ -292,18 +372,24 @@ export class TransportLibp2p implements ITransport {
           handshake.networkAccessBytes,
         );
         this.agentAccess.set(agentIdKey, accessGranted);
-        if (accessGranted) {
-          this.peerToAgent.set(connection.remotePeer, handshake.agentId);
-          this.agentToPeer.set(agentIdKey, connection.remotePeer);
-        }
         this.logger.info("Access {*}", {
           remoteId: connection.remotePeer,
+          agentId: handshake.agentId,
           accessGranted,
         });
         if (!accessGranted) {
           this.logger.warn("Invalid network access bytes. Closing connection.");
           await connection.close();
+          return;
         }
+        this.peerToAgent.set(connection.remotePeer, handshake.agentId);
+        this.agentToPeer.set(agentIdKey, connection.remotePeer);
+        stream.send(
+          NetworkAccessHandshake.encode({
+            agentId: this.localAgentId,
+            networkAccessBytes: this.localNetworkAccessBytes,
+          }),
+        );
       },
       { once: true },
     );

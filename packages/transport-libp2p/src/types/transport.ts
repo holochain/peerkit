@@ -59,6 +59,11 @@ export interface ITransport {
   /**
    * Send opaque agent-info bytes to an agent.
    * The agent must be connected and have been granted access.
+   *
+   * For relay nodes, the orchestrator calls this automatically in response to
+   * incoming agent-info (e.g. to bootstrap newly connected peers).
+   * For regular nodes, the caller is responsible for invoking it explicitly
+   * (e.g. after bootstrap or on agent-info change).
    */
   sendAgents(agentId: AgentId, data: Uint8Array): Promise<void>;
 

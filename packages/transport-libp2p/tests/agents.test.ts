@@ -12,7 +12,12 @@ import {
 } from "../src/index.js";
 import { NetworkAccessHandshake } from "../src/proto/access.js";
 import { INetworkAccessHandler } from "../src/types/transport.js";
-import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import {
+  createNode,
+  makeAgentId,
+  retryFnUntilTimeout,
+  setupTestLogger,
+} from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -88,4 +93,57 @@ test("Agents channel round-trip after access handshake", async () => {
 
   await libp2pNode.stop();
   await node.stop();
+});
+
+test("Two nodes can exchange agent infos", async () => {
+  const receivedByResponder: Uint8Array[] = [];
+  const receivedByInitiator: Uint8Array[] = [];
+
+  // Responder node: grants all access, collects incoming agent bytes
+  const { node: responder, address: responderAddress } = await createNode(
+    "responder",
+    async (_fromAgent, bytes) => {
+      receivedByResponder.push(bytes);
+    },
+    (_agentId, _bytes) => Promise.resolve(true),
+  );
+
+  // Initiator node: grants all access, connects to responder as a bootstrap relay
+  const { node: initiator } = await createNode(
+    "initiator",
+    async (_fromAgent, bytes) => {
+      receivedByInitiator.push(bytes);
+    },
+    (_agentId, _bytes) => Promise.resolve(true),
+    undefined,
+    [responderAddress],
+  );
+
+  // After bootstrap, both sides should know each other — verify via sendAgents
+  const responderAgentId = makeAgentId("responder");
+  const initiatorAgentId = makeAgentId("initiator");
+
+  await initiator.sendAgents(
+    responderAgentId,
+    new TextEncoder().encode("agents-from-initiator"),
+  );
+  await responder.sendAgents(
+    initiatorAgentId,
+    new TextEncoder().encode("agents-from-responder"),
+  );
+
+  await retryFnUntilTimeout(async () => receivedByResponder.length === 1);
+  await retryFnUntilTimeout(async () => receivedByInitiator.length === 1);
+
+  assert.equal(
+    new TextDecoder().decode(receivedByResponder[0]),
+    "agents-from-initiator",
+  );
+  assert.equal(
+    new TextDecoder().decode(receivedByInitiator[0]),
+    "agents-from-responder",
+  );
+
+  await initiator.stop();
+  await responder.stop();
 });
