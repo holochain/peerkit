@@ -6,8 +6,9 @@ import type { AgentId } from "./agent.js";
 export type NetworkAccessBytes = Uint8Array;
 
 /**
- * Peerkit-native address for a relay node. Parsed internally by the transport.
- * Format: `tcp://host:port` with an optional `#agentId` fragment for identity pinning.
+ * Peerkit-native address for a relay node.
+ *
+ * Every transport implementation parses it according to its own convention.
  */
 export type RelayAddress = string;
 
@@ -43,8 +44,26 @@ export type IAgentsReceivedCallback = (
  * Interface that defines the methods a peerkit transport needs to implement.
  */
 export interface ITransport {
+  /**
+   * Establish a connection to a known agent. The agent must have been
+   * previously discovered via {@link sendAgents}; throws if unknown.
+   */
   connect(agentId: AgentId, bytes: NetworkAccessBytes): Promise<void>;
+
+  /**
+   * Send an opaque application message to an agent.
+   * The agent must be connected.
+   */
   send(agentId: AgentId, data: Uint8Array): Promise<void>;
+
+  /**
+   * Send opaque agent-info bytes to an agent.
+   * The agent must be connected and have been granted access.
+   */
   sendAgents(agentId: AgentId, data: Uint8Array): Promise<void>;
+
+  /**
+   * Shut down the transport and all underlying connections.
+   */
   stop(): Promise<void>;
 }

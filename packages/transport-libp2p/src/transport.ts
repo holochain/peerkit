@@ -26,11 +26,15 @@ import type {
 export interface RelayOptions {
   addrs?: string[];
   id?: string;
+  /** The AgentId of this relay node */
+  agentId: AgentId;
 }
 
 export interface NodeOptions {
   addrs?: string[];
   id?: string;
+  /** The AgentId of this node */
+  agentId: AgentId;
   /**
    * Relay addresses to connect to at startup. Format: {@link @multiformats/multiaddr!Multiaddr}
    */
@@ -77,6 +81,7 @@ export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
 export class TransportLibp2p implements ITransport {
   private libp2p: Libp2p;
   private logger: Logger;
+  private localAgentId: AgentId;
   private agentsReceivedCallback: IAgentsReceivedCallback;
   private networkAccessHandler: INetworkAccessHandler;
   private messageHandler?: IMessageHandler;
@@ -96,6 +101,7 @@ export class TransportLibp2p implements ITransport {
     messageHandler?: IMessageHandler,
     options?: NodeOptions | RelayOptions,
   ) {
+    this.localAgentId = options?.agentId ?? new Uint8Array(32);
     this.agentsReceivedCallback = agentsReceivedCallback;
     this.networkAccessHandler = networkAccessHandler;
 
@@ -231,9 +237,7 @@ export class TransportLibp2p implements ITransport {
     const stream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
     stream.send(
       NetworkAccessHandshake.encode({
-        // Relay nodes receive a placeholder AgentId of all-zeros
-        // until the real local AgentId is wired up.
-        agentId: new Uint8Array(32),
+        agentId: this.localAgentId,
         networkAccessBytes,
       }),
     );
