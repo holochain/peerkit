@@ -5,7 +5,7 @@ import type { IConnection } from "./connection.js";
 /**
  * Interface of a handler for new listening addresses.
  */
-export type INewAddressHandler = (addrs: Multiaddr[]) => void;
+export type NewAddressHandler = (addrs: Multiaddr[]) => void;
 
 /**
  * Byte sequence to prove access to a network has been granted
@@ -22,7 +22,7 @@ export interface ITransport {
    * Hook called when the node observes a new address it can be contacted
    * at.
    */
-  setNewAddressesHandler(handler: INewAddressHandler): void;
+  setNewAddressesHandler(handler: NewAddressHandler): void;
 
   /**
    * Hook called on each incoming connection with the peer's network access bytes.

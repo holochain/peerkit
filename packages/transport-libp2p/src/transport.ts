@@ -11,7 +11,7 @@ import { Connection } from "./connection.js";
 import type {
   AgentId,
   IConnection,
-  INewAddressHandler,
+  NewAddressHandler,
   ITransport,
   NetworkAccessBytes,
   RelayConfig,
@@ -37,7 +37,7 @@ const ACCESS_PROTOCOL = "/peerkit/access/v1";
 export class TransportLibp2p implements ITransport {
   private libp2p: Libp2p;
   private logger: Logger;
-  private newAddressesHandler?: INewAddressHandler;
+  private newAddressesHandler?: NewAddressHandler;
   private networkAccessHandler?: IConnectHandler;
 
   constructor(libp2p: Libp2p, options?: TransportLibp2pConfig) {
@@ -88,7 +88,7 @@ export class TransportLibp2p implements ITransport {
     return new Connection(connection, stream);
   }
 
-  setNewAddressesHandler(handler: INewAddressHandler): void {
+  setNewAddressesHandler(handler: NewAddressHandler): void {
     if (this.newAddressesHandler) {
       this.logger.warn("New address handler exists, overwriting it.");
     }
