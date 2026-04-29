@@ -29,7 +29,7 @@ export interface TransportLibp2pConfig {
 
 type IConnectHandler = (bytes: NetworkAccessBytes) => boolean;
 
-const ACCESS_PROTOCOL = "/peerkit/access/0.1.0";
+const ACCESS_PROTOCOL = "/peerkit/access/v1";
 
 /**
  * The official peerkit transport based on Libp2p.
