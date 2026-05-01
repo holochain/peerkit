@@ -4,6 +4,14 @@
   "description": "",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -15,6 +23,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
+    "@peerkit/interface": "*",
     "@chainsafe/libp2p-noise": "^17.0.0",
     "@chainsafe/libp2p-yamux": "^8.0.1",
     "@libp2p/circuit-relay-v2": "^4.2.3",
