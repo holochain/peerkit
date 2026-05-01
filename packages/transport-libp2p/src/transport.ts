@@ -138,6 +138,7 @@ export class TransportLibp2p implements ITransport {
     this.logger.info("Transport created {*}", {
       addresses: libp2p.getMultiaddrs(),
       id: options?.id,
+      handshakeTimeoutMs: this.handshakeTimeoutMs,
     });
   }
 
@@ -291,8 +292,6 @@ export class TransportLibp2p implements ITransport {
       },
     );
 
-    await stream.close();
-
     let handshake: NetworkAccessHandshake;
     try {
       handshake = NetworkAccessHandshake.decode(accessHandshakeResponse);
@@ -326,17 +325,12 @@ export class TransportLibp2p implements ITransport {
   }
 
   private onAccessConnect = async (stream: Stream, connection: Connection) => {
-    this.logger.info(`Incoming stream {*}`, {
-      CURRENT_ACCESS_PROTOCOL,
+    this.logger.info(`Incoming access stream {*}`, {
       remoteId: connection.remotePeer,
     });
     stream.addEventListener(
       "message",
       async (message) => {
-        this.logger.info(`Incoming message {*}`, {
-          remoteId: connection.remotePeer,
-          CURRENT_ACCESS_PROTOCOL,
-        });
         const raw =
           message.data instanceof Uint8Array
             ? message.data
@@ -347,7 +341,8 @@ export class TransportLibp2p implements ITransport {
           handshake = NetworkAccessHandshake.decode(raw);
         } catch {
           this.logger.error(
-            "Failed to decode access handshake. Closing connection.",
+            "Failed to decode access handshake. Closing connection. {*}",
+            { remoteId: connection.remotePeer },
           );
           await connection.close();
           return;
@@ -374,7 +369,6 @@ export class TransportLibp2p implements ITransport {
         this.agentAccess.set(agentIdKey, accessGranted);
         this.logger.info("Access {*}", {
           remoteId: connection.remotePeer,
-          agentId: handshake.agentId,
           accessGranted,
         });
         if (!accessGranted) {
@@ -397,14 +391,13 @@ export class TransportLibp2p implements ITransport {
 
   private onAgentsConnect = async (stream: Stream, connection: Connection) => {
     this.logger.info(`Incoming stream {*}`, {
-      CURRENT_AGENTS_PROTOCOL,
       remoteId: connection.remotePeer,
     });
     const agentId = this.peerToAgent.get(connection.remotePeer);
     if (!agentId || this.agentAccess.get(agentIdToKey(agentId)) !== true) {
       this.logger.warn(
         "Remote peer tried to open an agents stream without being granted access. Closing connection. {*}",
-        { remotePeerId: connection.remotePeer },
+        { agentId, remoteId: connection.remotePeer },
       );
       await connection.close();
       return;
@@ -419,7 +412,7 @@ export class TransportLibp2p implements ITransport {
       for (const msg of decoder.feed(chunk)) {
         this.logger.debug(
           `Incoming message on stream ${CURRENT_AGENTS_PROTOCOL} {*}`,
-          { byteLength: msg.byteLength },
+          { peerId: connection.remotePeer, byteLength: msg.byteLength },
         );
         await this.agentsReceivedCallback(agentId, msg);
       }
@@ -435,14 +428,13 @@ export class TransportLibp2p implements ITransport {
     // Assign to another variable to preserve that `messageHandler` is defined.
     const messageHandler = this.messageHandler;
     this.logger.info(`Incoming stream {*}`, {
-      CURRENT_MESSAGE_PROTOCOL,
       remoteId: connection.remotePeer,
     });
     const agentId = this.peerToAgent.get(connection.remotePeer);
     if (!agentId || this.agentAccess.get(agentIdToKey(agentId)) !== true) {
       this.logger.warn(
         "Remote peer tried to open a message stream without being granted access. Closing connection. {*}",
-        { remotePeerId: connection.remotePeer },
+        { remoteId: connection.remotePeer },
       );
       await connection.close();
       return;
@@ -457,7 +449,7 @@ export class TransportLibp2p implements ITransport {
       for (const msg of decoder.feed(chunk)) {
         this.logger.debug(
           `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
-          { byteLength: msg.byteLength },
+          { peerId: connection.remotePeer, byteLength: msg.byteLength },
         );
         messageHandler(agentId, msg);
       }
