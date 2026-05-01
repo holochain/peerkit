@@ -35,7 +35,7 @@ test("Remote node closes connection when host sends invalid network access bytes
   await retryFnUntilTimeout(async () => connection.status === "closed");
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });
 
 test("Access handshake initiator closes connection when responder is denied", async () => {
@@ -59,8 +59,8 @@ test("Access handshake initiator closes connection when responder is denied", as
     initiator.sendAgents(responder.getNodeId(), new Uint8Array([0])),
   ).rejects.toThrow();
 
-  await initiator.stop();
-  await responder.stop();
+  await initiator.shutDown();
+  await responder.shutDown();
 });
 
 test("Outbound access handshake times out when responder sends no response", async () => {
@@ -92,7 +92,7 @@ test("Outbound access handshake times out when responder sends no response", asy
     node.sendAgents(libp2pNode.peerId.toString(), new Uint8Array([0])),
   ).rejects.toThrow();
 
-  await node.stop();
+  await node.shutDown();
   await libp2pNode.stop();
 });
 
@@ -112,7 +112,7 @@ test("Opening a stream with an unknown protocol fails", async () => {
   await expect(connection.newStream("/unknown/protocol")).rejects.toThrow();
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });
 
 test("Network access handler is not repeatedly called for previously rejected peer", async () => {
@@ -152,5 +152,5 @@ test("Network access handler is not repeatedly called for previously rejected pe
   expect(networkAccessHandler).toHaveBeenCalledTimes(1);
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });

@@ -11,8 +11,8 @@ import {
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
 import {
-  IMessageHandler,
-  INetworkAccessHandler,
+  MessageHandler,
+  NetworkAccessHandler,
 } from "../src/types/transport.js";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
@@ -40,17 +40,17 @@ test("Opening a message stream without being granted access closes the connectio
   await retryFnUntilTimeout(async () => stream.status === "closed");
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });
 
 test("Send a message after having been granted access", async () => {
   // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
+  const networkAccessHandler: NetworkAccessHandler = (_agentId, bytes) =>
     Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
   const receivedMessages: Uint8Array[] = [];
   // Define a message handler that stores received message for later assertion
-  const messageHandler: IMessageHandler = (_fromAgent, message) => {
+  const messageHandler: MessageHandler = (_fromAgent, message) => {
     receivedMessages.push(message);
     return Promise.resolve();
   };
@@ -82,17 +82,17 @@ test("Send a message after having been granted access", async () => {
   assert.equal(new TextDecoder().decode(receivedMessages[0]), "hello");
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });
 
 test("Large messages are chunked and received correctly", async () => {
   // Define an access handler
   const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
+  const networkAccessHandler: NetworkAccessHandler = (_agentId, bytes) =>
     Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
   // Define a message handler that stores received message for later assertion
   const receivedMessages: Uint8Array[] = [];
-  const messageHandler: IMessageHandler = (_fromAgent, message) => {
+  const messageHandler: MessageHandler = (_fromAgent, message) => {
     receivedMessages.push(message);
     return Promise.resolve();
   };
@@ -123,5 +123,5 @@ test("Large messages are chunked and received correctly", async () => {
   assert.deepEqual(receivedMessages[0], new Uint8Array(1024 * 300));
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });

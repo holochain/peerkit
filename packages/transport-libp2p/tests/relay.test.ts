@@ -43,7 +43,7 @@ test("Invalid network access bytes closes connection to relay", async () => {
   await retryFnUntilTimeout(async () => connection.status === "closed");
 
   await libp2pNode.stop();
-  await relay.stop();
+  await relay.shutDown();
 });
 
 test("Opening an agents stream without being granted access closes the connection", async () => {
@@ -61,7 +61,7 @@ test("Opening an agents stream without being granted access closes the connectio
   await retryFnUntilTimeout(async () => stream.status === "closed");
 
   await libp2pNode.stop();
-  await relay.stop();
+  await relay.shutDown();
 });
 
 test("Relay rejects message protocol streams", async () => {
@@ -87,7 +87,7 @@ test("Relay rejects message protocol streams", async () => {
   ).rejects.toThrow();
 
   await libp2pNode.stop();
-  await relay.stop();
+  await relay.shutDown();
 });
 
 test("Relay knows node's agent infos after agent exchange", async () => {
@@ -131,6 +131,6 @@ test("Relay knows node's agent infos after agent exchange", async () => {
   await retryFnUntilTimeout(async () => agentInfosReceivedByRelay.length === 1);
   assert.deepEqual(agentInfosReceivedByRelay[0], agentInfosOnNode);
 
-  await node.stop();
-  await relay.stop();
+  await node.shutDown();
+  await relay.shutDown();
 });

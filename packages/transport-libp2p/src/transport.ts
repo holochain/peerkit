@@ -14,9 +14,9 @@ import type { Libp2p } from "libp2p";
 import { createLibp2p } from "libp2p";
 import { encodeFrame, FrameDecoder } from "./frame.js";
 import type {
-  IAgentsReceivedCallback,
-  IMessageHandler,
-  INetworkAccessHandler,
+  AgentsReceivedCallback,
+  MessageHandler,
+  NetworkAccessHandler,
   ITransport,
   NetworkAccessBytes,
   NodeId,
@@ -82,9 +82,9 @@ export class TransportLibp2p implements ITransport {
   private logger: Logger;
   private localNetworkAccessBytes: NetworkAccessBytes;
   private handshakeTimeoutMs: number;
-  private agentsReceivedCallback: IAgentsReceivedCallback;
-  private networkAccessHandler: INetworkAccessHandler;
-  private messageHandler?: IMessageHandler;
+  private agentsReceivedCallback: AgentsReceivedCallback;
+  private networkAccessHandler: NetworkAccessHandler;
+  private messageHandler?: MessageHandler;
 
   // Keyed by NodeId string. true = granted, false = denied.
   // Both entries are sticky for the session.
@@ -92,9 +92,9 @@ export class TransportLibp2p implements ITransport {
 
   constructor(
     libp2p: Libp2p,
-    agentsReceivedCallback: IAgentsReceivedCallback,
-    networkAccessHandler: INetworkAccessHandler,
-    messageHandler?: IMessageHandler,
+    agentsReceivedCallback: AgentsReceivedCallback,
+    networkAccessHandler: NetworkAccessHandler,
+    messageHandler?: MessageHandler,
     options?: NodeOptions | RelayOptions,
   ) {
     this.localNetworkAccessBytes =
@@ -133,9 +133,9 @@ export class TransportLibp2p implements ITransport {
    * (e.g. after bootstrap or when local agent-info changes).
    */
   static async create(
-    agentsReceivedCallback: IAgentsReceivedCallback,
-    networkAccessHandler: INetworkAccessHandler,
-    messageHandler: IMessageHandler,
+    agentsReceivedCallback: AgentsReceivedCallback,
+    networkAccessHandler: NetworkAccessHandler,
+    messageHandler: MessageHandler,
     options?: NodeOptions,
   ): Promise<TransportLibp2p> {
     const libp2pNode = await createLibp2p({
@@ -163,12 +163,12 @@ export class TransportLibp2p implements ITransport {
 
   /**
    * Create a relay node. Handles access and agents protocols; does not handle messages.
-   * The orchestrator wires {@link sendAgents} into {@link IAgentsReceivedCallback} to
+   * The orchestrator wires {@link sendAgents} into {@link AgentsReceivedCallback} to
    * fan out agent-info automatically as peers connect.
    */
   static async createRelay(
-    agentsReceivedCallback: IAgentsReceivedCallback,
-    networkAccessHandler: INetworkAccessHandler,
+    agentsReceivedCallback: AgentsReceivedCallback,
+    networkAccessHandler: NetworkAccessHandler,
     options?: RelayOptions,
   ): Promise<TransportLibp2p> {
     const libp2pNode = await createLibp2p({
@@ -213,7 +213,7 @@ export class TransportLibp2p implements ITransport {
 
   async send(_nodeId: NodeId, _data: Uint8Array): Promise<void> {}
 
-  async stop(): Promise<void> {
+  async shutDown(): Promise<void> {
     return this.libp2p.stop();
   }
 
