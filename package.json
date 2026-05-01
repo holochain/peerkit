@@ -23,7 +23,8 @@
     "doc": "docs"
   },
   "workspaces": [
-    "packages/transport-libp2p"
+    "packages/transport-libp2p",
+    "packages/interface"
   ],
   "engines": {
     "node": ">=22"

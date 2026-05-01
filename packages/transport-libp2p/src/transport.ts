@@ -21,7 +21,7 @@ import type {
   NetworkAccessBytes,
   NodeId,
   RelayAddress,
-} from "./types/index.js";
+} from "@peerkit/interface";
 
 export interface RelayOptions {
   addrs?: string[];
@@ -163,8 +163,6 @@ export class TransportLibp2p implements ITransport {
 
   /**
    * Create a relay node. Handles access and agents protocols; does not handle messages.
-   * The orchestrator wires {@link sendAgents} into {@link AgentsReceivedCallback} to
-   * fan out agent-info automatically as peers connect.
    */
   static async createRelay(
     agentsReceivedCallback: AgentsReceivedCallback,

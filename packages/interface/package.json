@@ -1,0 +1,32 @@
+{
+  "name": "@peerkit/interface",
+  "version": "0.1.0",
+  "description": "Interfaces for the peerkit data sync framework",
+  "keywords": [
+    "peerkit",
+    "data",
+    "sync",
+    "interface"
+  ],
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "license": "MIT",
+  "author": "dev-team@holochain.org",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {}
+}

@@ -9,7 +9,7 @@ import type {
   AgentsReceivedCallback,
   MessageHandler,
   NetworkAccessHandler,
-} from "../src/types/index.js";
+} from "@peerkit/interface";
 
 export const setupTestLogger = async () => {
   await configure({
