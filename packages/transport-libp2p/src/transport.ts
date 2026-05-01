@@ -30,6 +30,14 @@ export interface RelayOptions {
    * Network access bytes sent in the counter-handshake response to connecting peers.
    */
   networkAccessBytes?: NetworkAccessBytes;
+  /**
+   * Callback when agent infos have been received
+   */
+  agentsReceivedCallback: AgentsReceivedCallback;
+  /**
+   * Handler for incoming network access streams
+   */
+  networkAccessHandler: NetworkAccessHandler;
 }
 
 export interface NodeOptions {
@@ -39,6 +47,18 @@ export interface NodeOptions {
    * Network access bytes sent to relays during bootstrap handshake and in counter-handshake responses.
    */
   networkAccessBytes?: NetworkAccessBytes;
+  /**
+   * Callback when agent infos have been received
+   */
+  agentsReceivedCallback: AgentsReceivedCallback;
+  /**
+   * Handler for incoming network access streams
+   */
+  networkAccessHandler: NetworkAccessHandler;
+  /**
+   * Handler for incoming message streams
+   */
+  messageHandler?: MessageHandler;
   /**
    * Relay addresses to connect to at startup. Format: {@link @multiformats/multiaddr!Multiaddr}
    */
@@ -90,13 +110,7 @@ export class TransportLibp2p implements ITransport {
   // Both entries are sticky for the session.
   private nodeAccess: Map<string, boolean> = new Map();
 
-  constructor(
-    libp2p: Libp2p,
-    agentsReceivedCallback: AgentsReceivedCallback,
-    networkAccessHandler: NetworkAccessHandler,
-    messageHandler?: MessageHandler,
-    options?: NodeOptions | RelayOptions,
-  ) {
+  constructor(libp2p: Libp2p, options: NodeOptions | RelayOptions) {
     this.localNetworkAccessBytes =
       options?.networkAccessBytes ?? new Uint8Array([0]); // If set to new Uint8Array(0), .send doesn't send anything confuses the hell out of everyone
     this.handshakeTimeoutMs =
@@ -104,15 +118,15 @@ export class TransportLibp2p implements ITransport {
         "handshakeTimeoutMs" in options &&
         options.handshakeTimeoutMs) ||
       10_000;
-    this.agentsReceivedCallback = agentsReceivedCallback;
-    this.networkAccessHandler = networkAccessHandler;
+    this.agentsReceivedCallback = options.agentsReceivedCallback;
+    this.networkAccessHandler = options.networkAccessHandler;
 
     libp2p.handle(CURRENT_ACCESS_PROTOCOL, this.onAccessConnect);
     libp2p.handle(CURRENT_AGENTS_PROTOCOL, this.onAgentsConnect);
-    if (messageHandler) {
+    if ("messageHandler" in options) {
       // Regular node that will handle messages. Relay nodes don't handle messages.
       libp2p.handle(CURRENT_MESSAGE_PROTOCOL, this.onMessageConnect);
-      this.messageHandler = messageHandler;
+      this.messageHandler = options.messageHandler;
     }
 
     this.libp2p = libp2p;
@@ -132,12 +146,7 @@ export class TransportLibp2p implements ITransport {
    * The caller must invoke {@link sendAgents} explicitly to distribute agent-info
    * (e.g. after bootstrap or when local agent-info changes).
    */
-  static async create(
-    agentsReceivedCallback: AgentsReceivedCallback,
-    networkAccessHandler: NetworkAccessHandler,
-    messageHandler: MessageHandler,
-    options?: NodeOptions,
-  ): Promise<TransportLibp2p> {
+  static async createNode(options: NodeOptions): Promise<TransportLibp2p> {
     const libp2pNode = await createLibp2p({
       transports: [tcp(), circuitRelayTransport()],
       connectionEncrypters: [noise()],
@@ -148,13 +157,7 @@ export class TransportLibp2p implements ITransport {
       },
     });
     await libp2pNode.start();
-    const transport = new TransportLibp2p(
-      libp2pNode,
-      agentsReceivedCallback,
-      networkAccessHandler,
-      messageHandler,
-      options,
-    );
+    const transport = new TransportLibp2p(libp2pNode, options);
     if (options?.bootstrapRelays?.length) {
       await transport.connectToRelays(options.bootstrapRelays);
     }
@@ -164,11 +167,7 @@ export class TransportLibp2p implements ITransport {
   /**
    * Create a relay node. Handles access and agents protocols; does not handle messages.
    */
-  static async createRelay(
-    agentsReceivedCallback: AgentsReceivedCallback,
-    networkAccessHandler: NetworkAccessHandler,
-    options?: RelayOptions,
-  ): Promise<TransportLibp2p> {
+  static async createRelay(options: RelayOptions): Promise<TransportLibp2p> {
     const libp2pNode = await createLibp2p({
       transports: [tcp()],
       connectionEncrypters: [noise()],
@@ -179,13 +178,7 @@ export class TransportLibp2p implements ITransport {
       },
     });
     await libp2pNode.start();
-    return new TransportLibp2p(
-      libp2pNode,
-      agentsReceivedCallback,
-      networkAccessHandler,
-      undefined, // Relay nodes don't handle messages
-      options,
-    );
+    return new TransportLibp2p(libp2pNode, options);
   }
 
   getNodeId(): NodeId {

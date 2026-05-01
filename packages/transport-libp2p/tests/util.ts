@@ -102,15 +102,13 @@ export const createRelay = async (options: TestRelayOptions) => {
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => false);
-  const relay = await TransportLibp2p.createRelay(
+  const relay = await TransportLibp2p.createRelay({
+    addrs: [address],
+    id,
+    networkAccessBytes,
     agentsReceivedCallback,
     networkAccessHandler,
-    {
-      addrs: [address],
-      id,
-      networkAccessBytes,
-    },
-  );
+  });
   return { relay, address };
 };
 
@@ -154,16 +152,14 @@ export const createNode = async (options: TestNodeOptions) => {
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => false);
   const messageHandler =
     options.messageHandler ?? (async (_fromPeer, _message) => {});
-  const node = await TransportLibp2p.create(
+  const node = await TransportLibp2p.createNode({
+    addrs: [address],
+    id,
     agentsReceivedCallback,
     networkAccessHandler,
     messageHandler,
-    {
-      addrs: [address],
-      id,
-      bootstrapRelays,
-      handshakeTimeoutMs,
-    },
-  );
+    bootstrapRelays,
+    handshakeTimeoutMs,
+  });
   return { node, address };
 };
