@@ -6,18 +6,10 @@ import {
 import getPort from "get-port";
 import { TransportLibp2p } from "../src/index.js";
 import type {
-  AgentId,
   IAgentsReceivedCallback,
   IMessageHandler,
   INetworkAccessHandler,
 } from "../src/types/index.js";
-
-export const makeAgentId = (id: string): AgentId => {
-  const bytes = new Uint8Array(32);
-  const encoded = new TextEncoder().encode(id);
-  bytes.set(encoded.subarray(0, 32));
-  return bytes;
-};
 
 export const setupTestLogger = async () => {
   await configure({
@@ -78,67 +70,90 @@ export const retryFnUntilTimeout = async (
   }
 };
 
+export interface TestRelayOptions {
+  /**
+   * Optional string to identify the node in logs
+   */
+  id?: string;
+  /**
+   * Optional handler for receiving agents
+   */
+  agentsReceivedCallback?: IAgentsReceivedCallback;
+  /**
+   * Optional handler for network access checks. Defaults to denying all access
+   */
+  networkAccessHandler?: INetworkAccessHandler;
+  /**
+   * Optional network access bytes included in counter-handshake responses
+   */
+  networkAccessBytes?: Uint8Array;
+}
+
 /**
  * Creates a test relay transport
  *
- * @param id Optional string to identify the node in logs
- * @param agentsReceivedCallback Optional handler for receiving agents
- * @param networkAccessHandler Optional handler for network access checks. Defaults to denying all access
- * @param networkAccessBytes Optional network access bytes included in counter-handshake responses
  * @returns A Peerkit transport and its listening address (for raw libp2p dials in tests)
  */
-export const createRelay = async (
-  id?: string,
-  agentsReceivedCallback?: IAgentsReceivedCallback,
-  networkAccessHandler?: INetworkAccessHandler,
-  networkAccessBytes?: Uint8Array,
-) => {
+export const createRelay = async (options: TestRelayOptions) => {
+  const { id, networkAccessBytes } = options;
   const port = await getPort({ port: [30_000, 40_000] });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
-  agentsReceivedCallback =
-    agentsReceivedCallback ?? ((_fromAgent, _bytes) => Promise.resolve());
-  networkAccessHandler =
-    networkAccessHandler ?? ((_fromAgent, _bytes) => Promise.resolve(false));
+  const agentsReceivedCallback =
+    options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
+  const networkAccessHandler =
+    options.networkAccessHandler ?? (async (_fromPeer, _bytes) => false);
   const relay = await TransportLibp2p.createRelay(
     agentsReceivedCallback,
     networkAccessHandler,
     {
       addrs: [address],
       id,
-      agentId: makeAgentId(id ?? "relay"),
       networkAccessBytes,
     },
   );
   return { relay, address };
 };
 
+export interface TestNodeOptions {
+  /**
+   * Optional string to identify the node in logs
+   */
+  id?: string;
+  /**
+   * Optional handler for receiving agents
+   */
+  agentsReceivedCallback?: IAgentsReceivedCallback;
+  /**
+   * Optional handler for network access checks. Defaults to denying all access
+   */
+  networkAccessHandler?: INetworkAccessHandler;
+  /**
+   * Optional message handler
+   */
+  messageHandler?: IMessageHandler;
+  /**
+   * Optional relay addresses to connect to at startup
+   */
+  bootstrapRelays?: string[];
+  /**
+   * Optional timeout for the outbound access handshake response
+   */
+  handshakeTimeoutMs?: number;
+}
+
 /**
  * Creates a test node transport
- *
- * @param id Optional string to identify the node in logs
- * @param agentsReceivedCallback Optional handler for receiving agents
- * @param networkAccessHandler Optional handler for network access checks. Defaults to denying all access
- * @param messageHandler Optional message handler
- * @param bootstrapRelays Optional relay addresses to connect to at startup
- * @param handshakeTimeoutMs Optional timeout for the outbound access handshake response
- * @returns A Peerkit transport and its listening address (for raw libp2p dials in tests)
  */
-export const createNode = async (
-  id?: string,
-  agentsReceivedCallback?: IAgentsReceivedCallback,
-  networkAccessHandler?: INetworkAccessHandler,
-  messageHandler?: IMessageHandler,
-  bootstrapRelays?: string[],
-  handshakeTimeoutMs?: number,
-) => {
+export const createNode = async (options: TestNodeOptions) => {
   const port = await getPort({ port: [30_000, 40_000] });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
-  agentsReceivedCallback =
-    agentsReceivedCallback ?? ((_fromAgent, _bytes) => Promise.resolve());
-  networkAccessHandler =
-    networkAccessHandler ?? ((_fromAgent, _bytes) => Promise.resolve(false));
-  messageHandler =
-    messageHandler ?? ((_fromAgent, _agentList) => Promise.resolve());
+  const { id, bootstrapRelays, handshakeTimeoutMs } = options;
+  const agentsReceivedCallback =
+    options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
+  const networkAccessHandler =
+    options.networkAccessHandler ?? (async (_fromPeer, _bytes) => false);
+  const messageHandler =
+    options.messageHandler ?? (async (_fromPeer, _message) => {});
   const node = await TransportLibp2p.create(
     agentsReceivedCallback,
     networkAccessHandler,
@@ -146,7 +161,6 @@ export const createNode = async (
     {
       addrs: [address],
       id,
-      agentId: makeAgentId(id ?? "node"),
       bootstrapRelays,
       handshakeTimeoutMs,
     },

@@ -10,24 +10,16 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
 } from "../src/index.js";
-import { NetworkAccessHandshake } from "../src/proto/access.js";
 import { INetworkAccessHandler } from "../src/types/transport.js";
-import {
-  createNode,
-  makeAgentId,
-  retryFnUntilTimeout,
-  setupTestLogger,
-} from "./util.js";
+import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 
-afterEach(async () => {
-  // Reset logger configuration
-  await reset();
-});
+// Reset logger configuration
+afterEach(reset);
 
 test("Opening an agents stream without being granted access closes the connection", async () => {
-  const { node, address } = await createNode("node1");
+  const { node, address } = await createNode({ id: "node1" });
 
   const libp2pNode = await createLibp2p({
     transports: [tcp()],
@@ -46,21 +38,20 @@ test("Opening an agents stream without being granted access closes the connectio
 
 test("Agents channel round-trip after access handshake", async () => {
   const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: INetworkAccessHandler = (_agentId, bytes) =>
+  const networkAccessHandler: INetworkAccessHandler = (_fromPeer, bytes) =>
     Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
-  const receivedAgents: Array<{ fromAgent: Uint8Array; bytes: Uint8Array }> =
-    [];
+  const receivedAgents: Array<{ fromPeer: string; bytes: Uint8Array }> = [];
   const agentsReceivedCallback = async (
-    fromAgent: Uint8Array,
+    fromPeer: string,
     bytes: Uint8Array,
   ) => {
-    receivedAgents.push({ fromAgent, bytes });
+    receivedAgents.push({ fromPeer, bytes });
   };
-  const { node, address } = await createNode(
-    "node1",
+  const { node, address } = await createNode({
+    id: "node1",
     agentsReceivedCallback,
     networkAccessHandler,
-  );
+  });
 
   const encoder = new TextEncoder();
   const libp2pNode = await createLibp2p({
@@ -69,15 +60,9 @@ test("Agents channel round-trip after access handshake", async () => {
     streamMuxers: [yamux()],
     addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
   });
-  const agentId = new Uint8Array(32).fill(1);
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId,
-      networkAccessBytes: encoder.encode(VALID_ACCESS_BYTES),
-    }),
-  );
+  accessStream.send(encoder.encode(VALID_ACCESS_BYTES));
   await accessStream.close();
 
   const agentsStream = await connection.newStream(CURRENT_AGENTS_PROTOCOL);
@@ -85,7 +70,7 @@ test("Agents channel round-trip after access handshake", async () => {
   await agentsStream.close();
 
   await retryFnUntilTimeout(async () => receivedAgents.length === 1);
-  assert.deepEqual(receivedAgents[0]!.fromAgent, agentId);
+  assert.equal(receivedAgents[0]!.fromPeer, libp2pNode.peerId.toString());
   assert.equal(
     new TextDecoder().decode(receivedAgents[0]!.bytes),
     "agent-info",
@@ -100,35 +85,31 @@ test("Two nodes can exchange agent infos", async () => {
   const receivedByInitiator: Uint8Array[] = [];
 
   // Responder node: grants all access, collects incoming agent bytes
-  const { node: responder, address: responderAddress } = await createNode(
-    "responder",
-    async (_fromAgent, bytes) => {
+  const { node: responder, address: responderAddress } = await createNode({
+    id: "responder",
+    agentsReceivedCallback: async (_fromPeer, bytes) => {
       receivedByResponder.push(bytes);
     },
-    (_agentId, _bytes) => Promise.resolve(true),
-  );
+    networkAccessHandler: async (_fromPeer, _bytes) => true,
+  });
 
   // Initiator node: grants all access, connects to responder as a bootstrap relay
-  const { node: initiator } = await createNode(
-    "initiator",
-    async (_fromAgent, bytes) => {
+  const { node: initiator } = await createNode({
+    id: "initiator",
+    agentsReceivedCallback: async (_fromPeer, bytes) => {
       receivedByInitiator.push(bytes);
     },
-    (_agentId, _bytes) => Promise.resolve(true),
-    undefined,
-    [responderAddress],
-  );
+    networkAccessHandler: async (_fromPeer, _bytes) => true,
+    bootstrapRelays: [responderAddress],
+  });
 
   // After bootstrap, both sides should know each other — verify via sendAgents
-  const responderAgentId = makeAgentId("responder");
-  const initiatorAgentId = makeAgentId("initiator");
-
   await initiator.sendAgents(
-    responderAgentId,
+    responder.getNodeId(),
     new TextEncoder().encode("agents-from-initiator"),
   );
   await responder.sendAgents(
-    initiatorAgentId,
+    initiator.getNodeId(),
     new TextEncoder().encode("agents-from-responder"),
   );
 
