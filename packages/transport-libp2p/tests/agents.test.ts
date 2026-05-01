@@ -10,7 +10,7 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
 } from "../src/index.js";
-import { INetworkAccessHandler } from "../src/types/transport.js";
+import { NetworkAccessHandler } from "../src/types/transport.js";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
@@ -33,12 +33,12 @@ test("Opening an agents stream without being granted access closes the connectio
   await retryFnUntilTimeout(async () => stream.status === "closed");
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });
 
 test("Agents channel round-trip after access handshake", async () => {
   const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: INetworkAccessHandler = (_fromPeer, bytes) =>
+  const networkAccessHandler: NetworkAccessHandler = (_fromPeer, bytes) =>
     Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
   const receivedAgents: Array<{ fromPeer: string; bytes: Uint8Array }> = [];
   const agentsReceivedCallback = async (
@@ -77,7 +77,7 @@ test("Agents channel round-trip after access handshake", async () => {
   );
 
   await libp2pNode.stop();
-  await node.stop();
+  await node.shutDown();
 });
 
 test("Two nodes can exchange agent infos", async () => {
@@ -125,6 +125,6 @@ test("Two nodes can exchange agent infos", async () => {
     "agents-from-responder",
   );
 
-  await initiator.stop();
-  await responder.stop();
+  await initiator.shutDown();
+  await responder.shutDown();
 });
