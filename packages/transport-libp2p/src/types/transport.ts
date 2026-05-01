@@ -25,7 +25,7 @@ export type RelayAddress = string;
  * the Network Access Bytes as the first and only message, to check if
  * a peer has access to the network or not.
  */
-export type INetworkAccessHandler = (
+export type NetworkAccessHandler = (
   nodeId: NodeId,
   bytes: NetworkAccessBytes,
 ) => Promise<boolean>;
@@ -33,7 +33,7 @@ export type INetworkAccessHandler = (
 /**
  * Interface to handle incoming messages from a message stream.
  */
-export type IMessageHandler = (
+export type MessageHandler = (
   fromNode: NodeId,
   message: Uint8Array,
 ) => Promise<void>;
@@ -47,7 +47,7 @@ export type ConnectedToRelayHandler = () => void;
 /**
  * Callback to call when agents have been received from another node.
  */
-export type IAgentsReceivedCallback = (
+export type AgentsReceivedCallback = (
   fromNode: NodeId,
   bytes: Uint8Array,
 ) => Promise<void>;
@@ -81,5 +81,5 @@ export interface ITransport {
   /**
    * Shut down the transport and all underlying connections.
    */
-  stop(): Promise<void>;
+  shutDown(): Promise<void>;
 }

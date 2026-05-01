@@ -15,15 +15,22 @@ Peerkit is a TypeScript peer-to-peer data synchronization framework. It sits abo
 - Preserve spec-mandated defaults and invariants: closed networks by default, `NetworkAccessBytes` gating before any app data, blob content-addressing, `AgentId = public key`, signatures on state changes, pluggable distribution/connection strategies, no "get all" on unbounded collections.
 - Stay within MVP scope (Layer 0 + 1, desktop, full replication) unless the task explicitly extends it.
 - If requirements and spec conflict, stop and flag the conflict — do not silently deviate. If the spec has an open question relevant to the task, surface it rather than guess.
-- When spec terminology exists (`AgentId`, `PeerId`, `NetworkAccessBytes`, `Blob`, `Hash`, `willStore`, epoch, tombstone, etc.), use it verbatim.
+- When spec terminology exists (`AgentId`, `NetworkAccessBytes`, `Blob`, `Hash`, `willStore`, epoch, tombstone, etc.), use it verbatim.
 
 ## Monorepo layout
 
 npm workspaces. Root is private and orchestrates builds; only published packages live under `packages/`.
 
-- `packages/transport-libp2p` — `@peerkit/transport-libp2p`, the default transport. Implements the `ITransport` interface on top of libp2p (TCP + noise + yamux + identify).
+- `packages/interface` — `@peerkit/interface`, shared type definitions (`ITransport`, `NodeId`, `NetworkAccessBytes`, callbacks). All other packages import from here.
+- `packages/transport-libp2p` — `@peerkit/transport-libp2p`, the default transport. Implements `ITransport` on top of libp2p (TCP + noise + yamux + identify).
 
 Workspace root pins Node `>=22` and uses `"type": "module"` + TypeScript `module: nodenext`. Imports inside TS sources use `.js` extensions (ESM resolution), even when importing `.ts` files.
+
+New workspace packages must:
+
+1. Add a `"references"` entry in the root `tsconfig.json`.
+2. Extend the root `tsconfig.json` with `composite: true`, `rootDir: "src"`, `outDir: "dist"`.
+3. Add an `exports` field in `package.json` pointing to `./dist/index.js` / `./dist/index.d.ts`.
 
 ## Commands
 
@@ -37,7 +44,7 @@ Run from repo root unless noted.
 - Format: `npm run fmt`
 - Test all workspaces: `npm test`
 - Test a single workspace: `npm test -w @peerkit/transport-libp2p`
-- Single test file: `npm test -w @peerkit/transport-libp2p -- tests/connect.test.ts`
+- Single test file: `npm test -w @peerkit/transport-libp2p -- tests/access.test.ts`
 - Single test by name: `npm test -w @peerkit/transport-libp2p -- -t "Invalid network access bytes"`
 
 Vitest runs with `--run` by default (CI-style, no watch).
@@ -53,16 +60,35 @@ Before declaring work done, run the same checks CI runs (`.github/workflows/test
 
 ## Architecture — transport layer
 
-`ITransport` (`packages/transport-libp2p/src/types/transport.ts`) is the contract a transport must satisfy. `TransportLibp2p` is the reference implementation.
+`ITransport` is defined in `packages/interface/src/transport.ts` and is the contract every transport must satisfy. `TransportLibp2p` in `packages/transport-libp2p` is the reference implementation.
 
-Key behaviors future contributors must preserve:
+### Transport public API
 
-- **Network access gating.** Every incoming stream on `/peerkit/access/0.1.0` must present `NetworkAccessBytes` first. The handler registered via `setNetworkAccessHandler` decides accept/reject. If no handler is set, or the handler returns `false`, the transport **closes the underlying libp2p connection** (not just the stream). Tests in `tests/connect.test.ts` lock this in.
-- **Access protocol constant.** `ACCESS_PROTOCOL = "/peerkit/access/0.1.0"` — changing it is a breaking protocol change.
-- **Arrow-field callbacks.** `onConnect` is an arrow class field because libp2p invokes it as a bare callback; converting it to a method drops `this`.
-- **Incoming message bytes.** libp2p may deliver `message.data` as either `Uint8Array` or a `Uint8ArrayList` — normalize with `.subarray()` as in `transport.ts`.
-- **Address identification.** New listening addresses are surfaced via the `peer:identify` event and forwarded to `setNewAddressesHandler`. Handlers are last-write-wins; overwriting warns.
-- **Construction.** Use `TransportLibp2p.create(options)` (async) rather than `new TransportLibp2p(...)` directly — the static factory owns libp2p node creation and `start()`.
+All runtime methods are keyed by `NodeId` (an opaque `string` — the libp2p peer ID in multibase encoding). No libp2p types cross the public boundary. Mapping between peerkit `AgentId` and transport `NodeId` is the responsibility of the layer above.
+
+```ts
+interface ITransport {
+  getNodeId(): NodeId;
+  connect(nodeId: NodeId, bytes: NetworkAccessBytes): Promise<void>;
+  sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void>;
+  send(nodeId: NodeId, data: Uint8Array): Promise<void>;
+  shutDown(): Promise<void>;
+}
+```
+
+### Key behaviors future contributors must preserve
+
+- **Network access gating.** Every incoming connection must complete a raw-bytes handshake on `/peerkit/access/v1` before any other stream is accepted. The `NetworkAccessHandler` decides accept/reject. If no handler is set, or the handler returns `false`, the transport **closes the underlying libp2p connection** (not just the stream). Denied peers are remembered for the session and rejected immediately on reconnect without re-invoking the handler.
+- **Access protocol wire format.** The initiator sends its `NetworkAccessBytes` as a raw `Uint8Array` message. The responder replies with its own `NetworkAccessBytes` if access is granted, then closes the connection if not. No protobuf encoding — the protocol ID (`/peerkit/access/v1`) is the version signal.
+- **Arrow-field callbacks.** `onAccessConnect`, `onAgentsConnect`, `onMessageConnect` are arrow class fields because libp2p passes them as bare callbacks; converting to methods drops `this`.
+- **Incoming message bytes.** libp2p may deliver `message.data` as either `Uint8Array` or `Uint8ArrayList` — normalize with `.subarray()` before use.
+- **Construction.** Use `TransportLibp2p.create(...)` or `TransportLibp2p.createRelay(...)` (async static factories) rather than `new TransportLibp2p(...)` directly — the factories own libp2p node creation and `start()`.
+- **Default `networkAccessBytes`.** Defaults to `new Uint8Array([0])`, not an empty array — an empty array causes `.send()` to be a no-op, which breaks the counter-handshake.
+
+### Two construction modes
+
+- **Node** (`TransportLibp2p.create`): handles all three protocols — access, agents, messages. Supports `bootstrapRelays` to connect at startup.
+- **Relay** (`TransportLibp2p.createRelay`): handles access and agents only; message protocol is not registered. Acts as bootstrap and circuit-relay server.
 
 ## Logging
 

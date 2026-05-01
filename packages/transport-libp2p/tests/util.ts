@@ -6,9 +6,9 @@ import {
 import getPort from "get-port";
 import { TransportLibp2p } from "../src/index.js";
 import type {
-  IAgentsReceivedCallback,
-  IMessageHandler,
-  INetworkAccessHandler,
+  AgentsReceivedCallback,
+  MessageHandler,
+  NetworkAccessHandler,
 } from "../src/types/index.js";
 
 export const setupTestLogger = async () => {
@@ -78,11 +78,11 @@ export interface TestRelayOptions {
   /**
    * Optional handler for receiving agents
    */
-  agentsReceivedCallback?: IAgentsReceivedCallback;
+  agentsReceivedCallback?: AgentsReceivedCallback;
   /**
    * Optional handler for network access checks. Defaults to denying all access
    */
-  networkAccessHandler?: INetworkAccessHandler;
+  networkAccessHandler?: NetworkAccessHandler;
   /**
    * Optional network access bytes included in counter-handshake responses
    */
@@ -122,15 +122,15 @@ export interface TestNodeOptions {
   /**
    * Optional handler for receiving agents
    */
-  agentsReceivedCallback?: IAgentsReceivedCallback;
+  agentsReceivedCallback?: AgentsReceivedCallback;
   /**
    * Optional handler for network access checks. Defaults to denying all access
    */
-  networkAccessHandler?: INetworkAccessHandler;
+  networkAccessHandler?: NetworkAccessHandler;
   /**
    * Optional message handler
    */
-  messageHandler?: IMessageHandler;
+  messageHandler?: MessageHandler;
   /**
    * Optional relay addresses to connect to at startup
    */
