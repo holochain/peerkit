@@ -28,5 +28,8 @@
     "skipLibCheck": true
   },
   "files": [],
-  "references": [{ "path": "packages/transport-libp2p" }]
+  "references": [
+    { "path": "packages/transport-libp2p" },
+    { "path": "packages/interface" }
+  ]
 }

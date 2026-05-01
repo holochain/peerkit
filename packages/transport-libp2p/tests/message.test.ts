@@ -10,10 +10,7 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
-import {
-  MessageHandler,
-  NetworkAccessHandler,
-} from "../src/types/transport.js";
+import type { MessageHandler, NetworkAccessHandler } from "@peerkit/interface";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
