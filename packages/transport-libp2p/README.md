@@ -33,13 +33,15 @@ const relay = await TransportLibp2p.createRelay(
 );
 ```
 
-## AgentId-only public API
+## NodeId-only public API
 
-All runtime methods are keyed by `AgentId` (`Uint8Array`). No libp2p types (`PeerId`, `Multiaddr`, `Connection`) cross the public boundary — the transport substrate stays swappable.
+All runtime methods are keyed by `NodeId` (an opaque string — the libp2p peer ID in multibase encoding). No libp2p types (`Connection`, `Multiaddr`) cross the public boundary. Mapping between peerkit `AgentId` and `NodeId` is the responsibility of the layer above the transport.
+
+Each transport instance exposes its own peer ID via `transport.getNodeId`.
 
 ## Access gating
 
-Every incoming connection must complete an access handshake on `/peerkit/access/0.1.0` before opening any other stream. The `INetworkAccessHandler` decides whether to grant or deny access. Denied agents are remembered for the session and rejected immediately on reconnect without re-running the handler.
+Every incoming connection must complete an access handshake on `/peerkit/access/v1` before opening any other stream. The `INetworkAccessHandler` decides whether to grant or deny access. Denied peers are remembered for the session and rejected immediately on reconnect without re-running the handler.
 
 ## `RelayAddress` format
 

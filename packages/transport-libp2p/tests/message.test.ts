@@ -10,7 +10,6 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
-import { NetworkAccessHandshake } from "../src/proto/access.js";
 import {
   IMessageHandler,
   INetworkAccessHandler,
@@ -19,13 +18,11 @@ import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 
-afterEach(async () => {
-  // Reset logger configuration
-  await reset();
-});
+// Reset logger configuration
+afterEach(reset);
 
 test("Opening a message stream without being granted access closes the connection", async () => {
-  const { node, address } = await createNode("valid");
+  const { node, address } = await createNode({ id: "valid" });
 
   // Create a node and try to open a stream with an unknown protocol.
   const libp2pNode = await createLibp2p({
@@ -58,12 +55,11 @@ test("Send a message after having been granted access", async () => {
     return Promise.resolve();
   };
   // Create a node that will receive the message
-  const { node, address } = await createNode(
-    "node1",
-    undefined,
+  const { node, address } = await createNode({
+    id: "node1",
     networkAccessHandler,
     messageHandler,
-  );
+  });
 
   // Create a node that will receive the message
   const encoder = new TextEncoder();
@@ -76,12 +72,7 @@ test("Send a message after having been granted access", async () => {
   // Connect to the first node, perform access handshake and send message
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId: new Uint8Array(32),
-      networkAccessBytes: encoder.encode(VALID_ACCESS_BYTES),
-    }),
-  );
+  accessStream.send(encoder.encode(VALID_ACCESS_BYTES));
   await accessStream.close();
 
   const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
@@ -106,12 +97,11 @@ test("Large messages are chunked and received correctly", async () => {
     return Promise.resolve();
   };
   // Create anode that will receive the message
-  const { node, address } = await createNode(
-    "node1",
-    undefined,
+  const { node, address } = await createNode({
+    id: "node1",
     networkAccessHandler,
     messageHandler,
-  );
+  });
 
   const encoder = new TextEncoder();
   const libp2pNode = await createLibp2p({
@@ -122,12 +112,7 @@ test("Large messages are chunked and received correctly", async () => {
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId: new Uint8Array(32),
-      networkAccessBytes: encoder.encode(VALID_ACCESS_BYTES),
-    }),
-  );
+  accessStream.send(encoder.encode(VALID_ACCESS_BYTES));
   await accessStream.close();
 
   const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);

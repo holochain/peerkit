@@ -10,27 +10,22 @@ import {
   CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
-import { NetworkAccessHandshake } from "../src/proto/access.js";
 import {
   createNode,
   createRelay,
-  makeAgentId,
   retryFnUntilTimeout,
   setupTestLogger,
 } from "./util.js";
 
 beforeEach(setupTestLogger);
 
-afterEach(async () => {
-  await reset();
-});
+afterEach(reset);
 
 test("Invalid network access bytes closes connection to relay", async () => {
-  const { relay, address } = await createRelay(
-    "relay",
-    undefined,
-    (_fromAgent, _bytes) => Promise.resolve(false), // Rejects all access
-  );
+  const { relay, address } = await createRelay({
+    id: "relay",
+    networkAccessHandler: async (_fromPeer, _bytes) => false, // Rejects all access
+  });
 
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
@@ -42,12 +37,7 @@ test("Invalid network access bytes closes connection to relay", async () => {
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId: new Uint8Array(32),
-      networkAccessBytes: new TextEncoder().encode("invalid"),
-    }),
-  );
+  accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
 
   await retryFnUntilTimeout(async () => connection.status === "closed");
@@ -57,7 +47,7 @@ test("Invalid network access bytes closes connection to relay", async () => {
 });
 
 test("Opening an agents stream without being granted access closes the connection", async () => {
-  const { relay, address } = await createRelay("relay");
+  const { relay, address } = await createRelay({ id: "relay" });
 
   const libp2pNode = await createLibp2p({
     transports: [tcp()],
@@ -75,11 +65,10 @@ test("Opening an agents stream without being granted access closes the connectio
 });
 
 test("Relay rejects message protocol streams", async () => {
-  const { relay, address } = await createRelay(
-    "relay",
-    undefined,
-    (_fromAgent, _bytes) => Promise.resolve(true), // Allow all access
-  );
+  const { relay, address } = await createRelay({
+    id: "relay",
+    networkAccessHandler: async (_fromPeer, _bytes) => true, // Allow all access
+  });
 
   // Create a node, connect to relay, perform access handshake and check that opening a message stream fails.
   const libp2pNode = await createLibp2p({
@@ -90,12 +79,7 @@ test("Relay rejects message protocol streams", async () => {
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId: new Uint8Array(32),
-      networkAccessBytes: new TextEncoder().encode("invalid"),
-    }),
-  );
+  accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
 
   await expect(
@@ -107,60 +91,45 @@ test("Relay rejects message protocol streams", async () => {
 });
 
 test("Relay knows node's agent infos after agent exchange", async () => {
-  const agentInfoReceivedByRelay: Uint8Array[] = [];
-  const nodeAgentId = makeAgentId("node1");
+  const agentInfosReceivedByRelay: Uint8Array[] = [];
 
   // Relay collects incoming agent bytes and sends them back to the node
-  const { relay, address: relayAddress } = await createRelay(
-    "relay",
-    async (fromAgent, bytes) => {
-      agentInfoReceivedByRelay.push(bytes);
-      // Echo agent info back to the sender
-      await relay.sendAgents(fromAgent, bytes);
+  const { relay, address: relayAddress } = await createRelay({
+    id: "relay",
+    agentsReceivedCallback: async (_fromPeer, bytes) => {
+      agentInfosReceivedByRelay.push(bytes);
     },
-    (_agentId, _bytes) => Promise.resolve(true),
-  );
-
-  const agentInfoReceivedByNode: Uint8Array[] = [];
-  const { node } = await createNode(
-    "node1",
-    async (_fromAgent, bytes) => {
-      agentInfoReceivedByNode.push(bytes);
+    networkAccessHandler: async (_fromPeer, _bytes) => {
+      console.log("hello");
+      return true;
     },
-    (_agentId, _bytes) => Promise.resolve(true),
-    undefined,
-    [relayAddress],
-  );
+  });
 
-  // Send agent info from node to relay
-  await node.sendAgents(
-    makeAgentId("relay"),
-    new TextEncoder().encode("node1-agent-info"),
-  );
+  const agentInfosReceivedByNode: Uint8Array[] = [];
+  const { node } = await createNode({
+    id: "node1",
+    agentsReceivedCallback: async (_fromPeer, bytes) => {
+      agentInfosReceivedByNode.push(bytes);
+    },
+    networkAccessHandler: async (_fromPeer, _bytes) => true,
+    bootstrapRelays: [relayAddress],
+  });
 
-  // Relay receives it and echoes back; node receives the echo
-  await retryFnUntilTimeout(async () => agentInfoReceivedByRelay.length === 1);
-  await retryFnUntilTimeout(async () => agentInfoReceivedByNode.length === 1);
+  // Relay sends agent infos to node
+  const agentInfosOnRelay = new TextEncoder().encode("relay-initiated");
+  await relay.sendAgents(node.getNodeId(), agentInfosOnRelay);
 
-  assert.equal(
-    new TextDecoder().decode(agentInfoReceivedByRelay[0]),
-    "node1-agent-info",
-  );
-  assert.equal(
-    new TextDecoder().decode(agentInfoReceivedByNode[0]),
-    "node1-agent-info",
-  );
+  // Node receives them
+  await retryFnUntilTimeout(async () => agentInfosReceivedByNode.length === 1);
+  assert.deepEqual(agentInfosReceivedByNode[0], agentInfosOnRelay);
 
-  // Relay can reach the node by agentId (two-way handshake populated relay agent-peer-mapping)
-  await relay.sendAgents(
-    nodeAgentId,
-    new TextEncoder().encode("relay-initiated"),
-  );
-  await retryFnUntilTimeout(async () => agentInfoReceivedByNode.length === 2);
-  assert.equal(
-    new TextDecoder().decode(agentInfoReceivedByNode[1]),
-    "relay-initiated",
-  );
+  // Send agent infos from node to relay
+  const agentInfosOnNode = new TextEncoder().encode("node1-agent-info");
+  await node.sendAgents(relay.getNodeId(), agentInfosOnNode);
+
+  // Relay receives them
+  await retryFnUntilTimeout(async () => agentInfosReceivedByRelay.length === 1);
+  assert.deepEqual(agentInfosReceivedByRelay[0], agentInfosOnNode);
 
   await node.stop();
   await relay.stop();

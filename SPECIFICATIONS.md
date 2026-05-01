@@ -168,9 +168,11 @@ The choice to have explicit infrastructure rather than pure peer-to-peer infrast
 
 Layer 0 is responsible for establishing connections between peers, enforcing network access control, and routing application-level messages. The reference implementation is [`@peerkit/transport-libp2p`](packages/transport-libp2p/), built on libp2p.
 
-#### Public API: AgentId only
+#### Public API: NodeId only
 
-The transport's public API uses peerkit-native types only. `AgentId` identifies peers across every method, callback, and event. Library-specific identifiers (libp2p `PeerId`, libp2p `Connection`, multiformats `Multiaddr`) never cross the public boundary. The transport translates internally so the networking library can be swapped without affecting any caller.
+The transport's public API uses a single opaque `NodeId` type (a string) across every method, callback, and event. Library-specific identifiers (libp2p `NodeId`, libp2p `Connection`, multiformats `Multiaddr`) never cross the public boundary. The transport translates internally so the networking library can be swapped without affecting any caller.
+
+Mapping between peerkit `AgentId` (public key) and the transport's `NodeId` is the responsibility of the layer above the transport.
 
 The only externally-supplied address in the transport's public API is the relay address used at bootstrap (passed at construction). All other addressing — peers' addresses, relay paths, identification of unconnected peers — is an implementation detail of the transport, handled through the networking library's own peer-discovery and peer-store mechanisms.
 
@@ -235,8 +237,8 @@ The transport's contract to the rest of Peerkit is fully described by:
 
 - The two construction modes (infrastructure, regular).
 - A network access handler hook.
-- Connect by `AgentId`.
-- Send/receive opaque bytes by `AgentId` for agent-info and application messages.
+- Connect by `NodeId`.
+- Send/receive opaque bytes by `NodeId` for agent-info and application messages.
 - Relay willingness configuration.
 
 A second implementation (iroh, future) would replace the library-specific internals while exposing the same surface. Packages above the transport remain unchanged when the networking library changes.
@@ -246,13 +248,14 @@ A second implementation (iroh, future) would replace the library-specific intern
 **Types**:
 
 ```typescript
-// Identifier for an agent (its public key)
-type AgentId = Uint8Array;
+// Opaque peer identifier string (libp2p peer ID multibase encoding).
+// Mapping to peerkit AgentId is the responsibility of the layer above.
+type NodeId = string;
 
 // Byte sequence presented to prove network access has been granted
 type NetworkAccessBytes = Uint8Array;
 
-// Info asssociated with an agent
+// Info associated with an agent
 export interface IAgentInfo {
   id: AgentId;
   canRelay: boolean;
@@ -261,36 +264,22 @@ export interface IAgentInfo {
 
 **API**:
 
-The transport is injected as a dependency. The orchestrator interacts with it through the `ITransport` interface. The transport package exposes two construction paths — one for infrastructure nodes, one for regular nodes — both producing instances that satisfy `ITransport`. On infrastructure nodes, application messaging (`send`, `setMessageHandler`) is not serviced; peers attempting to use it see a clean protocol-unsupported error.
+The transport is injected as a dependency. The orchestrator interacts with it through the `ITransport` interface. The transport package exposes two construction paths — one for infrastructure nodes, one for regular nodes — both producing instances that satisfy `ITransport`. On infrastructure nodes, application messaging (`send`) is not serviced; peers attempting to use it see a clean protocol-unsupported error.
 
 ```typescript
 interface ITransport {
-  // Establish a connection to a peer by AgentId, performing the access
-  // handshake. Resolves once the remote has accepted access.
-  connect(agentId: AgentId, bytes: NetworkAccessBytes): Promise<void>;
+  // Get the transport's node ID
+  getNodeId(): NodeId;
 
-  // Send a list of serialized agent infos to another agent.
-  sendAgents(agentId: AgentId, agentList: Uint8Array): Promise<void>;
+  // Establish a connection to a peer by NodeId, performing the access
+  // handshake. Resolves once the remote has accepted access.
+  connect(peerId: NodeId, bytes: NetworkAccessBytes): Promise<void>;
+
+  // Send a list of serialized agent infos to another peer.
+  sendAgents(peerId: NodeId, agentList: Uint8Array): Promise<void>;
 
   // Send opaque application data to a peer. Regular nodes only.
-  send(agentId: AgentId, data: Uint8Array): Promise<void>;
-
-  // Hook called on each incoming network access handshake.
-  // Return true to accept, false to reject and drop the connection.
-  setNetworkAccessHandler(
-    handler: (agentId: AgentId, bytes: NetworkAccessBytes) => boolean,
-  ): void;
-
-  // Hook called with serialized list of agent infos received from another agent.
-  setAgentsReceivedHandler(
-    handler: (fromAgentId: AgentId, bytes: Uint8Array) => void,
-  ): void;
-
-  // Hook called with serialized message received from another agent.
-  // Regular nodes only.
-  setMessageHandler(
-    handler: (fromAgentId: AgentId, bytes: Uint8Array) => void,
-  ): void;
+  send(peerId: NodeId, data: Uint8Array): Promise<void>;
 
   // Shut down the transport.
   stop(): Promise<void>;
