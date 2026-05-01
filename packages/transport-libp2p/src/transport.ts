@@ -5,29 +5,27 @@ import {
   circuitRelayTransport,
 } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
-import type { Connection, PeerId, Stream } from "@libp2p/interface";
+import type { Connection, Stream } from "@libp2p/interface";
+import { peerIdFromString as nodeIdFromString } from "@libp2p/peer-id";
 import { tcp } from "@libp2p/tcp";
 import { getLogger, type Logger } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import type { Libp2p } from "libp2p";
 import { createLibp2p } from "libp2p";
 import { encodeFrame, FrameDecoder } from "./frame.js";
-import { NetworkAccessHandshake } from "./proto/access.js";
 import type {
-  AgentId,
   IAgentsReceivedCallback,
   IMessageHandler,
   INetworkAccessHandler,
   ITransport,
   NetworkAccessBytes,
+  NodeId,
   RelayAddress,
 } from "./types/index.js";
 
 export interface RelayOptions {
   addrs?: string[];
   id?: string;
-  /** The AgentId of this relay node */
-  agentId: AgentId;
   /**
    * Network access bytes sent in the counter-handshake response to connecting peers.
    */
@@ -37,25 +35,19 @@ export interface RelayOptions {
 export interface NodeOptions {
   addrs?: string[];
   id?: string;
-  /** The AgentId of this node */
-  agentId: AgentId;
-  /**
-   * Relay addresses to connect to at startup. Format: {@link @multiformats/multiaddr!Multiaddr}
-   */
-  bootstrapRelays?: RelayAddress[];
   /**
    * Network access bytes sent to relays during bootstrap handshake and in counter-handshake responses.
    */
   networkAccessBytes?: NetworkAccessBytes;
   /**
+   * Relay addresses to connect to at startup. Format: {@link @multiformats/multiaddr!Multiaddr}
+   */
+  bootstrapRelays?: RelayAddress[];
+  /**
    * Timeout in milliseconds for the outbound access handshake response. Defaults to 10 000 ms.
    */
   handshakeTimeoutMs?: number;
 }
-
-// Stable string key for an AgentId (Uint8Array has no value equality in JS).
-const agentIdToKey = (agentId: AgentId) =>
-  agentId.reduce((acc, byte) => acc + byte.toString(16).padStart(2, "0"), "");
 
 /**
  * Identifier for the current network access protocol in peerkit.
@@ -88,20 +80,15 @@ export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
 export class TransportLibp2p implements ITransport {
   private libp2p: Libp2p;
   private logger: Logger;
-  private localAgentId: AgentId;
   private localNetworkAccessBytes: NetworkAccessBytes;
   private handshakeTimeoutMs: number;
   private agentsReceivedCallback: IAgentsReceivedCallback;
   private networkAccessHandler: INetworkAccessHandler;
   private messageHandler?: IMessageHandler;
 
-  // Map of peerkit agent ID to libp2p peer ID.
-  private peerToAgent: Map<PeerId, AgentId> = new Map();
-  // Reverse map for lookups of libp2p peer from agent ID.
-  private agentToPeer: Map<string, PeerId> = new Map();
-  // Map is keyed by a string, because objects are compared by reference, not by value.
-  // true = granted, false = denied. Both entries are sticky for the session.
-  private agentAccess: Map<string, boolean> = new Map();
+  // Keyed by NodeId string. true = granted, false = denied.
+  // Both entries are sticky for the session.
+  private nodeAccess: Map<string, boolean> = new Map();
 
   constructor(
     libp2p: Libp2p,
@@ -110,9 +97,8 @@ export class TransportLibp2p implements ITransport {
     messageHandler?: IMessageHandler,
     options?: NodeOptions | RelayOptions,
   ) {
-    this.localAgentId = options?.agentId ?? new Uint8Array(32);
     this.localNetworkAccessBytes =
-      options?.networkAccessBytes ?? new Uint8Array(0);
+      options?.networkAccessBytes ?? new Uint8Array([0]); // If set to new Uint8Array(0), .send doesn't send anything confuses the hell out of everyone
     this.handshakeTimeoutMs =
       (options &&
         "handshakeTimeoutMs" in options &&
@@ -204,38 +190,28 @@ export class TransportLibp2p implements ITransport {
     );
   }
 
-  async connect(agentId: AgentId, _bytes: NetworkAccessBytes): Promise<void> {
-    const key = agentIdToKey(agentId);
-    const peerId = this.agentToPeer.get(key);
-    if (!peerId) {
-      throw new Error(
-        "Agent not known to this transport. Ensure the agent has been discovered via the agents channel before calling connect().",
-      );
-    }
-    await this.libp2p.dial(peerId);
+  getNodeId(): NodeId {
+    return this.libp2p.peerId.toString();
   }
 
-  async send(_agentId: AgentId, _data: Uint8Array): Promise<void> {}
+  async connect(nodeId: NodeId, _bytes: NetworkAccessBytes): Promise<void> {
+    await this.libp2p.dial(nodeIdFromString(nodeId));
+  }
 
-  async sendAgents(agentId: AgentId, data: Uint8Array): Promise<void> {
-    const key = agentIdToKey(agentId);
-    const peerId = this.agentToPeer.get(key);
-    if (!peerId) {
-      throw new Error(
-        "Agent not known to this transport. Ensure the agent has been discovered before calling sendAgents().",
-      );
-    }
-    const connections = this.libp2p.getConnections(peerId);
+  async sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void> {
+    const libp2pPeerId = nodeIdFromString(nodeId);
+    const connections = this.libp2p.getConnections(libp2pPeerId);
     if (!connections.length) {
-      this.logger.error("sendAgents: No open connection to agent {*}", {
-        agentId,
-        peerId,
-      });
+      throw new Error(
+        `No open connection to peer ${nodeId}. Ensure the peer is connected before calling sendAgents().`,
+      );
     }
     const stream = await connections[0]!.newStream(CURRENT_AGENTS_PROTOCOL);
     stream.send(encodeFrame(data));
     await stream.close();
   }
+
+  async send(_nodeId: NodeId, _data: Uint8Array): Promise<void> {}
 
   async stop(): Promise<void> {
     return this.libp2p.stop();
@@ -260,69 +236,49 @@ export class TransportLibp2p implements ITransport {
     this.logger.info("Connecting to relay {*}", { relay });
     const connection = await this.libp2p.dial(addr);
 
-    // Perform outbound access handshake.
+    // Perform access handshake
     const stream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-    stream.send(
-      NetworkAccessHandshake.encode({
-        agentId: this.localAgentId,
-        networkAccessBytes: this.localNetworkAccessBytes,
-      }),
-    );
+    stream.send(this.localNetworkAccessBytes);
 
     // Await access handshake response with a timeout.
-    const accessHandshakeResponse = await new Promise<Uint8Array>(
-      (resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(new Error("Access handshake response timed out")),
-          this.handshakeTimeoutMs,
-        );
-        stream.addEventListener(
-          "message",
-          (message) => {
-            clearTimeout(timer);
-            const data =
-              message.data instanceof Uint8Array
-                ? message.data
-                : message.data.subarray();
-            resolve(data);
-          },
-          { once: true },
-        );
-      },
-    );
-
-    let handshake: NetworkAccessHandshake;
-    try {
-      handshake = NetworkAccessHandshake.decode(accessHandshakeResponse);
-    } catch {
-      this.logger.error(
-        "Failed to decode access handshake response. Closing connection.",
+    const responseBytes = await new Promise<Uint8Array>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Access handshake response timed out")),
+        this.handshakeTimeoutMs,
       );
-      await connection.close();
-      return;
-    }
+      stream.addEventListener(
+        "message",
+        (message) => {
+          clearTimeout(timer);
+          const data =
+            message.data instanceof Uint8Array
+              ? message.data
+              : message.data.subarray();
+          resolve(data);
+        },
+        { once: true },
+      );
+    });
 
-    const agentIdKey = agentIdToKey(handshake.agentId);
+    const peerKey = connection.remotePeer.toString();
     const accessGranted = await this.networkAccessHandler(
-      handshake.agentId,
-      handshake.networkAccessBytes,
+      connection.remotePeer.toString(),
+      responseBytes,
     );
-    this.agentAccess.set(agentIdKey, accessGranted);
+    this.nodeAccess.set(peerKey, accessGranted);
     if (accessGranted) {
-      this.peerToAgent.set(connection.remotePeer, handshake.agentId);
-      this.agentToPeer.set(agentIdKey, connection.remotePeer);
-      this.logger.info("Outbound access granted {*}", {
-        agentId: handshake.agentId,
+      this.logger.info("Access granted {*}", {
+        peerId: connection.remotePeer,
       });
     } else {
-      this.logger.warn(
-        "Outbound access denied by remote. Closing connection. {*}",
-        { agentId: handshake.agentId },
-      );
+      this.logger.warn("Access denied by remote. Closing connection. {*}", {
+        peerId: connection.remotePeer,
+      });
       await connection.close();
     }
   }
 
+  // Handler incoming network access streams
   private onAccessConnect = async (stream: Stream, connection: Connection) => {
     this.logger.info(`Incoming access stream {*}`, {
       remoteId: connection.remotePeer,
@@ -335,37 +291,26 @@ export class TransportLibp2p implements ITransport {
             ? message.data
             : message.data.subarray();
 
-        let handshake: NetworkAccessHandshake;
-        try {
-          handshake = NetworkAccessHandshake.decode(raw);
-        } catch {
-          this.logger.error(
-            "Failed to decode access handshake. Closing connection. {*}",
-            { remoteId: connection.remotePeer },
-          );
-          await connection.close();
-          return;
-        }
-        const agentIdKey = agentIdToKey(handshake.agentId);
+        const peerKey = connection.remotePeer.toString();
 
         this.logger.debug("Network access message {*}", {
-          agentId: handshake.agentId,
-          access: this.agentAccess.get(agentIdKey),
+          remoteId: connection.remotePeer,
+          access: this.nodeAccess.get(peerKey),
         });
-        // Check if this agent has been denied access before
-        if (this.agentAccess.get(agentIdKey) === false) {
+        // Check if this peer has been denied access before
+        if (this.nodeAccess.get(peerKey) === false) {
           this.logger.warn(
-            "Previously rejected agent is trying to access network again. Closing connection without network access check. {*}",
-            { agentId: handshake.agentId },
+            "Previously rejected peer is trying to access network again. Closing connection. {*}",
+            { remoteId: connection.remotePeer },
           );
           return await connection.close();
         }
 
         const accessGranted = await this.networkAccessHandler(
-          handshake.agentId,
-          handshake.networkAccessBytes,
+          connection.remotePeer.toString(),
+          raw,
         );
-        this.agentAccess.set(agentIdKey, accessGranted);
+        this.nodeAccess.set(peerKey, accessGranted);
         this.logger.info("Access {*}", {
           remoteId: connection.remotePeer,
           accessGranted,
@@ -375,28 +320,22 @@ export class TransportLibp2p implements ITransport {
           await connection.close();
           return;
         }
-        this.peerToAgent.set(connection.remotePeer, handshake.agentId);
-        this.agentToPeer.set(agentIdKey, connection.remotePeer);
-        stream.send(
-          NetworkAccessHandshake.encode({
-            agentId: this.localAgentId,
-            networkAccessBytes: this.localNetworkAccessBytes,
-          }),
-        );
+        stream.send(this.localNetworkAccessBytes);
       },
       { once: true },
     );
   };
 
+  // Handler for incoming agents streams
   private onAgentsConnect = async (stream: Stream, connection: Connection) => {
-    this.logger.info(`Incoming stream {*}`, {
+    this.logger.info(`Incoming agents stream {*}`, {
       remoteId: connection.remotePeer,
     });
-    const agentId = this.peerToAgent.get(connection.remotePeer);
-    if (!agentId || this.agentAccess.get(agentIdToKey(agentId)) !== true) {
+    const peerKey = connection.remotePeer.toString();
+    if (this.nodeAccess.get(peerKey) !== true) {
       this.logger.warn(
         "Remote peer tried to open an agents stream without being granted access. Closing connection. {*}",
-        { agentId, remoteId: connection.remotePeer },
+        { remoteId: connection.remotePeer },
       );
       await connection.close();
       return;
@@ -413,11 +352,15 @@ export class TransportLibp2p implements ITransport {
           `Incoming message on stream ${CURRENT_AGENTS_PROTOCOL} {*}`,
           { peerId: connection.remotePeer, byteLength: msg.byteLength },
         );
-        await this.agentsReceivedCallback(agentId, msg);
+        await this.agentsReceivedCallback(
+          connection.remotePeer.toString(),
+          msg,
+        );
       }
     });
   };
 
+  // Handler for incoming message streams
   private onMessageConnect = async (stream: Stream, connection: Connection) => {
     if (!this.messageHandler) {
       throw new Error(
@@ -426,11 +369,11 @@ export class TransportLibp2p implements ITransport {
     }
     // Assign to another variable to preserve that `messageHandler` is defined.
     const messageHandler = this.messageHandler;
-    this.logger.info(`Incoming stream {*}`, {
+    this.logger.info(`Incoming message stream {*}`, {
       remoteId: connection.remotePeer,
     });
-    const agentId = this.peerToAgent.get(connection.remotePeer);
-    if (!agentId || this.agentAccess.get(agentIdToKey(agentId)) !== true) {
+    const peerKey = connection.remotePeer.toString();
+    if (this.nodeAccess.get(peerKey) !== true) {
       this.logger.warn(
         "Remote peer tried to open a message stream without being granted access. Closing connection. {*}",
         { remoteId: connection.remotePeer },
@@ -450,7 +393,7 @@ export class TransportLibp2p implements ITransport {
           `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
           { peerId: connection.remotePeer, byteLength: msg.byteLength },
         );
-        messageHandler(agentId, msg);
+        messageHandler(connection.remotePeer.toString(), msg);
       }
     });
   };

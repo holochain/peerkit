@@ -6,27 +6,18 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_ACCESS_PROTOCOL } from "../src/index.js";
-import { NetworkAccessHandshake } from "../src/proto/access.js";
-import {
-  createNode,
-  makeAgentId,
-  retryFnUntilTimeout,
-  setupTestLogger,
-} from "./util.js";
+import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 
-afterEach(async () => {
-  // Reset logger configuration
-  await reset();
-});
+// Reset logger configuration
+afterEach(reset);
 
 test("Remote node closes connection when host sends invalid network access bytes", async () => {
-  const { node, address } = await createNode(
-    "valid",
-    undefined,
-    (_agentId, _bytes) => Promise.resolve(false), // Rejects all access attempts.
-  );
+  const { node, address } = await createNode({
+    id: "valid",
+    networkAccessHandler: async (_fromPeer, _bytes) => false, // Rejects all access attempts.
+  });
 
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
@@ -38,12 +29,7 @@ test("Remote node closes connection when host sends invalid network access bytes
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId: new Uint8Array(32),
-      networkAccessBytes: new TextEncoder().encode("invalid"),
-    }),
-  );
+  accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
 
   await retryFnUntilTimeout(async () => connection.status === "closed");
@@ -54,27 +40,23 @@ test("Remote node closes connection when host sends invalid network access bytes
 
 test("Access handshake initiator closes connection when responder is denied", async () => {
   // Responder grants the initiator, but initiator will deny the responder.
-  const { node: responder, address: responderAddress } = await createNode(
-    "responder",
-    undefined,
-    (_agentId, _bytes) => Promise.resolve(true), // Grants initiator
-  );
+  const { node: responder, address: responderAddress } = await createNode({
+    id: "responder",
+    networkAccessHandler: async (_fromPeer, _bytes) => true, // Grants initiator
+  });
 
   // Initiator denies all incoming access — so after the outbound handshake response arrives,
   // it will deny the responder and close the connection.
-  const { node: initiator } = await createNode(
-    "initiator",
-    undefined,
-    (_agentId, _bytes) => Promise.resolve(false), // Denies responder
-    undefined,
-    [responderAddress],
-  );
+  const { node: initiator } = await createNode({
+    id: "initiator",
+    networkAccessHandler: async (_fromPeer, _bytes) => false, // Denies responder
+    bootstrapRelays: [responderAddress],
+  });
 
   // After bootstrap attempt, the initiator should have closed the connection.
-  // The responder's agentId should not be reachable from initiator.
-  const responderAgentId = makeAgentId("responder");
+  // The responder's peer ID should not be reachable from initiator.
   await expect(
-    initiator.sendAgents(responderAgentId, new Uint8Array([1])),
+    initiator.sendAgents(responder.getNodeId(), new Uint8Array([0])),
   ).rejects.toThrow();
 
   await initiator.stop();
@@ -98,18 +80,16 @@ test("Outbound access handshake times out when responder sends no response", asy
 
   // Node with a very short timeout so the test doesn't take 10 s.
   // create() resolves — relay failures are logged but not fatal.
-  const { node } = await createNode(
-    "initiator",
-    undefined,
-    (_agentId, _bytes) => Promise.resolve(true),
-    undefined,
-    [silentAddress],
-    50, // handshakeTimeoutMs
-  );
+  const { node } = await createNode({
+    id: "initiator",
+    networkAccessHandler: async (_fromPeer, _bytes) => true,
+    bootstrapRelays: [silentAddress],
+    handshakeTimeoutMs: 50,
+  });
 
-  // The relay's agentId was never registered — sendAgents should throw.
+  // The silent node's peer ID was never granted access — sendAgents should throw.
   await expect(
-    node.sendAgents(makeAgentId("relay"), new Uint8Array([1])),
+    node.sendAgents(libp2pNode.peerId.toString(), new Uint8Array([0])),
   ).rejects.toThrow();
 
   await node.stop();
@@ -117,7 +97,7 @@ test("Outbound access handshake times out when responder sends no response", asy
 });
 
 test("Opening a stream with an unknown protocol fails", async () => {
-  const { node, address } = await createNode("valid");
+  const { node, address } = await createNode({ id: "valid" });
 
   // Create a node and try to open a stream with an unknown protocol.
   const libp2pNode = await createLibp2p({
@@ -135,36 +115,12 @@ test("Opening a stream with an unknown protocol fails", async () => {
   await node.stop();
 });
 
-test("Sending malformed bytes on the access stream closes the connection", async () => {
-  const { node, address } = await createNode("valid", undefined, () =>
-    Promise.resolve(true),
-  );
-
-  const libp2pNode = await createLibp2p({
-    transports: [tcp()],
-    connectionEncrypters: [noise()],
-    streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
-  });
-  const connection = await libp2pNode.dial(multiaddr(address));
-  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(new Uint8Array([0xff, 0xff, 0xff, 0xff]));
-  await accessStream.close();
-
-  // Connection should be closed after the malformed handshake.
-  await retryFnUntilTimeout(async () => connection.status === "closed");
-
-  await libp2pNode.stop();
-  await node.stop();
-});
-
-test("Network access handler is not repeatedly called for previously rejected agent", async () => {
+test("Network access handler is not repeatedly called for previously rejected peer", async () => {
   const networkAccessHandler = vi.fn().mockReturnValue(false); // Rejects all access
-  const { node, address } = await createNode(
-    "valid",
-    undefined,
+  const { node, address } = await createNode({
+    id: "valid",
     networkAccessHandler,
-  );
+  });
 
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
@@ -174,15 +130,9 @@ test("Network access handler is not repeatedly called for previously rejected ag
     streamMuxers: [yamux()],
     addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
   });
-  const agentId = new Uint8Array(32);
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(
-    NetworkAccessHandshake.encode({
-      agentId,
-      networkAccessBytes: new TextEncoder().encode("invalid"),
-    }),
-  );
+  accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
   console.log("once");
 
@@ -193,12 +143,7 @@ test("Network access handler is not repeatedly called for previously rejected ag
   // Connect again to the same node
   const connection2 = await libp2pNode.dial(multiaddr(address));
   const accessStream2 = await connection2.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream2.send(
-    NetworkAccessHandshake.encode({
-      agentId,
-      networkAccessBytes: new TextEncoder().encode("invalid"),
-    }),
-  );
+  accessStream2.send(new TextEncoder().encode("invalid"));
   await accessStream2.close();
 
   await retryFnUntilTimeout(async () => connection2.status === "closed");

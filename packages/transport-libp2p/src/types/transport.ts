@@ -1,4 +1,10 @@
-import type { AgentId } from "./agent.js";
+/**
+ * Opaque node identifier string.
+ * The transport uses this type across its public surface to identify peers.
+ *
+ * Mapping to peerkit AgentId is the responsibility of the caller.
+ */
+export type NodeId = string;
 
 /**
  * Byte sequence to prove access to a network has been granted
@@ -20,7 +26,7 @@ export type RelayAddress = string;
  * a peer has access to the network or not.
  */
 export type INetworkAccessHandler = (
-  agentId: AgentId,
+  nodeId: NodeId,
   bytes: NetworkAccessBytes,
 ) => Promise<boolean>;
 
@@ -28,15 +34,21 @@ export type INetworkAccessHandler = (
  * Interface to handle incoming messages from a message stream.
  */
 export type IMessageHandler = (
-  fromAgent: AgentId,
+  fromNode: NodeId,
   message: Uint8Array,
 ) => Promise<void>;
 
 /**
- * Callback to call when agents have been received from other nodes.
+ * Called when the circuit relay reservation is established and the node
+ * can be contacted through the relay.
+ */
+export type ConnectedToRelayHandler = () => void;
+
+/**
+ * Callback to call when agents have been received from another node.
  */
 export type IAgentsReceivedCallback = (
-  fromAgent: AgentId,
+  fromNode: NodeId,
   bytes: Uint8Array,
 ) => Promise<void>;
 
@@ -45,27 +57,26 @@ export type IAgentsReceivedCallback = (
  */
 export interface ITransport {
   /**
-   * Establish a connection to a known agent. The agent must have been
-   * previously discovered via {@link sendAgents}; throws if unknown.
+   * Get the transport-level identifier of this node.
    */
-  connect(agentId: AgentId, bytes: NetworkAccessBytes): Promise<void>;
+  getNodeId(): NodeId;
 
   /**
-   * Send an opaque application message to an agent.
-   * The agent must be connected.
+   * Establish a connection to a known peer. Throws if the peer is unknown.
    */
-  send(agentId: AgentId, data: Uint8Array): Promise<void>;
+  connect(nodeId: NodeId, bytes: NetworkAccessBytes): Promise<void>;
 
   /**
-   * Send opaque agent-info bytes to an agent.
-   * The agent must be connected and have been granted access.
-   *
-   * For relay nodes, the orchestrator calls this automatically in response to
-   * incoming agent-info (e.g. to bootstrap newly connected peers).
-   * For regular nodes, the caller is responsible for invoking it explicitly
-   * (e.g. after bootstrap or on agent-info change).
+   * Send opaque agent-info bytes to a peer.
+   * The peer must be connected and have been granted access.
    */
-  sendAgents(agentId: AgentId, data: Uint8Array): Promise<void>;
+  sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void>;
+
+  /**
+   * Send an opaque application message to a peer.
+   * The peer must be connected and have been granted access.
+   */
+  send(nodeId: NodeId, data: Uint8Array): Promise<void>;
 
   /**
    * Shut down the transport and all underlying connections.
