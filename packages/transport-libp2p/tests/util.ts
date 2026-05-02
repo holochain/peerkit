@@ -91,8 +91,6 @@ export interface TestRelayOptions {
 
 /**
  * Creates a test relay transport
- *
- * @returns A Peerkit transport and its listening address (for raw libp2p dials in tests)
  */
 export const createRelay = async (options: TestRelayOptions) => {
   const { id, networkAccessBytes } = options;
@@ -118,7 +116,7 @@ export interface TestNodeOptions {
    */
   id?: string;
   /**
-   * Optional handler for receiving agents
+   * Optional callback when receiving agents
    */
   agentsReceivedCallback?: AgentsReceivedCallback;
   /**

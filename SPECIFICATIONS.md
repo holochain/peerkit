@@ -2,7 +2,7 @@
 
 ## 1. What is Peerkit aiming to accomplish?
 
-Peerkit is a peer-to-peer (P2P) data synchronization library. Its purpose is to enable developers to add decentralized data sharing to their applications without dedicated server infrastructure (beyond optional, openly-runnable relay and bootstrap nodes), where groups of users have full control over their data and their participation.
+Peerkit is a peer-to-peer (P2P) data synchronization library. Its purpose is to enable developers to add decentralized data sharing to their applications, where groups of users have full control over their data and their participation.
 
 Peerkit is not a runtime or an all-or-nothing framework. It is a library that can be integrated into existing applications. An app may use Peerkit to synchronize only a subset of its data, while the rest of the app uses conventional storage, APIs, or other backends. Peerkit only manages the data that is specified through its storage hooks. This makes adoption incremental: developers can add P2P capabilities to one feature of an existing app without rewriting the rest.
 
@@ -44,7 +44,7 @@ Low-level libraries like libp2p provide networking primitives: transport, encryp
 - How to manage access control, membership, and privacy
 - How to handle scalability as the network grows
 
-Peerkit sits above these libraries and provides an opinionated-by-default but modular framework that addresses all of the above, while using libp2p (or iroh if libp2p proves problematic in production) as its networking library. Where iroh's built-in protocols (gossip, blobs, docs) overlap with Peerkit's higher-level functionality, Peerkit may leverage them as implementations rather than rebuilding equivalent functionality.
+Peerkit sits above these libraries and provides an opinionated-by-default but modular framework that addresses all of the above.
 
 ### Positioning relative to p2panda
 
@@ -84,7 +84,7 @@ p2panda provides a similar layer of abstraction (structured data, gossip, access
 
 - **Platforms**: runs fully on Linux, macOS, Windows, Android, and iOS. Runs on Chromium at least in leecher mode over a relayed connection.
 - **Language**: users MAY write apps in JavaScript/TypeScript. Framework itself is TypeScript.
-- **Minimal out-of-band data**: ideally only the address of an entry point and entrance secrets for the app space are required to use an app. Self-descriptive data.
+- **Minimal out-of-band data**: ideally only the address of an entry point and entrance secrets for the app space are required to use an app.
 - **Modularity**: must be agnostic to or allow swapping of data distribution strategy, data/state model, storage implementation, and transport medium.
 - **Privacy and security**: assume adversaries are present. Privacy and security built in at the network layer.
 - **Resource-conscious**: should run on old smartphones with metered data. No unreasonable burdens on devices.
@@ -120,13 +120,13 @@ Design principles:
 
 An **agent** is a participant with a cryptographic identity: a public/private keypair. The agent's public key is its `AgentId` — a stable, verifiable identifier that does not depend on any central registry.
 
-The framework generates the agent's keypair on first run and persists it through storage. On subsequent runs it reloads the same keypair. The app does not provide or manage key material. Signing happens internally — the private key is never exposed.
+The framework generates the agent's keypair on first run and persists it through storage. On subsequent runs it reloads the same keypair. The app does not provide or manage key material. Signing happens and the private key is never exposed.
 
 The local agent's public identity is accessible after initialization through the orchestrator.
 
-`AgentInfo` is the shareable, serializable descriptor exchanged between peers — an agent's "business card." Its schema is owned by the agent module; from the transport's perspective `AgentInfo` is opaque bytes. Whether it carries connectivity-relevant addressing or only app-meaningful metadata is the agent module's call. Address resolution for connecting peers is the transport's internal concern, handled through the networking library's own peer-discovery and peer-store mechanisms.
+`AgentInfo` is the shareable, serializable descriptor exchanged between peers. Its schema is owned by the agent module. From the transport's perspective `AgentInfo` is opaque bytes. It carries the address where the agent can be contacted at.
 
-**Signing**: signed payloads (e.g. state changes in higher-level components) are signed by their author using the agent's private key. Peers verify the signature using the AgentId. This ensures only the holder of the private key can produce signatures attributed to that agent — no central authority is needed.
+**Signing**: signed payloads (e.g. state changes in higher-level components) are signed by their author using the agent's private key. Peers verify the signature using the AgentId.
 
 #### Data validation
 
@@ -141,22 +141,18 @@ Storage is opinionated and platform-dependent. Pluggable storage lets developers
 
 Storage is injected as a dependency. The framework defines a storage interface; applications provide an implementation. Peerkit ships SurrealDB as the default implementation, which runs in both Node.js and browser environments.
 
-Different components persist different things — agent registry entries, blobs, orchestrator-managed state. The exact storage interface is documented at the package level.
-
-The transport package has no Storage dependency. Any state the transport produces that should survive across restarts (e.g. cached connectivity hints, a denied-agent set) is surfaced to the orchestrator, which persists it through Storage and passes it back at construction time.
+Different components persist different things. The exact storage interface is documented at the package level.
 
 ### Infrastructure
 
-Peerkit's network architecture distinguishes regular nodes — the participants — from infrastructure that supports them. Infrastructure consists of:
+Peerkit's network architecture distinguishes regular nodes — the participants — from infrastructure that supports them. Infrastructure serves two distinct roles:
 
-- **Relays**: provide circuit-relay service so regular nodes behind NAT can be reached. Most consumer devices sit behind a router that blocks incoming connections; relays allow these devices to participate.
-- **Bootstrap service for peer discovery**: distributes the current set of known agents to new joiners, so that a node freshly connecting to the network learns about other agents and can begin synchronizing data with them.
+- **Relay**: provides NAT traversal so regular nodes behind restrictive routers can be reached. Most consumer devices cannot accept incoming connections directly; relays bridge this gap. The relay is transport-internal infrastructure: its address is passed as configuration at construction and it is never exposed to the layer above as a `NodeId`. How the relay is used is an implementation detail of the transport (libp2p uses a circuit-relay peer; iroh uses relay servers contacted over HTTPS).
+- **Bootstrap node**: an addressable node with a `NodeId` that distributes the current set of known agents to new joiners. A node freshly connecting to the network contacts the bootstrap peer, exchanges agent infos with it, and through those infos learns about and connects to other peers. The bootstrap peer is a regular node, the layer above sends agent infos to it by `NodeId` just like any other peer.
+
+These two roles are logically independent. They can be hosted on the same machine at the same public address (as in the MVP, where a single infrastructure node serves both), or split across separate nodes.
 
 Infrastructure is openly runnable: there is no privileged operator, no central authority. App developers, communities, or motivated users run infrastructure nodes; networks support multiple. Infrastructure has no privileged access to application data — it is gated by the network access control and routed end-to-end between regular nodes.
-
-In MVP, both infrastructure functions run together on the same nodes. In principle they can be split.
-
-The choice to have explicit infrastructure rather than pure peer-to-peer infrastructure-free networking reflects a pragmatic tradeoff: reliable NAT traversal across mobile carriers, residential networks, and browsers is hard to achieve purely peer-to-peer, and a small number of stable infrastructure nodes turns hard connectivity problems into routine ones. The same shape applies regardless of which networking library is used — libp2p provides circuit relay; iroh has its own relay servers.
 
 **Resource management for relaying**: A node acting as relay carries the bandwidth cost of forwarding traffic. The framework must:
 
@@ -211,7 +207,16 @@ Most consumer devices sit behind a router that blocks incoming connections. The 
 
 #### Bootstrap
 
-At construction, a regular node receives one or more relay addresses. Once connected to a relay, the node receives the current set of known agents and can begin synchronizing data. After the initial bootstrap, agent discovery proceeds bi-directionally with all connected peers.
+At construction, a regular node receives one or more relay addresses (transport-internal config) and the `NodeId` of one or more bootstrap peers. Once connected to the relay, the node exchanges agent infos with the bootstrap peer and learns about existing peers. After the initial bootstrap, agent discovery proceeds bi-directionally with all connected peers.
+
+**Relay-mediated peer discovery and connection flow:**
+
+1. A node connects to the relay and completes the access handshake. The transport notifies the layer above once the node has a relay-reachable address, an address through which other peers can contact it via the relay.
+2. The node compiles and signs its own `AgentInfo`, which includes its relay-reachable address, and stores it in the agent store.
+3. Then the node sends all its `AgentInfo`s to the relay.
+4. The relay stores received agent infos. When a new node connects and completes the access handshake, the relay sends it the stored agent infos so the joining node learns about existing peers.
+5. The joining node has the relay-reachable addresses and node IDs of existing peers and can connect to them through the relay.
+6. The transport attempts to upgrade relay-assisted connections to direct connections where possible. On success the relay drops out of the data path; on failure the relay-assisted connection remains as fallback.
 
 Local network discovery (mDNS) is a future enhancement that allows zero-configuration discovery on the same LAN.
 
@@ -268,21 +273,42 @@ The transport is injected as a dependency. The orchestrator interacts with it th
 
 ```typescript
 interface ITransport {
-  // Get the transport's node ID
+  /**
+   * Get the transport-level identifier of this node.
+   */
   getNodeId(): NodeId;
 
-  // Establish a connection to a peer by NodeId, performing the access
-  // handshake. Resolves once the remote has accepted access.
-  connect(peerId: NodeId, bytes: NetworkAccessBytes): Promise<void>;
+  /**
+   * Establish a connection to a known peer by its full address.
+   *
+   * If the connection is routed through a relay, the address must include the
+   * relay address.
+   */
+  connect(nodeAddress: NodeAddress): Promise<void>;
 
-  // Send a list of serialized agent infos to another peer.
-  sendAgents(peerId: NodeId, agentList: Uint8Array): Promise<void>;
+  /**
+   * Send opaque agent-info bytes to a peer.
+   * The peer must be connected and have been granted access.
+   */
+  sendAgents(nodeId: NodeId, agents: Uint8Array): Promise<void>;
 
-  // Send opaque application data to a peer. Regular nodes only.
-  send(peerId: NodeId, data: Uint8Array): Promise<void>;
+  /**
+   * Send an opaque application message to a peer.
+   * The peer must be connected and have been granted access.
+   */
+  send(nodeId: NodeId, message: Uint8Array): Promise<void>;
 
-  // Shut down the transport.
-  stop(): Promise<void>;
+  /**
+   * Is the connection to the provided node a direct connection?
+   *
+   * `false` means the connection is relayed.
+   */
+  isDirectConnection(nodeId: NodeId): boolean;
+
+  /**
+   * Shut down the transport and all underlying connections.
+   */
+  shutDown(): Promise<void>;
 }
 ```
 
@@ -290,63 +316,65 @@ This interface enables replacement of js-libp2p with iroh or another networking 
 
 ### Layer 1: P2P networking
 
-Layer 1 routes opaque blobs to the right peers so that higher-level components can build eventually-consistent shared state on top.
+Routing opaque blobs to the right peers so that layers above can create eventually consistent shared state.
 
 **Capabilities**:
 
 - Peer responsibility coverage tracking and automatic management for adequate coverage
-- Distributing blobs through gossip, addressed by content hash
-- Tracking what blobs have been received and integrated; not storing blobs itself (delegated to Storage)
-- Providing application messaging primitives between peers, addressed by `AgentId`
-- Resource budgets (future): each peer advertises its willingness to relay and store data
+- Generic data and agent identifiers (future-proofing)
+- Does not store blobs itself, but tracks what blobs have been received and integrated
+- Implements evaluation of incoming network access bytes to allow or deny connections
+- Resource budgets (future): each peer advertises its willingness to relay data
 
-#### Data distribution
+#### Data distribution interface
 
-Layer 1 provides blob distribution across regular nodes. It does not prescribe how blobs are routed — the distribution strategy is pluggable via dependency injection. Peerkit ships full replication as the MVP default.
+Layer 1 provides blob distribution across peers. It does not prescribe how blobs are routed — the distribution strategy is pluggable via dependency injection. Peerkit ships a full replication default in the MVP.
 
-**Core concept**: every blob has a content hash (its identity). Layer 1 ensures blobs reach the peers that should have them, according to the active distribution strategy. Layer 1 does not define a key space or routing topology — those are concerns of the distribution strategy.
+**Core concept**: Every blob has a content hash (its identity). Layer 1 ensures blobs reach the peers that should have them, according to the active distribution strategy. Layer 1 does not define a key space or routing topology — those are concerns of the distribution strategy.
 
-The distribution strategy answers a single question: should this peer (identified by `AgentId`) hold this blob? The strategy inspects the blob to make the decision; the caller does not specify a target, routing is the strategy's responsibility.
+**Distribution strategy interface** (injected by developer):
 
+- `willStore(peerId: PeerId, blob: Uint8Array) -> bool` — should this peer store the given blob?
+
+The strategy inspects the blob to determine routing. The caller does not specify a target — routing is entirely the strategy's responsibility.
 **Example strategies**:
 
-1. **Full replication** (MVP, built-in): every peer stores everything. Always returns true. No coordination needed. Works for small networks (tens or hundreds of peers).
-2. **DHT / key-based**: defines a 256-bit hash ring. Peers claim responsibility for portions of the key space; the strategy maps the blob's hash to a position on the ring and returns true based on proximity. The classic Kademlia/Chord approach, suited for large open networks.
-3. **Direct replication**: returns true for a fixed set of peers configured by the app. For backup apps, personal sync, or scenarios where the author decides exactly who gets the data.
-4. **Topic-based**: maps blobs to topics (e.g. by schema type). Peers subscribe to topics and receive blobs published to them. Pub/sub pattern.
+1. **Full replication** (MVP, built-in): every peer stores everything. `willStore()` always returns true. No coordination needed. Works for small networks (tens or hundreds of peers).
+2. **DHT / key-based**: defines a 256-bit hash ring. `willStore()` maps the blob's content hash to a position on the ring and returns a value according to the proximity of the peer. Peers claim responsibility for portions of the key space. The classic Kademlia/Chord approach, suited for large open networks.
+3. **Direct replication**: `willStore()` returns true for a fixed set of peers configured by the app. For backup apps, personal sync, or any scenario where the author decides exactly who gets the data.
+4. **Topic-based**: the strategy maps blobs to topics (e.g. by schema type). Peers subscribe to topics and receive blobs published to them. Pub/sub pattern.
 
 #### Gossip
 
 Gossip is the mechanism by which blobs propagate across the network. It operates in two phases:
 
-**Push (new blob propagation)**: when a peer publishes or integrates a new blob, it immediately forwards it to connected peers for whom the strategy returns true.
+**Push (new blob propagation)**: When a peer publishes or integrates a new blob, it immediately forwards it to connected peers for whom `willStore()` returns true.
 
-**Pull (anti-entropy)**: when two peers connect, they reconcile their stored blobs to repair gaps. Each peer advertises a compact summary of the blobs it holds; the other responds with any blobs the first is missing. This handles blob exchange with peers that didn't receive pushed blobs for whatever reason.
+**Pull**: When two peers connect, they reconcile their stored blobs to repair any gaps. Each peer advertises a compact summary of the blobs it holds; the other peer responds with any blobs the first is missing. This handles blob exchange with peers that didn't receive pushed blobs for whatever reason.
 
 A summary must be compact enough to exchange on every connection. The exact representation depends on the gossip strategy.
 
-**Open question**: the MVP gossip strategy is unresolved. Simple push to all connected peers is the simplest implementation.
+**Gossip and the distribution strategy**: gossip push uses `willStore()` to decide which peers to forward a blob to. Anti-entropy pull is scoped to the blobs a peer is responsible for under the active strategy. The gossip mechanism itself is strategy-agnostic.
+
+**Open question**: The MVP gossip strategy is unresolved. Simple push to all connected peers is the simplest implementation.
 
 #### Connection management
 
-Each regular node maintains connections to a bounded number of peers. The connection management strategy is pluggable, like the distribution strategy. Peerkit ships a default that connects to all known peers (suitable for small MVP networks).
+Each peer maintains connections to a bounded number of peers. The connection management strategy is pluggable via dependency injection, like the distribution strategy. Peerkit ships a default that connects to all peers.
 
 Example strategies:
 
 - **Persistent connections** (default): maintain long-lived connections to all peers.
-- **Ephemeral connections**: open connections on demand (connect-fire-close), maintaining only a small number of persistent connections. Persistent connections rotate through neighbors to maintain coverage. Suited for large networks where holding many connections is expensive.
+- **Ephemeral connections**: open connections on demand (connect-fire-close), maintaining only a small number of persistent connections. The persistent connections can rotate through neighbors to maintain coverage. Suited for large networks where holding many connections is expensive.
 
 #### Module boundary
-
-Layer 1 packages — agent module, data gossip, distribution strategy — expose AgentId-keyed APIs to applications and the orchestrator. The agent module receives bytes on the transport's agents channel, decodes `AgentInfo`, and updates the local agent registry; it sends `AgentInfo` updates to peers through the transport. The registry is queryable as a directory of known agents. Data gossip drives blob synchronization: it connects to known agents through the transport (by `AgentId`), pushes new blobs that the strategy says should reach a given peer, and runs anti-entropy pull on connect.
 
 **Types**:
 
 ```typescript
-// Hash value of a data blob (content address)
+// Hash value of a data blob
 type Hash = Uint8Array;
-
-// A blob of data
+// Blobs of data
 type Blob = Uint8Array;
 ```
 
@@ -355,24 +383,23 @@ type Blob = Uint8Array;
 ```typescript
 interface INetworking {
   // Publish a blob. The distribution strategy determines which peers receive it.
-  publish(blob: Blob): Promise<Hash>;
+  publish(blob: Blob): Promise<void>;
 
-  // Retrieve a blob by content hash.
-  // Only supported by strategies that can locate peers by hash (e.g. full
-  // replication, DHT). Push-only strategies (e.g. pub-sub) cannot support
-  // this — returns null if unavailable.
+  // Retrieve a blob by its content hash.
+  // Only supported by strategies that can locate peers by hash (e.g. full replication, DHT).
+  // Push-only strategies (e.g. pub-sub) cannot support this — returns null if unavailable.
   get(hash: Hash): Promise<Blob | null>;
 
-  // Block or unblock a peer.
-  block(agentId: AgentId): void;
-  unblock(agentId: AgentId): void;
+  // Block or unblock a peer connection
+  block(peer: PeerId): void;
+  unblock(peer: PeerId): void;
 
-  // Send an opaque application message to a peer (fire-and-forget).
-  send(agentId: AgentId, data: Uint8Array): Promise<void>;
+  // Send an opaque message to a peer (fire-and-forget)
+  send(peer: PeerId, data: Uint8Array): Promise<void>;
 }
 ```
 
-**Note on `get(hash)`**: not all distribution strategies support targeted retrieval by hash. Full replication and DHT-based strategies can locate responsible peers from a hash alone. Push-only strategies (e.g. topic-based pub-sub) have no reverse lookup — blobs are received when pushed, not fetched on demand. Callers should not rely on `get()` being available unless the active strategy supports it.
+**Note on `get(hash)`**: Not all distribution strategies support targeted retrieval by hash. Full replication and DHT-based strategies can locate responsible peers from a hash alone. Push-only strategies (e.g. topic-based pub-sub) have no reverse lookup — blobs are received when pushed, not fetched on demand. Callers should not rely on `get()` being available unless the active strategy supports it.
 
 **Hooks** (called by Layer 1 into the layer above or into injected storage):
 
@@ -380,14 +407,14 @@ interface INetworking {
 interface INetworkingHooks {
   // Called when a new blob arrives from the network.
   // The callee is responsible for persisting accepted blobs via injected storage.
-  onIntegrate(fromAgentId: AgentId, blob: Blob): "accepted" | "rejected";
+  onIntegrate(peerId: PeerId, blob: Blob): "accepted" | "rejected";
 
   // Retrieve a blob by hash from local storage.
   // Called when a peer requests a blob this node is responsible for.
   getBlob(hash: Hash): Promise<Uint8Array | null>;
 
-  // Handle an incoming opaque application message from a peer.
-  onMessage(fromAgentId: AgentId, data: Uint8Array): void;
+  // Handle an incoming message from a peer
+  onMessage(peer: PeerId, data: Uint8Array): void;
 }
 ```
 
@@ -641,7 +668,7 @@ Target: millions of nodes over time. Scalability is addressed at three levels:
   - libp2p: more mature, direct browser connections, large community, proven at scale (Ethereum, IPFS)
   - iroh: technically excellent, better hole-punching via relay fallback, but lacks JS wrapper and browser direct connections
 - **Storage**: SurrealDB as default (common database for browser and desktop, JS SDK available), but pluggable
-- **Architecture style**: a small encapsulated transport layer plus cross-cutting packages (agent module, data gossip, distribution strategy, storage), composed by an orchestrator. Storage logic (data model, distribution strategy) is not built into the core API but selected per application.
+- **Architecture style**: core API covers peer discovery, transport, and agents; storage logic (data model, distribution strategy) is not built into the core API but selected per application
 
 ## 7. Technical principles
 
@@ -661,18 +688,17 @@ Not every app needs all 4 layers. The layers are additive — each builds on the
 
 **What's included:**
 
-- `@peerkit/transport-libp2p` with both construction modes (infrastructure, regular)
+- js-libp2p transport with manual bootstrap address entry
 - Encrypted connections (Noise protocol)
-- Network access bytes handshake with sticky denial (closed networks by default)
-- Agent module: keypair management, agent registry, `AgentInfo` exchange via the transport's agents channel
-- Data gossip: simple push on new blob, anti-entropy pull on connect
-- Full replication built-in distribution strategy (every peer stores everything)
-- Storage: a default implementation that runs in Node.js. Pluggable.
-- Orchestrator (`peerkit` package): wires components, owns persistence, exposes a simple API for applications
+- Network access bytes handshake (closed networks by default)
+- Publish and get opaque blobs (full replication — every peer stores everything)
+- Block/unblock peers
+- Gossip to propagate new blobs to connected peers
+- Peer messaging (signals)
 
 **What's deliberately excluded from MVP:**
 
-- Custom data distribution — full replication is the built-in default. The distribution interface is exposed for developers to provide their own strategy.
+- Custom data distribution — **full replication** is the built-in default (every peer stores everything). The distribution interface is exposed for developers to provide their own strategy.
 - Layer 2 (schemas) — app structures its own blobs
 - Layer 3 (indexing) — app builds its own local indexes
 - Layer 4 (state changes, conflict resolution) — app handles its own state change semantics
@@ -693,10 +719,7 @@ The app developer handles data structure, indexing, and conflict resolution in t
 
 ## 9. Open questions
 
-- **Relay address format.** Stable, peerkit-native serialization for the bootstrap configuration value, with library-specific parsing inside the transport. Concrete shape pending.
-- **Persistence boundaries.** Which transport state the orchestrator should rehydrate at startup vs. let the transport rebuild from scratch.
-- **Gossip strategy.** Simple flooding is the placeholder. K2's gossip approach (by arc and timestamp) may be more efficient than simple flooding, but porting K2's implementation to TypeScript is a significant effort.
-- **Local-network discovery (mDNS).** Not in MVP but a natural extension once relays are working.
 - How should merge function logic be embedded in schemas? Options include interpreted language source code or compiled WASM, but both constrain app languages and runtime platforms. Could specify both a merge function and the name of its runtime engine.
+- What gossip strategy should the MVP use? K2's gossip approach (by arc and timestamp) may be more efficient than simple flooding, but porting K2's implementation to TypeScript is a significant effort.
 - How to handle multi-data/multi-app composition (multiple dataspaces with bridge calling/signals)?
 - How to handle atomic operations across multiple blobs in a distributed system? (A higher-order CRDT could be added that enables publishing multiple state changes of lower-order CRDTs as a single state change.)
