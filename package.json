@@ -37,7 +37,7 @@
     "test": "npm test --workspaces",
     "build:docs": "typedoc",
     "build:dist": "tsc --build",
-    "build": "npm run build:docs && npm run build:dist",
+    "build": "npm run build:dist && npm run build:docs",
     "prepare": "husky"
   },
   "lint-staged": {
