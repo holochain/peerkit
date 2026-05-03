@@ -79,13 +79,11 @@ describe("FrameDecoder", () => {
     // Split right through the second frame's header
     const split = a.byteLength + 2;
     const first = decoder.feed(combined.slice(0, split));
-    assert(first.length && first[0]);
-    expect(first).toHaveLength(1);
+    assert(first.length === 1 && first[0]);
     expect(Array.from(first[0])).toEqual([42]);
 
     const second = decoder.feed(combined.slice(split));
-    assert(second.length && second[0]);
-    expect(second).toHaveLength(1);
+    assert(second.length === 1 && second[0]);
     expect(Array.from(second[0])).toEqual([99]);
   });
 
