@@ -56,16 +56,16 @@ export const retryFnUntilTimeout = async (
   timeoutMs?: number,
   sleepMs?: number,
 ) => {
-  timeoutMs = timeoutMs ?? 2000;
+  timeoutMs = timeoutMs ?? 2_000;
   sleepMs = sleepMs ?? 100;
   const start = performance.now();
   for (;;) {
     const result = await fn();
     if (result === true) {
-      return Promise.resolve();
+      return;
     }
     if (performance.now() - start > timeoutMs) {
-      return Promise.reject("retryFnUntilTimeout timed out");
+      throw new Error("retryFnUntilTimeout timed out");
     }
     await sleep(sleepMs);
   }

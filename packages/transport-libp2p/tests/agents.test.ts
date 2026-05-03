@@ -9,7 +9,7 @@ import { encodeFrame } from "../src/frame.js";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
-} from "../src/index.js";
+} from "@peerkit/transport-libp2p";
 import type { NetworkAccessHandler } from "@peerkit/interface";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
