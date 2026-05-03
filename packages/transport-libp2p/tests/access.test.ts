@@ -121,7 +121,7 @@ test("Valid network access bytes grant connection to other node", async () => {
     networkAccessBytes: VALID_ACCESS_BYTES,
   });
 
-  await node2.connect(address1, new Uint8Array());
+  await node2.connect(address1);
 
   await node1.shutDown();
   await node2.shutDown();
@@ -151,7 +151,7 @@ test("Invalid network access bytes deny connection to initiating node", async ()
     handshakeTimeoutMs: 500,
   });
 
-  await expect(node2.connect(address1, new Uint8Array())).rejects.toThrow();
+  await expect(node2.connect(address1)).rejects.toThrow();
 
   await node1.shutDown();
   await node2.shutDown();
@@ -180,7 +180,7 @@ test("Invalid network access bytes deny connection to remote node", async () => 
     networkAccessBytes: VALID_ACCESS_BYTES,
   });
 
-  await expect(node2.connect(address1, new Uint8Array())).rejects.toThrow();
+  await expect(node2.connect(address1)).rejects.toThrow();
 
   await node1.shutDown();
   await node2.shutDown();

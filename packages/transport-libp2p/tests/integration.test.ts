@@ -1,6 +1,6 @@
 import { reset } from "@logtape/logtape";
 import { afterEach, assert, beforeEach, test } from "vitest";
-import { TransportLibp2p } from "../src/index.js";
+import { TransportLibp2p } from "@peerkit/transport-libp2p";
 import { createRelay, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
@@ -92,7 +92,7 @@ test(
 
     // Node 2 connects to node 1 over the relay.
     const node1Address = new TextDecoder().decode(node2AgentStore[0]);
-    await node2.connect(node1Address, new Uint8Array([0]));
+    await node2.connect(node1Address);
 
     // Node 1 sends a message to node 2 over the relay
     await node1.send(
@@ -203,7 +203,7 @@ test(
 
     // Node 2 connects to node 1 over the relay.
     const node1Address = new TextDecoder().decode(node2AgentStore[0]);
-    await node2.connect(node1Address, new Uint8Array([0]));
+    await node2.connect(node1Address);
 
     // Wait for the connection upgrade to a direct connection.
     await retryFnUntilTimeout(

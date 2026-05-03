@@ -15,16 +15,16 @@ export type NodeId = string;
 export type NodeAddress = string;
 
 /**
- * Byte sequence to prove access to a network has been granted
- */
-export type NetworkAccessBytes = Uint8Array;
-
-/**
  * Peerkit-native address for a relay node.
  *
  * Every transport implementation parses it according to its own convention.
  */
 export type RelayAddress = string;
+
+/**
+ * Byte sequence to prove access to a network has been granted
+ */
+export type NetworkAccessBytes = Uint8Array;
 
 /**
  * Interface to handle incoming access streams.
@@ -79,7 +79,7 @@ export interface ITransport {
    * If the connection is routed through a relay, the address must include the
    * relay address.
    */
-  connect(nodeAddress: NodeAddress, bytes: NetworkAccessBytes): Promise<void>;
+  connect(nodeAddress: NodeAddress): Promise<void>;
 
   /**
    * Send opaque agent-info bytes to a peer.

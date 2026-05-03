@@ -211,10 +211,7 @@ export class TransportLibp2p implements ITransport {
     return this.libp2p.peerId.toString();
   }
 
-  async connect(
-    nodeAddress: NodeAddress,
-    _bytes: NetworkAccessBytes,
-  ): Promise<void> {
+  async connect(nodeAddress: NodeAddress): Promise<void> {
     this.logger.info("Connecting to node {*}", { nodeAddress });
     const connection = await this.libp2p.dial(multiaddr(nodeAddress));
 

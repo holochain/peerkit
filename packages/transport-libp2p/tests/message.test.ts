@@ -5,11 +5,11 @@ import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, test } from "vitest";
-import { encodeFrame, FrameDecoder } from "../src/frame.js";
+import { encodeFrame } from "../src/frame.js";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
-} from "../src/index.js";
+} from "@peerkit/transport-libp2p";
 import type { MessageHandler, NetworkAccessHandler } from "@peerkit/interface";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
@@ -56,15 +56,13 @@ test("Send a message after having been granted access", async () => {
   const { node: node2 } = await createNode({
     id: "node2",
   });
-  const encoder = new TextEncoder();
-  await node2.connect(address, encoder.encode("e"));
+  await node2.connect(address);
 
-  await node2.send(node1.getNodeId(), encodeFrame(encoder.encode("hello")));
+  await node2.send(node1.getNodeId(), new TextEncoder().encode("hello"));
 
   await retryFnUntilTimeout(async () => receivedMessages.length === 1);
   assert(receivedMessages[0]);
-  const receivedMessage = new FrameDecoder().feed(receivedMessages[0])[0];
-  assert.equal("hello", new TextDecoder().decode(receivedMessage));
+  assert.equal("hello", new TextDecoder().decode(receivedMessages[0]));
 
   await node2.shutDown();
   await node1.shutDown();
