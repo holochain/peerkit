@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { assert, describe, expect, test } from "vitest";
 import { encodeFrame, FrameDecoder } from "../src/frame.js";
 
 describe("encodeFrame", () => {
@@ -25,7 +25,7 @@ describe("FrameDecoder", () => {
     const payload = new Uint8Array([10, 20, 30]);
     const msgs = decoder.feed(encodeFrame(payload));
 
-    expect(msgs).toHaveLength(1);
+    assert(msgs.length === 1 && msgs[0]);
     expect(Array.from(msgs[0])).toEqual([10, 20, 30]);
   });
 
@@ -50,7 +50,7 @@ describe("FrameDecoder", () => {
     expect(decoder.feed(frame.slice(3, 6))).toHaveLength(0);
     const msgs = decoder.feed(frame.slice(6));
 
-    expect(msgs).toHaveLength(1);
+    assert(msgs.length === 1 && msgs[0]);
     expect(Array.from(msgs[0])).toEqual([1, 2, 3, 4, 5]);
   });
 
@@ -63,7 +63,7 @@ describe("FrameDecoder", () => {
     combined.set(b, a.byteLength);
 
     const msgs = decoder.feed(combined);
-    expect(msgs).toHaveLength(2);
+    assert(msgs.length === 2 && msgs[0] && msgs[1]);
     expect(Array.from(msgs[0])).toEqual([1, 2]);
     expect(Array.from(msgs[1])).toEqual([3, 4, 5]);
   });
@@ -79,10 +79,12 @@ describe("FrameDecoder", () => {
     // Split right through the second frame's header
     const split = a.byteLength + 2;
     const first = decoder.feed(combined.slice(0, split));
+    assert(first.length && first[0]);
     expect(first).toHaveLength(1);
     expect(Array.from(first[0])).toEqual([42]);
 
     const second = decoder.feed(combined.slice(split));
+    assert(second.length && second[0]);
     expect(second).toHaveLength(1);
     expect(Array.from(second[0])).toEqual([99]);
   });
@@ -93,7 +95,7 @@ describe("FrameDecoder", () => {
     const payload = new Uint8Array(1024 * 300).fill(7);
     const msgs = decoder.feed(encodeFrame(payload));
 
-    expect(msgs).toHaveLength(1);
+    assert(msgs.length === 1 && msgs[0]);
     expect(msgs[0].byteLength).toBe(payload.byteLength);
     expect(msgs[0].every((b) => b === 7)).toBe(true);
   });

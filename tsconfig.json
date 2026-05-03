@@ -5,7 +5,7 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "target": "es2024",
-    "types": [],
+    "types": ["node"],
 
     // Project References
     "composite": true,
@@ -17,7 +17,6 @@
 
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
 
     // Recommended Options
     "strict": true,

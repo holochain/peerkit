@@ -4,10 +4,11 @@ import {
   getConsoleSink,
 } from "@logtape/logtape";
 import getPort from "get-port";
-import { TransportLibp2p } from "../src/index.js";
+import { TransportLibp2p } from "@peerkit/transport-libp2p";
 import type {
   AgentsReceivedCallback,
   MessageHandler,
+  NetworkAccessBytes,
   NetworkAccessHandler,
 } from "@peerkit/interface";
 
@@ -120,9 +121,15 @@ export interface TestNodeOptions {
    */
   agentsReceivedCallback?: AgentsReceivedCallback;
   /**
-   * Optional handler for network access checks. Defaults to denying all access
+   * Optional handler for network access checks.
+   *
+   * Defaults to allowing all access.
    */
   networkAccessHandler?: NetworkAccessHandler;
+  /**
+   * Optional network access bytes
+   */
+  networkAccessBytes?: NetworkAccessBytes;
   /**
    * Optional message handler
    */
@@ -147,7 +154,8 @@ export const createNode = async (options: TestNodeOptions) => {
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const networkAccessHandler =
-    options.networkAccessHandler ?? (async (_fromPeer, _bytes) => false);
+    options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
+  const networkAccessBytes = options.networkAccessBytes ?? new Uint8Array([0]);
   const messageHandler =
     options.messageHandler ?? (async (_fromPeer, _message) => {});
   const node = await TransportLibp2p.createNode({
@@ -155,6 +163,7 @@ export const createNode = async (options: TestNodeOptions) => {
     id,
     agentsReceivedCallback,
     networkAccessHandler,
+    networkAccessBytes,
     messageHandler,
     bootstrapRelays,
     handshakeTimeoutMs,

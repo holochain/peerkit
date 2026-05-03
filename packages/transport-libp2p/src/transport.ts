@@ -28,7 +28,7 @@ import type {
 
 export interface RelayOptions {
   addrs?: string[];
-  id?: string;
+  id: string | undefined;
   /**
    * Network access bytes sent in the counter-handshake response to connecting peers.
    */
@@ -45,7 +45,7 @@ export interface RelayOptions {
 
 export interface NodeOptions {
   addrs?: string[];
-  id?: string;
+  id: string | undefined;
   /**
    * Network access bytes sent to relays during bootstrap handshake and in counter-handshake responses.
    */
@@ -190,8 +190,15 @@ export class TransportLibp2p implements ITransport {
       transports: [tcp()],
       connectionEncrypters: [noise()],
       streamMuxers: [yamux()],
-      // Circuit relay server enables relay functionality
-      services: { relay: circuitRelayServer(), identify: identify() },
+      // Circuit relay server enables relay functionality.
+      // applyDefaultLimit: false removes the 2-min / 128 KiB per-connection
+      // caps so the relay can serve as a permanent data-channel fallback.
+      services: {
+        relay: circuitRelayServer({
+          reservations: { applyDefaultLimit: false },
+        }),
+        identify: identify(),
+      },
       addresses: {
         listen: options?.addrs ?? ["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"],
       },
@@ -208,7 +215,10 @@ export class TransportLibp2p implements ITransport {
     nodeAddress: NodeAddress,
     _bytes: NetworkAccessBytes,
   ): Promise<void> {
-    await this.libp2p.dial(multiaddr(nodeAddress));
+    this.logger.info("Connecting to node {*}", { nodeAddress });
+    const connection = await this.libp2p.dial(multiaddr(nodeAddress));
+
+    await this.performNetworkAccessHandshake(connection);
   }
 
   async sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void> {
@@ -221,13 +231,30 @@ export class TransportLibp2p implements ITransport {
       );
     }
     const stream = await connections[0].newStream(CURRENT_AGENTS_PROTOCOL, {
-      runOnLimitedConnection: true,
+      // runOnLimitedConnection: true,
     });
     stream.send(encodeFrame(data));
     await stream.close();
   }
 
-  async send(_nodeId: NodeId, _data: Uint8Array): Promise<void> {}
+  async send(nodeId: NodeId, data: Uint8Array): Promise<void> {
+    const connections = this.libp2p.getConnections(peerIdFromString(nodeId));
+    if (connections.length === 0 || !connections[0]) {
+      this.logger.error("No open connection to node when trying to send {*}", {
+        nodeId,
+      });
+      throw new Error("No open connection when trying to send");
+    }
+    // Prefer a direct connection; fall back to a relayed one.
+    const connection = connections.find((c) => c.direct) ?? connections[0];
+    let stream = connection.streams.find(
+      (stream) => stream.protocol === CURRENT_MESSAGE_PROTOCOL,
+    );
+    if (!stream || stream.status !== "open") {
+      stream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+    }
+    stream.send(encodeFrame(data));
+  }
 
   isDirectConnection(nodeId: NodeId): boolean {
     return this.libp2p
@@ -289,6 +316,13 @@ export class TransportLibp2p implements ITransport {
     this.logger.info("Connecting to relay {*}", { relay });
     const connection = await this.libp2p.dial(addr);
 
+    const relayPeerId = await this.performNetworkAccessHandshake(connection);
+    return relayPeerId;
+  }
+
+  private async performNetworkAccessHandshake(
+    connection: Connection,
+  ): Promise<PeerId> {
     // Perform access handshake, send network access bytes to relay.
     const stream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
     stream.send(this.localNetworkAccessBytes);
@@ -320,16 +354,16 @@ export class TransportLibp2p implements ITransport {
     );
     this.nodeAccess.set(nodeIdString, accessGranted);
     if (accessGranted) {
-      this.logger.info("Access granted to relay {*}", {
+      this.logger.info("Access granted to remote {*}", {
         peerId: connection.remotePeer,
       });
       return connection.remotePeer;
     } else {
-      this.logger.warn("Access denied to relay. Closing connection. {*}", {
+      this.logger.warn("Access denied to remote. Closing connection. {*}", {
         peerId: connection.remotePeer,
       });
       await connection.close();
-      throw new Error("Access denied to relay");
+      throw new Error("Access denied to remote");
     }
   }
 
@@ -348,17 +382,21 @@ export class TransportLibp2p implements ITransport {
 
         const peerKey = connection.remotePeer.toString();
 
-        this.logger.debug("Access message {*}", {
-          remoteId: connection.remotePeer,
-          access: this.nodeAccess.get(peerKey),
-        });
+        this.logger.debug(
+          `Incoming message on stream ${CURRENT_ACCESS_PROTOCOL} {*}`,
+          {
+            remoteId: connection.remotePeer,
+            access: this.nodeAccess.get(peerKey),
+          },
+        );
         // Check if this peer has been denied access before
         if (this.nodeAccess.get(peerKey) === false) {
           this.logger.warn(
             "Previously rejected peer is trying to access network again. Closing connection. {*}",
             { remoteId: connection.remotePeer },
           );
-          return await connection.close();
+          await connection.close();
+          return;
         }
 
         const accessGranted = await this.networkAccessHandler(
@@ -383,18 +421,7 @@ export class TransportLibp2p implements ITransport {
 
   // Handler for incoming agents streams
   private onAgentsConnect = async (stream: Stream, connection: Connection) => {
-    this.logger.info(`Incoming ${CURRENT_AGENTS_PROTOCOL} stream {*}`, {
-      remoteId: connection.remotePeer,
-    });
-    const nodeIdString = connection.remotePeer.toString();
-    if (this.nodeAccess.get(nodeIdString) !== true) {
-      this.logger.warn(
-        "Remote peer tried to open an agents stream without being granted access. Closing connection. {*}",
-        { remoteId: connection.remotePeer },
-      );
-      await connection.close();
-      return;
-    }
+    await this.accessCheck(CURRENT_AGENTS_PROTOCOL, connection);
 
     const decoder = new FrameDecoder();
     stream.addEventListener("message", async (message) => {
@@ -424,18 +451,8 @@ export class TransportLibp2p implements ITransport {
     }
     // Assign to another variable to preserve that `messageHandler` is defined.
     const messageHandler = this.messageHandler;
-    this.logger.info(`Incoming ${CURRENT_MESSAGE_PROTOCOL} stream {*}`, {
-      remoteId: connection.remotePeer,
-    });
-    const peerKey = connection.remotePeer.toString();
-    if (this.nodeAccess.get(peerKey) !== true) {
-      this.logger.warn(
-        "Remote peer tried to open a message stream without being granted access. Closing connection. {*}",
-        { remoteId: connection.remotePeer },
-      );
-      await connection.close();
-      return;
-    }
+
+    await this.accessCheck(CURRENT_MESSAGE_PROTOCOL, connection);
 
     const decoder = new FrameDecoder();
     stream.addEventListener("message", async (message) => {
@@ -448,8 +465,23 @@ export class TransportLibp2p implements ITransport {
           `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
           { peerId: connection.remotePeer, byteLength: msg.byteLength },
         );
-        messageHandler(connection.remotePeer.toString(), msg);
+        await messageHandler(connection.remotePeer.toString(), msg);
       }
     });
+  };
+
+  private accessCheck = async (protocol: string, connection: Connection) => {
+    this.logger.info(`Incoming ${protocol} stream {*}`, {
+      remoteId: connection.remotePeer,
+    });
+    const nodeIdString = connection.remotePeer.toString();
+    if (this.nodeAccess.get(nodeIdString) !== true) {
+      this.logger.warn(
+        `Remote peer tried to open a ${protocol} stream without being granted access. Closing connection. {*}`,
+        { remoteId: connection.remotePeer },
+      );
+      await connection.close();
+      return;
+    }
   };
 }

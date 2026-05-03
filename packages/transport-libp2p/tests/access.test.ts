@@ -3,9 +3,11 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { tcp } from "@libp2p/tcp";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
+import { type NetworkAccessHandler } from "@peerkit/interface";
 import { createLibp2p } from "libp2p";
+import { isDeepStrictEqual } from "node:util";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { CURRENT_ACCESS_PROTOCOL } from "../src/index.js";
+import { CURRENT_ACCESS_PROTOCOL } from "@peerkit/transport-libp2p";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
@@ -94,6 +96,94 @@ test("Outbound access handshake times out when responder sends no response", asy
 
   await node.shutDown();
   await libp2pNode.stop();
+});
+
+test("Valid network access bytes grant connection to other node", async () => {
+  // Define an access handler
+  const VALID_ACCESS_BYTES = new TextEncoder().encode("pass");
+  const networkAccessHandler: NetworkAccessHandler = async (
+    _fromNode,
+    bytes,
+  ) => {
+    // bytes is a Buffer in Nodejs
+    return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
+  };
+
+  const { node: node1, address: address1 } = await createNode({
+    id: "node1",
+    networkAccessHandler,
+    networkAccessBytes: VALID_ACCESS_BYTES,
+  });
+
+  const { node: node2 } = await createNode({
+    id: "node2",
+    networkAccessHandler,
+    networkAccessBytes: VALID_ACCESS_BYTES,
+  });
+
+  await node2.connect(address1, new Uint8Array());
+
+  await node1.shutDown();
+  await node2.shutDown();
+});
+
+test("Invalid network access bytes deny connection to initiating node", async () => {
+  // Define an access handler
+  const VALID_ACCESS_BYTES = new TextEncoder().encode("pass");
+  const networkAccessHandler: NetworkAccessHandler = async (
+    _fromNode,
+    bytes,
+  ) => {
+    // bytes is a Buffer in Nodejs
+    return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
+  };
+
+  const { node: node1, address: address1 } = await createNode({
+    id: "node1",
+    networkAccessHandler,
+    networkAccessBytes: VALID_ACCESS_BYTES,
+  });
+
+  const { node: node2 } = await createNode({
+    id: "node2",
+    networkAccessHandler,
+    networkAccessBytes: new Uint8Array([1]), // invalid access bytes
+    handshakeTimeoutMs: 500,
+  });
+
+  await expect(node2.connect(address1, new Uint8Array())).rejects.toThrow();
+
+  await node1.shutDown();
+  await node2.shutDown();
+});
+
+test("Invalid network access bytes deny connection to remote node", async () => {
+  // Define an access handler
+  const VALID_ACCESS_BYTES = new TextEncoder().encode("pass");
+  const networkAccessHandler: NetworkAccessHandler = async (
+    _fromNode,
+    bytes,
+  ) => {
+    // bytes is a Buffer in Nodejs
+    return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
+  };
+
+  const { node: node1, address: address1 } = await createNode({
+    id: "node1",
+    networkAccessHandler,
+    networkAccessBytes: new Uint8Array([1]), // invalid access bytes
+  });
+
+  const { node: node2 } = await createNode({
+    id: "node2",
+    networkAccessHandler,
+    networkAccessBytes: VALID_ACCESS_BYTES,
+  });
+
+  await expect(node2.connect(address1, new Uint8Array())).rejects.toThrow();
+
+  await node1.shutDown();
+  await node2.shutDown();
 });
 
 test("Opening a stream with an unknown protocol fails", async () => {
