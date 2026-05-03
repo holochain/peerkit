@@ -3,7 +3,7 @@ import {
   getAnsiColorFormatter,
   getConsoleSink,
 } from "@logtape/logtape";
-import getPort from "get-port";
+import getPort, { portNumbers } from "get-port";
 import { TransportLibp2p } from "@peerkit/transport-libp2p";
 import type {
   AgentsReceivedCallback,
@@ -95,7 +95,7 @@ export interface TestRelayOptions {
  */
 export const createRelay = async (options: TestRelayOptions) => {
   const { id, networkAccessBytes } = options;
-  const port = await getPort({ port: [30_000, 40_000] });
+  const port = await getPort({ port: portNumbers(40_000, 50_000) });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
@@ -148,7 +148,7 @@ export interface TestNodeOptions {
  * Creates a test node transport
  */
 export const createNode = async (options: TestNodeOptions) => {
-  const port = await getPort({ port: [30_000, 40_000] });
+  const port = await getPort({ port: portNumbers(40_000, 50_000) });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   const { id, bootstrapRelays, handshakeTimeoutMs } = options;
   const agentsReceivedCallback =
