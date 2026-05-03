@@ -16,7 +16,7 @@
     "type": "git",
     "url": "git+https://github.com/holochain/peerkit.git"
   },
-  "license": "MIT",
+  "license": "CAL-1.0",
   "author": "dev-team@holochain.org",
   "type": "module",
   "exports": {

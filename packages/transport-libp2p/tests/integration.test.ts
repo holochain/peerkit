@@ -86,13 +86,13 @@ test(
 
     // Relay sends agent infos from agent store to node 2.
     // TODO register as on-peer connected? Figure out node's peer ID internally?
+    assert(relayAgentStore[0]);
     await relay.sendAgents(node2.getNodeId(), relayAgentStore[0]);
 
     await retryFnUntilTimeout(async () => node2AgentStore.length === 1);
 
     // Node 2 connects to node 1 over the relay.
     const node1Address = new TextDecoder().decode(node2AgentStore[0]);
-    console.log("node1 node address", node1Address);
     await node2.connect(node1Address, new Uint8Array([0]));
 
     // Wait for the connection upgrade to a direct connection.

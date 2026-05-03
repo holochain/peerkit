@@ -51,7 +51,7 @@ Vitest runs with `--run` by default (CI-style, no watch).
 
 ### CI checks
 
-Before declaring work done, run the same checks CI runs (`.github/workflows/test.yml`). All four must pass:
+Do not run CI checks unless explicitly asked. When asked, run the same checks CI runs (`.github/workflows/test.yml`). All four must pass:
 
 - `npm run lint`
 - `npx prettier . --check`
@@ -69,7 +69,7 @@ All runtime methods are keyed by `NodeId` (an opaque `string` — the libp2p pee
 ```ts
 interface ITransport {
   getNodeId(): NodeId;
-  connect(nodeId: NodeId, bytes: NetworkAccessBytes): Promise<void>;
+  connect(nodeAddress: NodeAddress): Promise<void>;
   sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void>;
   send(nodeId: NodeId, data: Uint8Array): Promise<void>;
   shutDown(): Promise<void>;
@@ -82,7 +82,7 @@ interface ITransport {
 - **Access protocol wire format.** The initiator sends its `NetworkAccessBytes` as a raw `Uint8Array` message. The responder replies with its own `NetworkAccessBytes` if access is granted, then closes the connection if not. No protobuf encoding — the protocol ID (`/peerkit/access/v1`) is the version signal.
 - **Arrow-field callbacks.** `onAccessConnect`, `onAgentsConnect`, `onMessageConnect` are arrow class fields because libp2p passes them as bare callbacks; converting to methods drops `this`.
 - **Incoming message bytes.** libp2p may deliver `message.data` as either `Uint8Array` or `Uint8ArrayList` — normalize with `.subarray()` before use.
-- **Construction.** Use `TransportLibp2p.create(...)` or `TransportLibp2p.createRelay(...)` (async static factories) rather than `new TransportLibp2p(...)` directly — the factories own libp2p node creation and `start()`.
+- **Construction.** Use `TransportLibp2p.createNode(...)` or `TransportLibp2p.createRelay(...)` (async static factories) rather than `new TransportLibp2p(...)` directly — the factories own libp2p node creation and `start()`.
 - **Default `networkAccessBytes`.** Defaults to `new Uint8Array([0])`, not an empty array — an empty array causes `.send()` to be a no-op, which breaks the counter-handshake.
 
 ### Two construction modes
@@ -98,7 +98,7 @@ interface ITransport {
 
 Root `tsconfig.json` sets strict-plus flags worth knowing before editing:
 
-- `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, `isolatedModules`.
+- `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, `isolatedModules`.
 - `composite: true` — packages are TS project references. New workspace packages must add a `"references"` entry in the root `tsconfig.json` and extend it.
 
 ESLint flat config (`eslint.config.mjs`) ignores `**/dist/**` and `docs/**`.

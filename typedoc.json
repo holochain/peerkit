@@ -1,6 +1,6 @@
 {
   "entryPointStrategy": "packages",
-  "entryPoints": ["packages/transport-libp2p"],
+  "entryPoints": ["packages/interface/", "packages/transport-libp2p"],
   "out": "docs",
   "externalSymbolLinkMappings": {
     "@multiformats/multiaddr": {
