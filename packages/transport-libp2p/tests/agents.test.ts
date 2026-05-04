@@ -5,13 +5,10 @@ import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, test } from "vitest";
-import { encodeFrame } from "../src/frame.js";
-import {
-  CURRENT_ACCESS_PROTOCOL,
-  CURRENT_AGENTS_PROTOCOL,
-} from "@peerkit/transport-libp2p";
+import { CURRENT_AGENTS_PROTOCOL } from "../src/index.js";
 import type { NetworkAccessHandler } from "@peerkit/interface";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { isDeepStrictEqual } from "node:util";
 
 beforeEach(setupTestLogger);
 
@@ -37,9 +34,9 @@ test("Opening an agents stream without being granted access closes the connectio
 });
 
 test("Agents channel round-trip after access handshake", async () => {
-  const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: NetworkAccessHandler = (_fromPeer, bytes) =>
-    Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
+  const VALID_ACCESS_BYTES = new TextEncoder().encode("pass");
+  const networkAccessHandler: NetworkAccessHandler = async (_fromPeer, bytes) =>
+    isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   const receivedAgents: Array<{ fromPeer: string; bytes: Uint8Array }> = [];
   const agentsReceivedCallback = async (
     fromPeer: string,
@@ -47,37 +44,33 @@ test("Agents channel round-trip after access handshake", async () => {
   ) => {
     receivedAgents.push({ fromPeer, bytes });
   };
-  const { node, address } = await createNode({
+  const { node: node1, address: address1 } = await createNode({
     id: "node1",
     agentsReceivedCallback,
     networkAccessHandler,
+    networkAccessBytes: VALID_ACCESS_BYTES,
   });
 
-  const encoder = new TextEncoder();
-  const libp2pNode = await createLibp2p({
-    transports: [tcp()],
-    connectionEncrypters: [noise()],
-    streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+  const { node: node2 } = await createNode({
+    id: "node2",
+    networkAccessHandler,
+    networkAccessBytes: VALID_ACCESS_BYTES,
   });
-  const connection = await libp2pNode.dial(multiaddr(address));
-  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(encoder.encode(VALID_ACCESS_BYTES));
-  await accessStream.close();
 
-  const agentsStream = await connection.newStream(CURRENT_AGENTS_PROTOCOL);
-  agentsStream.send(encodeFrame(encoder.encode("agent-info")));
-  await agentsStream.close();
+  await node2.connect(address1);
 
-  await retryFnUntilTimeout(async () => receivedAgents.length === 1);
-  assert.equal(receivedAgents[0]!.fromPeer, libp2pNode.peerId.toString());
-  assert.equal(
-    new TextDecoder().decode(receivedAgents[0]!.bytes),
-    "agent-info",
+  await node2.sendAgents(
+    node1.getNodeId(),
+    new TextEncoder().encode("agent-info"),
   );
 
-  await libp2pNode.stop();
-  await node.shutDown();
+  await retryFnUntilTimeout(async () => receivedAgents.length === 1);
+  assert(receivedAgents[0]);
+  assert.equal(receivedAgents[0].fromPeer, node2.getNodeId().toString());
+  assert.equal(new TextDecoder().decode(receivedAgents[0].bytes), "agent-info");
+
+  await node2.shutDown();
+  await node1.shutDown();
 });
 
 test("Two nodes can exchange agent infos", async () => {
@@ -90,7 +83,6 @@ test("Two nodes can exchange agent infos", async () => {
     agentsReceivedCallback: async (_fromPeer, bytes) => {
       receivedByResponder.push(bytes);
     },
-    networkAccessHandler: async (_fromPeer, _bytes) => true,
   });
 
   // Initiator node: grants all access, connects to responder as a bootstrap relay
@@ -99,9 +91,9 @@ test("Two nodes can exchange agent infos", async () => {
     agentsReceivedCallback: async (_fromPeer, bytes) => {
       receivedByInitiator.push(bytes);
     },
-    networkAccessHandler: async (_fromPeer, _bytes) => true,
-    bootstrapRelays: [responderAddress],
   });
+
+  await initiator.connect(responderAddress);
 
   // After bootstrap, both sides should know each other — verify via sendAgents
   await initiator.sendAgents(

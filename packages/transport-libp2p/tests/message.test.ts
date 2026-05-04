@@ -9,9 +9,10 @@ import { encodeFrame } from "../src/frame.js";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
-} from "@peerkit/transport-libp2p";
+} from "../src/index.js";
 import type { MessageHandler, NetworkAccessHandler } from "@peerkit/interface";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { isDeepStrictEqual } from "node:util";
 
 beforeEach(setupTestLogger);
 
@@ -68,25 +69,66 @@ test("Send a message after having been granted access", async () => {
   await node1.shutDown();
 });
 
+test("Send a message both ways on the same stream", async () => {
+  const messagesReceived1: Uint8Array[] = [];
+  // Define a message handler that stores received message for later assertion
+  const messageHandler1: MessageHandler = async (_fromAgent, message) => {
+    messagesReceived1.push(message);
+  };
+  // Create a node that will receive the message
+  const { node: node1, address } = await createNode({
+    id: "node1",
+    messageHandler: messageHandler1,
+  });
+
+  // Create another node
+  const messagesReceived2: Uint8Array[] = [];
+  // Define a message handler that stores received message for later assertion
+  const messageHandler2: MessageHandler = async (_fromAgent, message) => {
+    messagesReceived2.push(message);
+  };
+  const { node: node2 } = await createNode({
+    id: "node2",
+    messageHandler: messageHandler2,
+  });
+  await node2.connect(address);
+
+  // Send and receive message from node 2 to node 1
+  await node2.send(node1.getNodeId(), new TextEncoder().encode("hello"));
+
+  await retryFnUntilTimeout(async () => messagesReceived1.length === 1);
+  assert(messagesReceived1[0]);
+  assert.equal("hello", new TextDecoder().decode(messagesReceived1[0]));
+
+  // The other way, send from node 1 to node 2
+  await node1.send(node2.getNodeId(), new TextEncoder().encode("bye"));
+
+  await retryFnUntilTimeout(async () => messagesReceived2.length === 1);
+  assert(messagesReceived2[0]);
+  assert.equal("bye", new TextDecoder().decode(messagesReceived2[0]));
+
+  await node2.shutDown();
+  await node1.shutDown();
+});
+
 test("Large messages are chunked and received correctly", async () => {
   // Define an access handler
-  const VALID_ACCESS_BYTES = "pass";
-  const networkAccessHandler: NetworkAccessHandler = (_agentId, bytes) =>
-    Promise.resolve(bytes.toString() === VALID_ACCESS_BYTES);
+  const VALID_ACCESS_BYTES = new TextEncoder().encode("pass");
+  const networkAccessHandler: NetworkAccessHandler = async (_agentId, bytes) =>
+    isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   // Define a message handler that stores received message for later assertion
   const receivedMessages: Uint8Array[] = [];
-  const messageHandler: MessageHandler = (_fromAgent, message) => {
+  const messageHandler: MessageHandler = async (_fromAgent, message) => {
     receivedMessages.push(message);
-    return Promise.resolve();
   };
-  // Create anode that will receive the message
+  // Create a node that will receive the message
   const { node, address } = await createNode({
     id: "node1",
     networkAccessHandler,
+    networkAccessBytes: VALID_ACCESS_BYTES,
     messageHandler,
   });
 
-  const encoder = new TextEncoder();
   const libp2pNode = await createLibp2p({
     transports: [tcp()],
     connectionEncrypters: [noise()],
@@ -95,7 +137,7 @@ test("Large messages are chunked and received correctly", async () => {
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
-  accessStream.send(encoder.encode(VALID_ACCESS_BYTES));
+  accessStream.send(VALID_ACCESS_BYTES);
   await accessStream.close();
 
   const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);

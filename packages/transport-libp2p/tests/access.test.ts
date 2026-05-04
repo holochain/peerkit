@@ -7,7 +7,7 @@ import { type NetworkAccessHandler } from "@peerkit/interface";
 import { createLibp2p } from "libp2p";
 import { isDeepStrictEqual } from "node:util";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { CURRENT_ACCESS_PROTOCOL } from "@peerkit/transport-libp2p";
+import { CURRENT_ACCESS_PROTOCOL } from "../src/index.js";
 import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
@@ -224,7 +224,6 @@ test("Network access handler is not repeatedly called for previously rejected pe
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
   accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
-  console.log("once");
 
   await retryFnUntilTimeout(async () => connection.status === "closed");
 
