@@ -174,10 +174,14 @@ export class TransportLibp2p implements ITransport {
       },
     });
     await libp2pNode.start();
+
     const transport = new TransportLibp2p(libp2pNode, options);
-    // Connect to all provided relays.
+    /**
+     * Connect to all provided relays. This doesn't await success. The transport
+     * calls {@link connectedToRelayCallback} on successful connect to a relay.
+     */
     if (options?.bootstrapRelays?.length) {
-      await transport.connectToRelays(options.bootstrapRelays);
+      transport.connectToRelays(options.bootstrapRelays);
     }
     return transport;
   }
@@ -227,9 +231,7 @@ export class TransportLibp2p implements ITransport {
         `No open connection to peer ${nodeId}. Ensure the peer is connected before calling sendAgents().`,
       );
     }
-    const stream = await connections[0].newStream(CURRENT_AGENTS_PROTOCOL, {
-      // runOnLimitedConnection: true,
-    });
+    const stream = await connections[0].newStream(CURRENT_AGENTS_PROTOCOL);
     stream.send(encodeFrame(data));
     await stream.close();
   }
@@ -249,6 +251,18 @@ export class TransportLibp2p implements ITransport {
     );
     if (!stream || stream.status !== "open") {
       stream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+      // Register a listener so the remote end can write back on this stream.
+      if (this.messageHandler) {
+        const messageHandler = this.messageHandler;
+        const decoder = new FrameDecoder();
+        const nodeId = connection.remotePeer.toString();
+        stream.addEventListener("message", async (message) => {
+          const chunk = message.data.subarray();
+          for (const msg of decoder.feed(chunk)) {
+            await messageHandler(nodeId, msg);
+          }
+        });
+      }
     }
     stream.send(encodeFrame(data));
   }
@@ -269,7 +283,7 @@ export class TransportLibp2p implements ITransport {
       relays.map((relay) =>
         this.connectToRelay(relay)
           .then((relayNodeId) => {
-            this.logger.info("Connected to relay {*}", { relay });
+            this.logger.info("Connected to relay {*}", { relay, relayNodeId });
             if (this.connectedToRelayCallback) {
               const connectedToRelayCallback = this.connectedToRelayCallback;
               // Register event listener for when the dialable relay address has been
@@ -284,6 +298,7 @@ export class TransportLibp2p implements ITransport {
                         .some((c) => c.name === "p2p-circuit"),
                   );
                   if (relayAddress) {
+                    console.log("got relay address");
                     connectedToRelayCallback(
                       relayAddress.multiaddr.toString(),
                       relayNodeId.toString(),
@@ -334,10 +349,7 @@ export class TransportLibp2p implements ITransport {
         "message",
         (message) => {
           clearTimeout(timer);
-          const data =
-            message.data instanceof Uint8Array
-              ? message.data
-              : message.data.subarray();
+          const data = message.data.subarray();
           resolve(data);
         },
         { once: true },
@@ -372,22 +384,18 @@ export class TransportLibp2p implements ITransport {
     stream.addEventListener(
       "message",
       async (message) => {
-        const raw =
-          message.data instanceof Uint8Array
-            ? message.data
-            : message.data.subarray();
-
-        const peerKey = connection.remotePeer.toString();
+        const networkAccessBytes = message.data.subarray();
+        const nodeIdString = connection.remotePeer.toString();
 
         this.logger.debug(
           `Incoming message on stream ${CURRENT_ACCESS_PROTOCOL} {*}`,
           {
             remoteId: connection.remotePeer,
-            access: this.nodeAccess.get(peerKey),
+            access: this.nodeAccess.get(nodeIdString),
           },
         );
         // Check if this peer has been denied access before
-        if (this.nodeAccess.get(peerKey) === false) {
+        if (this.nodeAccess.get(nodeIdString) === false) {
           this.logger.warn(
             "Previously rejected peer is trying to access network again. Closing connection. {*}",
             { remoteId: connection.remotePeer },
@@ -398,9 +406,9 @@ export class TransportLibp2p implements ITransport {
 
         const accessGranted = await this.networkAccessHandler(
           connection.remotePeer.toString(),
-          raw,
+          networkAccessBytes,
         );
-        this.nodeAccess.set(peerKey, accessGranted);
+        this.nodeAccess.set(nodeIdString, accessGranted);
         this.logger.info("Access {*}", {
           remoteId: connection.remotePeer,
           accessGranted,
@@ -422,10 +430,7 @@ export class TransportLibp2p implements ITransport {
 
     const decoder = new FrameDecoder();
     stream.addEventListener("message", async (message) => {
-      const chunk =
-        message.data instanceof Uint8Array
-          ? message.data
-          : message.data.subarray();
+      const chunk = message.data.subarray();
       for (const msg of decoder.feed(chunk)) {
         this.logger.debug(
           `Incoming message on stream ${CURRENT_AGENTS_PROTOCOL} {*}`,
@@ -453,10 +458,7 @@ export class TransportLibp2p implements ITransport {
 
     const decoder = new FrameDecoder();
     stream.addEventListener("message", async (message) => {
-      const chunk =
-        message.data instanceof Uint8Array
-          ? message.data
-          : message.data.subarray();
+      const chunk = message.data.subarray();
       for (const msg of decoder.feed(chunk)) {
         this.logger.debug(
           `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,

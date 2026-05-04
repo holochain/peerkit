@@ -4,9 +4,10 @@ import {
   getConsoleSink,
 } from "@logtape/logtape";
 import getPort, { portNumbers } from "get-port";
-import { TransportLibp2p } from "@peerkit/transport-libp2p";
+import { TransportLibp2p } from "../src/index.js";
 import type {
   AgentsReceivedCallback,
+  ConnectedToRelayCallback,
   MessageHandler,
   NetworkAccessBytes,
   NetworkAccessHandler,
@@ -38,6 +39,11 @@ export const setupTestLogger = async () => {
   });
 };
 
+/**
+ * Sleep for the provided duration.
+ *
+ * @param durationMs Duration in milliseconds
+ */
 export const sleep = async (durationMs: number) =>
   new Promise((resolve) => setTimeout(resolve, durationMs));
 
@@ -56,6 +62,11 @@ export const retryFnUntilTimeout = async (
   timeoutMs?: number,
   sleepMs?: number,
 ) => {
+  // Capture the call-site stack before any await, then strip the utility
+  // frame so the error points directly to the test line that called this.
+  const callSiteError = new Error("retryFnUntilTimeout timed out");
+  Error.captureStackTrace(callSiteError, retryFnUntilTimeout);
+
   timeoutMs = timeoutMs ?? 2_000;
   sleepMs = sleepMs ?? 100;
   const start = performance.now();
@@ -65,7 +76,7 @@ export const retryFnUntilTimeout = async (
       return;
     }
     if (performance.now() - start > timeoutMs) {
-      throw new Error("retryFnUntilTimeout timed out");
+      throw callSiteError;
     }
     await sleep(sleepMs);
   }
@@ -95,12 +106,12 @@ export interface TestRelayOptions {
  */
 export const createRelay = async (options: TestRelayOptions) => {
   const { id, networkAccessBytes } = options;
-  const port = await getPort({ port: portNumbers(40_000, 50_000) });
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const networkAccessHandler =
-    options.networkAccessHandler ?? (async (_fromPeer, _bytes) => false);
+    options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
   const relay = await TransportLibp2p.createRelay({
     addrs: [address],
     id,
@@ -116,6 +127,10 @@ export interface TestNodeOptions {
    * Optional string to identify the node in logs
    */
   id?: string;
+  /**
+   * Optional callback when connected to a relay
+   */
+  connectedToRelayCallback?: ConnectedToRelayCallback;
   /**
    * Optional callback when receiving agents
    */
@@ -151,6 +166,8 @@ export const createNode = async (options: TestNodeOptions) => {
   const port = await getPort({ port: portNumbers(40_000, 50_000) });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   const { id, bootstrapRelays, handshakeTimeoutMs } = options;
+  const connectedToRelayCallback =
+    options.connectedToRelayCallback ?? undefined;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const networkAccessHandler =
@@ -161,6 +178,7 @@ export const createNode = async (options: TestNodeOptions) => {
   const node = await TransportLibp2p.createNode({
     addrs: [address],
     id,
+    connectedToRelayCallback,
     agentsReceivedCallback,
     networkAccessHandler,
     networkAccessBytes,

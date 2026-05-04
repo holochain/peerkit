@@ -9,13 +9,9 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
+  TransportLibp2p,
 } from "../src/index.js";
-import {
-  createNode,
-  createRelay,
-  retryFnUntilTimeout,
-  setupTestLogger,
-} from "./util.js";
+import { createRelay, retryFnUntilTimeout, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -99,21 +95,25 @@ test("Relay knows node's agent infos after agent exchange", async () => {
     agentsReceivedCallback: async (_fromPeer, bytes) => {
       agentInfosReceivedByRelay.push(bytes);
     },
-    networkAccessHandler: async (_fromPeer, _bytes) => {
-      console.log("hello");
-      return true;
-    },
   });
 
   const agentInfosReceivedByNode: Uint8Array[] = [];
-  const { node } = await createNode({
+  let connectedToRelay = false;
+  const node = await TransportLibp2p.createNode({
     id: "node1",
+    addrs: ["/p2p-circuit"],
     agentsReceivedCallback: async (_fromPeer, bytes) => {
       agentInfosReceivedByNode.push(bytes);
     },
-    networkAccessHandler: async (_fromPeer, _bytes) => true,
+    networkAccessHandler: async () => true,
     bootstrapRelays: [relayAddress],
+    connectedToRelayCallback: (_address, nodeId) => {
+      assert.equal(nodeId, relay.getNodeId());
+      connectedToRelay = true;
+    },
   });
+
+  await retryFnUntilTimeout(async () => connectedToRelay, 3_000);
 
   // Relay sends agent infos to node
   const agentInfosOnRelay = new TextEncoder().encode("relay-initiated");

@@ -78,25 +78,35 @@ export interface ITransport {
    *
    * If the connection is routed through a relay, the address must include the
    * relay address.
+   *
+   * @param nodeAddress The dialable address of the node to connect to
    */
   connect(nodeAddress: NodeAddress): Promise<void>;
 
   /**
    * Send opaque agent-info bytes to a peer.
    * The peer must be connected and have been granted access.
+   *
+   * @param nodeId The ID of the target node
+   * @param agents The list of agents to send to the node
    */
-  sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void>;
+  sendAgents(nodeId: NodeId, agents: Uint8Array): Promise<void>;
 
   /**
    * Send an opaque application message to a peer.
    * The peer must be connected and have been granted access.
+   *
+   * @param nodeId The ID of the target node
+   * @param message The message to send to the node
    */
-  send(nodeId: NodeId, data: Uint8Array): Promise<void>;
+  send(nodeId: NodeId, message: Uint8Array): Promise<void>;
 
   /**
    * Is the connection to the provided node a direct connection?
    *
    * `false` means the connection is relayed.
+   *
+   * @param nodeId The node ID of the connection to check
    */
   isDirectConnection(nodeId: NodeId): boolean;
 
