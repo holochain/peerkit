@@ -1,7 +1,7 @@
 import { reset } from "@logtape/logtape";
-import { afterEach, assert, beforeEach, test } from "vitest";
+import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { TransportLibp2p } from "../src/index.js";
-import { createRelay, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { createRelay, setupTestLogger } from "./util.js";
 import { NodeId } from "@peerkit/interface";
 
 beforeEach(setupTestLogger);
@@ -49,10 +49,10 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   });
 
   // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
-  await retryFnUntilTimeout(
-    async () =>
+  await vi.waitUntil(
+    () =>
       !!relayAddress1 && !!relayNodeId && peersConnectedToRelay.length === 1,
-    5_000,
+    { timeout: 2_000 },
   );
 
   // Node 1 sends agent infos, including its own, to relay.
@@ -62,7 +62,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
     new TextEncoder().encode(node1RelayedAddress),
   );
   // Await agent infos to arrive in relay's agent store.
-  await retryFnUntilTimeout(async () => relayAgentStore.length === 1);
+  await vi.waitFor(() => expect(relayAgentStore.length).toBe(1));
 
   // Create a second node that will also connect to the relay, receive
   // agent infos from it and then connect to node 1 through the relay.
@@ -94,16 +94,16 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
 
   // Wait for node 2's connection to relay to complete.
   // Node 1 is still connected to relay, so wait for 2 connected peers.
-  await retryFnUntilTimeout(
-    async () => !!relayAddress2 && peersConnectedToRelay.length === 2,
-    5_000,
+  await vi.waitUntil(
+    () => !!relayAddress2 && peersConnectedToRelay.length === 2,
+    { timeout: 5_000 },
   );
 
   // Relay sends agent infos from agent store to node 2.
   assert(relayAgentStore[0]);
   await relay.sendAgents(node2.getNodeId(), relayAgentStore[0]);
 
-  await retryFnUntilTimeout(async () => node2AgentStore.length === 1);
+  await vi.waitFor(() => expect(node2AgentStore.length).toBe(1));
 
   // Node 2 connects to node 1 over the relay.
   const node1Address = new TextDecoder().decode(node2AgentStore[0]);
@@ -114,8 +114,8 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   await node2.connect(node1Address);
 
   // Await the peerConnectedCallback to have fired for both nodes.
-  await retryFnUntilTimeout(
-    async () =>
+  await vi.waitUntil(
+    () =>
       peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
   );
 
@@ -126,7 +126,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
     new TextEncoder().encode("hello-from-node1"),
   );
 
-  await retryFnUntilTimeout(async () => messagesReceivedByNode2.length === 1);
+  await vi.waitFor(() => expect(messagesReceivedByNode2.length).toBe(1));
   assert(messagesReceivedByNode2[0]);
   assert.equal(
     new TextDecoder().decode(messagesReceivedByNode2[0]),
@@ -178,10 +178,10 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   });
 
   // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
-  await retryFnUntilTimeout(
-    async () =>
+  await vi.waitUntil(
+    () =>
       !!relayAddress1 && !!relayNodeId && peersConnectedToRelay.length === 1,
-    5_000,
+    { timeout: 5_000 },
   );
 
   // Node 1 sends agent infos, including its own, to relay.
@@ -191,7 +191,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
     new TextEncoder().encode(node1RelayedAddress),
   );
   // Await agent infos to arrive in relay's agent store.
-  await retryFnUntilTimeout(async () => relayAgentStore.length === 1);
+  await vi.waitFor(() => expect(relayAgentStore.length).toBe(1));
 
   // Create a second node that will also connect to the relay, receive
   // agent infos from it and then connect to node 1 through the relay.
@@ -229,16 +229,16 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
 
   // Wait for node 2's connection to relay to complete.
   // Node 1 is still connected to relay, so wait for 2 connected peers.
-  await retryFnUntilTimeout(
-    async () => !!relayAddress2 && peersConnectedToRelay.length === 2,
-    5_000,
+  await vi.waitUntil(
+    () => !!relayAddress2 && peersConnectedToRelay.length === 2,
+    { timeout: 5_000 },
   );
 
   // Relay sends agent infos from agent store to node 2.
   assert(relayAgentStore[0]);
   await relay.sendAgents(node2.getNodeId(), relayAgentStore[0]);
 
-  await retryFnUntilTimeout(async () => node2AgentStore.length === 1);
+  await vi.waitFor(() => expect(node2AgentStore.length).toBe(1));
 
   // Node 2 connects to node 1 over the relay.
   const node1Address = new TextDecoder().decode(node2AgentStore[0]);
@@ -249,17 +249,17 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   await node2.connect(node1Address);
 
   // Await the peerConnectedCallback to have fired for both nodes.
-  await retryFnUntilTimeout(
-    async () =>
+  await vi.waitUntil(
+    () =>
       peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
   );
 
   // Wait for the connection upgrade to a direct connection.
-  await retryFnUntilTimeout(
-    async () =>
+  await vi.waitUntil(
+    () =>
       node1.isDirectConnection(node2.getNodeId()) &&
       node2.isDirectConnection(node1.getNodeId()),
-    10_000,
+    { timeout: 10_000 },
   );
 
   // Node 1 sends a message to node 2 over the direct connection.
@@ -269,7 +269,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
     new TextEncoder().encode("hello-from-node1"),
   );
 
-  await retryFnUntilTimeout(async () => messagesReceivedByNode2.length === 1);
+  await vi.waitFor(() => expect(messagesReceivedByNode2.length).toBe(1));
   assert(messagesReceivedByNode2[0]);
   assert.equal(
     new TextDecoder().decode(messagesReceivedByNode2[0]),

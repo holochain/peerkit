@@ -8,7 +8,7 @@ import { createLibp2p } from "libp2p";
 import { isDeepStrictEqual } from "node:util";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_ACCESS_PROTOCOL } from "../src/index.js";
-import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { createNode, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -34,7 +34,7 @@ test("Remote node closes connection when host sends invalid network access bytes
   accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
 
-  await retryFnUntilTimeout(async () => connection.status === "closed");
+  await vi.waitUntil(() => connection.status === "closed");
 
   await libp2pNode.stop();
   await node.shutDown();
@@ -243,7 +243,7 @@ test("Network access handler is not repeatedly called for previously rejected pe
   accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
 
-  await retryFnUntilTimeout(async () => connection.status === "closed");
+  await vi.waitUntil(() => connection.status === "closed");
 
   expect(networkAccessHandler).toHaveBeenCalledTimes(1);
 
@@ -253,7 +253,7 @@ test("Network access handler is not repeatedly called for previously rejected pe
   accessStream2.send(new TextEncoder().encode("invalid"));
   await accessStream2.close();
 
-  await retryFnUntilTimeout(async () => connection2.status === "closed");
+  await vi.waitUntil(() => connection2.status === "closed");
 
   // Callback should not have been called again
   expect(networkAccessHandler).toHaveBeenCalledTimes(1);

@@ -4,14 +4,14 @@ import { tcp } from "@libp2p/tcp";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
-import { afterEach, assert, beforeEach, expect, test } from "vitest";
+import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
   TransportLibp2p,
 } from "../src/index.js";
-import { createRelay, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { createRelay, setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -36,7 +36,7 @@ test("Invalid network access bytes closes connection to relay", async () => {
   accessStream.send(new TextEncoder().encode("invalid"));
   await accessStream.close();
 
-  await retryFnUntilTimeout(async () => connection.status === "closed");
+  await vi.waitUntil(() => connection.status === "closed");
 
   await libp2pNode.stop();
   await relay.shutDown();
@@ -59,7 +59,7 @@ test("Opening an agents stream without being granted access closes the connectio
     // On Linux the stream is closed so fast that `newStream` throws.
   }
 
-  await retryFnUntilTimeout(async () => connection.status !== "open");
+  await vi.waitUntil(() => connection.status !== "open");
 
   await libp2pNode.stop();
   await relay.shutDown();
@@ -119,14 +119,14 @@ test("Relay knows node's agent infos after agent exchange", async () => {
     },
   });
 
-  await retryFnUntilTimeout(async () => connectedToRelay, 3_000);
+  await vi.waitUntil(() => connectedToRelay, 3_000);
 
   // Relay sends agent infos to node
   const agentInfosOnRelay = new TextEncoder().encode("relay-initiated");
   await relay.sendAgents(node.getNodeId(), agentInfosOnRelay);
 
   // Node receives them
-  await retryFnUntilTimeout(async () => agentInfosReceivedByNode.length === 1);
+  await vi.waitUntil(() => agentInfosReceivedByNode.length === 1);
   assert.deepEqual(agentInfosReceivedByNode[0], agentInfosOnRelay);
 
   // Send agent infos from node to relay
@@ -134,7 +134,7 @@ test("Relay knows node's agent infos after agent exchange", async () => {
   await node.sendAgents(relay.getNodeId(), agentInfosOnNode);
 
   // Relay receives them
-  await retryFnUntilTimeout(async () => agentInfosReceivedByRelay.length === 1);
+  await vi.waitUntil(() => agentInfosReceivedByRelay.length === 1);
   assert.deepEqual(agentInfosReceivedByRelay[0], agentInfosOnNode);
 
   await node.shutDown();
