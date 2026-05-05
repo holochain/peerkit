@@ -1,5 +1,6 @@
 /**
  * Opaque node identifier string.
+ *
  * The transport uses this type across its public surface to identify peers.
  *
  * Mapping to peerkit AgentId is the responsibility of the caller.
@@ -7,7 +8,7 @@
 export type NodeId = string;
 
 /**
- * Opaque node address string.
+ * Opaque node address string
  *
  * Every transport implementation parses it according to its own convention,
  * to connect to other nodes.
@@ -15,7 +16,7 @@ export type NodeId = string;
 export type NodeAddress = string;
 
 /**
- * Peerkit-native address for a relay node.
+ * Peerkit-native address for a relay node
  *
  * Every transport implementation parses it according to its own convention.
  */
@@ -27,7 +28,7 @@ export type RelayAddress = string;
 export type NetworkAccessBytes = Uint8Array;
 
 /**
- * Interface to handle incoming access streams.
+ * Interface to handle incoming access streams
  *
  * An access stream expects the Network Access Bytes as the first and only message,
  * to check if a peer has access to the network.
@@ -38,7 +39,7 @@ export type NetworkAccessHandler = (
 ) => Promise<boolean>;
 
 /**
- * Interface to handle incoming messages from a message stream.
+ * Interface to handle incoming messages from a message stream
  */
 export type MessageHandler = (
   fromNode: NodeId,
@@ -46,10 +47,10 @@ export type MessageHandler = (
 ) => Promise<void>;
 
 /**
- * Called when the circuit relay reservation is established and the node
- * can be contacted through the relay.
+ * Called when a connection to the relay is complete, including the network
+ * access handshake, and the node can be contacted through the relay
  *
- * Provides the relay's address for full address construction.
+ * Provides the relay's address and node ID for full address construction.
  */
 export type ConnectedToRelayCallback = (
   relayAddress: RelayAddress,
@@ -57,7 +58,7 @@ export type ConnectedToRelayCallback = (
 ) => void;
 
 /**
- * Called when agents have been received from another node.
+ * Called when agents have been received from another node
  */
 export type AgentsReceivedCallback = (
   fromNode: NodeId,
@@ -65,7 +66,7 @@ export type AgentsReceivedCallback = (
 ) => Promise<void>;
 
 /**
- * Interface that defines the methods a peerkit transport needs to implement.
+ * Interface that defines the methods a peerkit transport needs to implement
  */
 export interface ITransport {
   /**
