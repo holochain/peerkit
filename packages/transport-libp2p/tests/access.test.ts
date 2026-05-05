@@ -109,19 +109,26 @@ test("Valid network access bytes grant connection to other node", async () => {
     return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   };
 
+  const peerConnectedCallback1 = vi.fn();
   const { node: node1, address: address1 } = await createNode({
     id: "node1",
     networkAccessHandler,
     networkAccessBytes: VALID_ACCESS_BYTES,
+    peerConnectedCallback: peerConnectedCallback1,
   });
 
+  const peerConnectedCallback2 = vi.fn();
   const { node: node2 } = await createNode({
     id: "node2",
     networkAccessHandler,
     networkAccessBytes: VALID_ACCESS_BYTES,
+    peerConnectedCallback: peerConnectedCallback2,
   });
 
   await node2.connect(address1);
+
+  await vi.waitFor(() => expect(peerConnectedCallback1).toHaveBeenCalled());
+  await vi.waitFor(() => expect(peerConnectedCallback2).toHaveBeenCalled());
 
   await node1.shutDown();
   await node2.shutDown();
@@ -138,20 +145,25 @@ test("Invalid network access bytes deny connection to initiating node", async ()
     return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   };
 
+  const peerConnectedCallback1 = vi.fn();
   const { node: node1, address: address1 } = await createNode({
     id: "node1",
     networkAccessHandler,
     networkAccessBytes: VALID_ACCESS_BYTES,
+    peerConnectedCallback: peerConnectedCallback1,
   });
 
+  const peerConnectedCallback2 = vi.fn();
   const { node: node2 } = await createNode({
     id: "node2",
     networkAccessHandler,
     networkAccessBytes: new Uint8Array([1]), // invalid access bytes
-    handshakeTimeoutMs: 500,
+    peerConnectedCallback: peerConnectedCallback2,
   });
 
   await expect(node2.connect(address1)).rejects.toThrow();
+  expect(peerConnectedCallback1).to.not.toHaveBeenCalled();
+  expect(peerConnectedCallback2).to.not.toHaveBeenCalled();
 
   await node1.shutDown();
   await node2.shutDown();
@@ -168,19 +180,25 @@ test("Invalid network access bytes deny connection to remote node", async () => 
     return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   };
 
+  const peerConnectedCallback1 = vi.fn();
   const { node: node1, address: address1 } = await createNode({
     id: "node1",
     networkAccessHandler,
     networkAccessBytes: new Uint8Array([1]), // invalid access bytes
+    peerConnectedCallback: peerConnectedCallback1,
   });
 
+  const peerConnectedCallback2 = vi.fn();
   const { node: node2 } = await createNode({
     id: "node2",
     networkAccessHandler,
     networkAccessBytes: VALID_ACCESS_BYTES,
+    peerConnectedCallback: peerConnectedCallback2,
   });
 
   await expect(node2.connect(address1)).rejects.toThrow();
+  expect(peerConnectedCallback1).to.not.toHaveBeenCalled();
+  expect(peerConnectedCallback2).to.not.toHaveBeenCalled();
 
   await node1.shutDown();
   await node2.shutDown();

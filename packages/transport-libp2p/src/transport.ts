@@ -24,6 +24,7 @@ import type {
   RelayAddress,
   ConnectedToRelayCallback,
   NodeAddress,
+  PeerConnectedCallback,
 } from "@peerkit/interface";
 
 export interface RelayOptions {
@@ -37,6 +38,11 @@ export interface RelayOptions {
    * Callback when agent infos have been received
    */
   agentsReceivedCallback: AgentsReceivedCallback;
+  /**
+   * Callback when a peer connection is complete, signaling readiness to
+   * exchange data
+   */
+  peerConnectedCallback: PeerConnectedCallback;
   /**
    * Handler for incoming network access streams
    */
@@ -59,6 +65,11 @@ export interface NodeOptions {
    */
   agentsReceivedCallback: AgentsReceivedCallback;
   /**
+   * Callback when a peer connection is complete, signaling readiness to
+   * exchange data
+   */
+  peerConnectedCallback: PeerConnectedCallback;
+  /**
    * Handler for incoming network access streams
    */
   networkAccessHandler: NetworkAccessHandler;
@@ -79,25 +90,39 @@ export interface NodeOptions {
 /**
  * Identifier for the current network access protocol in peerkit.
  *
- * This protocol expects the network access bytes to be transmitted as
- * the only message. Based on validity of the bytes, access is granted
- * or denied.
+ * **Stream lifecycle**: opened by the initiator on every new connection.
+ * A single request/response exchange:
+ * 1. Initiator sends its `NetworkAccessBytes`.
+ * 2. Responder evaluates them, sends back its own `NetworkAccessBytes`,
+ *    then closes its write end.
+ * 3. Initiator receives the response, evaluates it, then closes its write end.
+ *
+ * The stream is fully reclaimed once both ends close. The connection remains open.
  */
 export const CURRENT_ACCESS_PROTOCOL = "/peerkit/access/v1";
 
 /**
  * Identifier for the current agents protocol in peerkit.
  *
- * This protocol is used to exchange agent information between connected
- * peers after access has been granted.
+ * **Stream lifecycle**: opened by whichever side wants to send agent infos.
+ * One-directional per exchange:
+ * 1. Sender sends a single framed payload, then closes its write end.
+ * 2. Receiver never writes back, so it closes its write end immediately on open.
+ *
+ * A new stream is opened for each {@link ITransport.sendAgents} call.
  */
 export const CURRENT_AGENTS_PROTOCOL = "/peerkit/agents/v1";
 
 /**
  * Identifier for the current messaging protocol in peerkit.
  *
- * This protocol is used to exchange messages between connected
- * peers after access has been granted.
+ * **Stream lifecycle**: opened by the first peer to send a message on a given
+ * connection. Bidirectional and long-lived:
+ * 1. Opener sends a framed message and registers a reply listener on the same stream.
+ * 2. Both peers write to the same stream for the lifetime of the connection.
+ *
+ * The stream is reused across messages; it is not closed after each send.
+ * Only available on nodes, relays do not register this protocol.
  */
 export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
 
@@ -113,6 +138,7 @@ export class TransportLibp2p implements ITransport {
   private networkAccessHandler: NetworkAccessHandler;
   private messageHandler?: MessageHandler;
   private connectedToRelayCallback?: ConnectedToRelayCallback;
+  private peerConnectedCallback?: PeerConnectedCallback;
 
   // Keyed by NodeId string. true = granted, false = denied.
   // Both entries are sticky for the session.
@@ -139,6 +165,9 @@ export class TransportLibp2p implements ITransport {
 
     if ("connectedToRelayCallback" in options) {
       this.connectedToRelayCallback = options.connectedToRelayCallback;
+    }
+    if ("peerConnectedCallback" in options) {
+      this.peerConnectedCallback = options.peerConnectedCallback;
     }
 
     this.libp2p = libp2p;
@@ -220,6 +249,11 @@ export class TransportLibp2p implements ITransport {
     const connection = await this.libp2p.dial(multiaddr(nodeAddress));
 
     await this.performNetworkAccessHandshake(connection);
+
+    // Connection to peer established, run callback.
+    if (this.peerConnectedCallback) {
+      this.peerConnectedCallback(connection.remotePeer.toString());
+    }
   }
 
   async sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void> {
@@ -298,7 +332,6 @@ export class TransportLibp2p implements ITransport {
                         .some((c) => c.name === "p2p-circuit"),
                   );
                   if (relayAddress) {
-                    console.log("got relay address");
                     connectedToRelayCallback(
                       relayAddress.multiaddr.toString(),
                       relayNodeId.toString(),
@@ -335,22 +368,43 @@ export class TransportLibp2p implements ITransport {
   private async performNetworkAccessHandshake(
     connection: Connection,
   ): Promise<PeerId> {
-    // Perform access handshake, send network access bytes to relay.
+    // Initiate access handshake
     const stream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+
+    // Send network access bytes to remote.
     stream.send(this.localNetworkAccessBytes);
 
-    // Await access handshake response with a timeout.
+    // Await remote's network access bytes with a timeout.
     const responseBytes = await new Promise<Uint8Array>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error("Access handshake response timed out")),
-        this.handshakeTimeoutMs,
+      // Close stream and throw error after handshake timed out.
+      const timer = setTimeout(async () => {
+        stream
+          .close()
+          .catch((error) =>
+            this.logger.info(
+              `Error when closing ${CURRENT_ACCESS_PROTOCOL} stream after handshake timeout {*}`,
+              { error },
+            ),
+          );
+        reject(new Error("Access handshake response timed out"));
+      }, this.handshakeTimeoutMs);
+
+      // Throw error when remote denies access.
+      stream.addEventListener(
+        "close",
+        () => {
+          clearTimeout(timer);
+          reject(new Error("Access denied by remote"));
+        },
+        { once: true },
       );
+
+      // Remote sends their network access bytes.
       stream.addEventListener(
         "message",
         (message) => {
           clearTimeout(timer);
-          const data = message.data.subarray();
-          resolve(data);
+          resolve(message.data.subarray());
         },
         { once: true },
       );
@@ -366,6 +420,7 @@ export class TransportLibp2p implements ITransport {
       this.logger.info("Access granted to remote {*}", {
         peerId: connection.remotePeer,
       });
+      await stream.close();
       return connection.remotePeer;
     } else {
       this.logger.warn("Access denied to remote. Closing connection. {*}", {
@@ -376,7 +431,8 @@ export class TransportLibp2p implements ITransport {
     }
   }
 
-  // Handler for incoming network access streams
+  // Handler for incoming network access streams, when a remote initiates the
+  // network access handshake.
   private onAccessConnect = async (stream: Stream, connection: Connection) => {
     this.logger.info(`Incoming ${CURRENT_ACCESS_PROTOCOL} stream {*}`, {
       remoteId: connection.remotePeer,
@@ -385,19 +441,19 @@ export class TransportLibp2p implements ITransport {
       "message",
       async (message) => {
         const networkAccessBytes = message.data.subarray();
-        const nodeIdString = connection.remotePeer.toString();
+        const remoteNodeId = connection.remotePeer.toString();
 
         this.logger.debug(
           `Incoming message on stream ${CURRENT_ACCESS_PROTOCOL} {*}`,
           {
             remoteId: connection.remotePeer,
-            access: this.nodeAccess.get(nodeIdString),
+            access: this.nodeAccess.get(remoteNodeId),
           },
         );
         // Check if this peer has been denied access before
-        if (this.nodeAccess.get(nodeIdString) === false) {
+        if (this.nodeAccess.get(remoteNodeId) === false) {
           this.logger.warn(
-            "Previously rejected peer is trying to access network again. Closing connection. {*}",
+            "Previously denied peer is trying to access network again. Closing connection. {*}",
             { remoteId: connection.remotePeer },
           );
           await connection.close();
@@ -405,10 +461,10 @@ export class TransportLibp2p implements ITransport {
         }
 
         const accessGranted = await this.networkAccessHandler(
-          connection.remotePeer.toString(),
+          remoteNodeId,
           networkAccessBytes,
         );
-        this.nodeAccess.set(nodeIdString, accessGranted);
+        this.nodeAccess.set(remoteNodeId, accessGranted);
         this.logger.info("Access {*}", {
           remoteId: connection.remotePeer,
           accessGranted,
@@ -418,7 +474,20 @@ export class TransportLibp2p implements ITransport {
           await connection.close();
           return;
         }
+
+        // Register an event listener that notifies about the completed handshake.
+        if (this.peerConnectedCallback) {
+          const peerConnectedCallback = this.peerConnectedCallback;
+          stream.addEventListener(
+            "remoteCloseWrite",
+            () => peerConnectedCallback(remoteNodeId),
+            { once: true },
+          );
+        }
+
         stream.send(this.localNetworkAccessBytes);
+        // Both ends of a stream must be closed for it to be fully released.
+        await stream.close();
       },
       { once: true },
     );
@@ -429,19 +498,25 @@ export class TransportLibp2p implements ITransport {
     await this.accessCheck(CURRENT_AGENTS_PROTOCOL, connection);
 
     const decoder = new FrameDecoder();
-    stream.addEventListener("message", async (message) => {
-      const chunk = message.data.subarray();
-      for (const msg of decoder.feed(chunk)) {
-        this.logger.debug(
-          `Incoming message on stream ${CURRENT_AGENTS_PROTOCOL} {*}`,
-          { peerId: connection.remotePeer, byteLength: msg.byteLength },
-        );
-        await this.agentsReceivedCallback(
-          connection.remotePeer.toString(),
-          msg,
-        );
-      }
-    });
+    stream.addEventListener(
+      "message",
+      async (message) => {
+        const chunk = message.data.subarray();
+        for (const msg of decoder.feed(chunk)) {
+          this.logger.debug(
+            `Incoming message on stream ${CURRENT_AGENTS_PROTOCOL} {*}`,
+            { peerId: connection.remotePeer, byteLength: msg.byteLength },
+          );
+          await this.agentsReceivedCallback(
+            connection.remotePeer.toString(),
+            msg,
+          );
+        }
+        // Both ends of a stream must be closed for it to be fully released.
+        await stream.close();
+      },
+      { once: true },
+    );
   };
 
   // Handler for incoming message streams

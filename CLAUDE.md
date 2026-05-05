@@ -60,21 +60,11 @@ Do not run CI checks unless explicitly asked. When asked, run the same checks CI
 
 ## Architecture — transport layer
 
-`ITransport` is defined in `packages/interface/src/transport.ts` and is the contract every transport must satisfy. `TransportLibp2p` in `packages/transport-libp2p` is the reference implementation.
+`ITransport` and all public API is defined in `packages/interface/src/transport.ts` and is the contract every transport must satisfy. `TransportLibp2p` in `packages/transport-libp2p` is the reference implementation.
 
 ### Transport public API
 
 All runtime methods are keyed by `NodeId` (an opaque `string` — the libp2p peer ID in multibase encoding). No libp2p types cross the public boundary. Mapping between peerkit `AgentId` and transport `NodeId` is the responsibility of the layer above.
-
-```ts
-interface ITransport {
-  getNodeId(): NodeId;
-  connect(nodeAddress: NodeAddress): Promise<void>;
-  sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void>;
-  send(nodeId: NodeId, data: Uint8Array): Promise<void>;
-  shutDown(): Promise<void>;
-}
-```
 
 ### Key behaviors future contributors must preserve
 

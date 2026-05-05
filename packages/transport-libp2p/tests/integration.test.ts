@@ -2,6 +2,7 @@ import { reset } from "@logtape/logtape";
 import { afterEach, assert, beforeEach, test } from "vitest";
 import { TransportLibp2p } from "../src/index.js";
 import { createRelay, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { NodeId } from "@peerkit/interface";
 
 beforeEach(setupTestLogger);
 
@@ -13,11 +14,15 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const relayAgentStore: Uint8Array[] = [];
   // Create the relay with a callback that pushes to the agent store when agent
   // infos have been received.
+  const peersConnectedToRelay: NodeId[] = [];
   const { relay, address: relayPublicAddress } = await createRelay({
     id: "relay",
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);
+    },
+    peerConnectedCallback: (nodeId) => {
+      peersConnectedToRelay.push(nodeId);
     },
   });
 
@@ -25,6 +30,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // agent info.
   let relayNodeId = "";
   let relayAddress1 = "";
+  const peersConnectedToNode1: NodeId[] = [];
   const node1 = await TransportLibp2p.createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
@@ -35,13 +41,17 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
       throw new Error("Node 1 shouldn't be sent agents");
     },
+    peerConnectedCallback: (nodeId) => {
+      peersConnectedToNode1.push(nodeId);
+    },
     addrs: ["/p2p-circuit"], // Only bind to relay transport
     bootstrapRelays: [relayPublicAddress],
   });
 
   // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
   await retryFnUntilTimeout(
-    async () => !!relayAddress1 && !!relayNodeId,
+    async () =>
+      !!relayAddress1 && !!relayNodeId && peersConnectedToRelay.length === 1,
     5_000,
   );
 
@@ -57,9 +67,11 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // Create a second node that will also connect to the relay, receive
   // agent infos from it and then connect to node 1 through the relay.
   const node2AgentStore: Uint8Array[] = [];
+  const peersConnectedToNode2: NodeId[] = [];
   const messagesReceivedByNode2: Uint8Array[] = [];
   let relayAddress2 = "";
   const node2 = await TransportLibp2p.createNode({
+    id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, _nodeId) => {
       relayAddress2 = address;
@@ -68,20 +80,26 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
       assert.equal(fromNode, relay.getNodeId());
       node2AgentStore.push(agentInfos);
     },
+    peerConnectedCallback: (nodeId) => {
+      assert.equal(nodeId, node1.getNodeId());
+      peersConnectedToNode2.push(nodeId);
+    },
     messageHandler: async (fromNode, message) => {
       assert.equal(fromNode, node1.getNodeId());
       messagesReceivedByNode2.push(message);
     },
-    id: "node2",
     addrs: ["/p2p-circuit"], // Only bind to relay transport
     bootstrapRelays: [relayPublicAddress],
   });
 
   // Wait for node 2's connection to relay to complete.
-  await retryFnUntilTimeout(async () => !!relayAddress2, 5_000);
+  // Node 1 is still connected to relay, so wait for 2 connected peers.
+  await retryFnUntilTimeout(
+    async () => !!relayAddress2 && peersConnectedToRelay.length === 2,
+    5_000,
+  );
 
   // Relay sends agent infos from agent store to node 2.
-  // TODO register as on-peer connected? Figure out node's peer ID internally?
   assert(relayAgentStore[0]);
   await relay.sendAgents(node2.getNodeId(), relayAgentStore[0]);
 
@@ -89,11 +107,22 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
 
   // Node 2 connects to node 1 over the relay.
   const node1Address = new TextDecoder().decode(node2AgentStore[0]);
+  // No peers should be connected to node 1.
+  assert.deepEqual(peersConnectedToNode1, []);
+  // No peers should be connected to node 2.
+  assert.deepEqual(peersConnectedToNode2, []);
   await node2.connect(node1Address);
 
-  // Node 1 sends a message to node 2 over the relay
+  // Await the peerConnectedCallback to have fired for both nodes.
+  await retryFnUntilTimeout(
+    async () =>
+      peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
+  );
+
+  // Node 1 sends a message to node 2 over the relay.
+  // Node 1 learned node 2's ID from the peersConnectedCallback.
   await node1.send(
-    node2.getNodeId(),
+    peersConnectedToNode1[0],
     new TextEncoder().encode("hello-from-node1"),
   );
 
@@ -114,11 +143,15 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   const relayAgentStore: Uint8Array[] = [];
   // Create the relay with a callback that pushes to the agent store when agent
   // infos have been received.
+  const peersConnectedToRelay: NodeId[] = [];
   const { relay, address: relayPublicAddress } = await createRelay({
     id: "relay",
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);
+    },
+    peerConnectedCallback: (nodeId) => {
+      peersConnectedToRelay.push(nodeId);
     },
   });
 
@@ -126,6 +159,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   // agent info.
   let relayNodeId = "";
   let relayAddress1 = "";
+  const peersConnectedToNode1: NodeId[] = [];
   const node1 = await TransportLibp2p.createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
@@ -136,13 +170,17 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
       throw new Error("Node 1 shouldn't be sent agents");
     },
+    peerConnectedCallback: (nodeId) => {
+      peersConnectedToNode1.push(nodeId);
+    },
     addrs: ["/ip4/0.0.0.0/tcp/0", "/p2p-circuit"],
     bootstrapRelays: [relayPublicAddress],
   });
 
   // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
   await retryFnUntilTimeout(
-    async () => !!relayAddress1 && !!relayNodeId,
+    async () =>
+      !!relayAddress1 && !!relayNodeId && peersConnectedToRelay.length === 1,
     5_000,
   );
 
@@ -160,7 +198,9 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   const node2AgentStore: Uint8Array[] = [];
   const messagesReceivedByNode2: Uint8Array[] = [];
   let relayAddress2 = "";
+  const peersConnectedToNode2: NodeId[] = [];
   const node2 = await TransportLibp2p.createNode({
+    id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, _nodeId) => {
       relayAddress2 = address;
@@ -169,11 +209,14 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
       assert.equal(fromNode, relay.getNodeId());
       node2AgentStore.push(agentInfos);
     },
+    peerConnectedCallback: (nodeId) => {
+      assert.equal(nodeId, node1.getNodeId());
+      peersConnectedToNode2.push(nodeId);
+    },
     messageHandler: async (fromNode, message) => {
       assert.equal(fromNode, node1.getNodeId());
       messagesReceivedByNode2.push(message);
     },
-    id: "node2",
     // dns protocol is a workaround when testing locally.
     // When on a relayed connection, the node attempts to establish a direct
     // connection to the other node and scans for dialable addresses.
@@ -185,10 +228,13 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   });
 
   // Wait for node 2's connection to relay to complete.
-  await retryFnUntilTimeout(async () => !!relayAddress2, 5_000);
+  // Node 1 is still connected to relay, so wait for 2 connected peers.
+  await retryFnUntilTimeout(
+    async () => !!relayAddress2 && peersConnectedToRelay.length === 2,
+    5_000,
+  );
 
   // Relay sends agent infos from agent store to node 2.
-  // TODO register as on-peer connected? Figure out node's peer ID internally?
   assert(relayAgentStore[0]);
   await relay.sendAgents(node2.getNodeId(), relayAgentStore[0]);
 
@@ -196,7 +242,17 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
 
   // Node 2 connects to node 1 over the relay.
   const node1Address = new TextDecoder().decode(node2AgentStore[0]);
+  // No peers should be connected to node 1.
+  assert.deepEqual(peersConnectedToNode1, []);
+  // No peers should be connected to node 2.
+  assert.deepEqual(peersConnectedToNode2, []);
   await node2.connect(node1Address);
+
+  // Await the peerConnectedCallback to have fired for both nodes.
+  await retryFnUntilTimeout(
+    async () =>
+      peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
+  );
 
   // Wait for the connection upgrade to a direct connection.
   await retryFnUntilTimeout(
@@ -207,8 +263,9 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   );
 
   // Node 1 sends a message to node 2 over the direct connection.
+  // Node 1 learned node 2's ID from the peersConnectedCallback.
   await node1.send(
-    node2.getNodeId(),
+    peersConnectedToNode1[0],
     new TextEncoder().encode("hello-from-node1"),
   );
 

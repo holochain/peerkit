@@ -182,7 +182,7 @@ The mode is fixed at construction because the underlying networking library cann
 
 The transport handles three types of messages between peers:
 
-- **Network access handshake**: the first message on every new connection. Carries the connecting agent's AgentId together with `NetworkAccessBytes`. Owned by the transport — wire format and policy enforcement live in the transport package.
+- **Network access handshake**: the first message on every new connection. Carries the connecting agent's `NetworkAccessBytes`. Policy enforcement lives in the transport package.
 - **Agent-info messages**: opaque routing for agent-info exchange. Wire format owned by the agent module; the transport routes payload bytes between connected peers and the agent module's handler.
 - **Application messages**: opaque routing for application data. Wire format owned by application code (or higher-level components like data gossip). Available on regular nodes only.
 

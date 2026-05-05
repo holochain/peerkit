@@ -28,10 +28,9 @@ export type RelayAddress = string;
 export type NetworkAccessBytes = Uint8Array;
 
 /**
- * Interface to handle incoming access streams
+ * Processing hook for incoming access handshakes.
  *
- * An access stream expects the Network Access Bytes as the first and only message,
- * to check if a peer has access to the network.
+ * The transport awaits this. Return `false` to deny access, `true` to grant it.
  */
 export type NetworkAccessHandler = (
   nodeId: NodeId,
@@ -39,7 +38,9 @@ export type NetworkAccessHandler = (
 ) => Promise<boolean>;
 
 /**
- * Interface to handle incoming messages from a message stream
+ * Processing hook for incoming messages from a message stream.
+ *
+ * The transport awaits this. Return a rejected promise to surface errors.
  */
 export type MessageHandler = (
   fromNode: NodeId,
@@ -48,9 +49,11 @@ export type MessageHandler = (
 
 /**
  * Called when a connection to the relay is complete, including the network
- * access handshake, and the node can be contacted through the relay
+ * access handshake, and the node can be contacted through the relay.
  *
  * Provides the relay's address and node ID for full address construction.
+ *
+ * Fire-and-forget notification. The transport does not await this.
  */
 export type ConnectedToRelayCallback = (
   relayAddress: RelayAddress,
@@ -58,7 +61,18 @@ export type ConnectedToRelayCallback = (
 ) => void;
 
 /**
- * Called when agents have been received from another node
+ * Fire-and-forget notification — the transport does not await this.
+ *
+ * Called when a connection to a peer is complete, including the network
+ * access handshake, and the node can exchange data.
+ * Provides the node ID as identification.
+ */
+export type PeerConnectedCallback = (nodeId: NodeId) => void;
+
+/**
+ * Processing hook for incoming agent-info bytes.
+ *
+ * The transport awaits this. Return a rejected promise to surface errors.
  */
 export type AgentsReceivedCallback = (
   fromNode: NodeId,
