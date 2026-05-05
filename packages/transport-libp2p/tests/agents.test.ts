@@ -25,9 +25,14 @@ test("Opening an agents stream without being granted access closes the connectio
     addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
-  const stream = await connection.newStream(CURRENT_AGENTS_PROTOCOL);
+  assert(connection.status === "open");
+  try {
+    await connection.newStream(CURRENT_AGENTS_PROTOCOL);
+  } catch {
+    // On Linux the stream is closed so fast that `newStream` throws.
+  }
 
-  await retryFnUntilTimeout(async () => stream.status === "closed");
+  await retryFnUntilTimeout(async () => connection.status !== "open");
 
   await libp2pNode.stop();
   await node.shutDown();

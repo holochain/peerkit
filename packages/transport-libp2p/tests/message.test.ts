@@ -32,10 +32,14 @@ test("Opening a message stream without being granted access closes the connectio
     },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
-  // The protocol is registered, so newStream() succeeds.
-  // The other node detects missing access and closes the connection asynchronously.
-  const stream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
-  await retryFnUntilTimeout(async () => stream.status === "closed");
+  assert(connection.status === "open");
+  try {
+    await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+  } catch {
+    // On Linux the stream is closed so fast that `newStream` throws.
+  }
+
+  await retryFnUntilTimeout(async () => connection.status !== "open");
 
   await libp2pNode.stop();
   await node.shutDown();
