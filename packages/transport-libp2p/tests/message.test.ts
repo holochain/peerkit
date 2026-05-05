@@ -4,14 +4,14 @@ import { tcp } from "@libp2p/tcp";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
-import { afterEach, assert, beforeEach, test } from "vitest";
+import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { encodeFrame } from "../src/frame.js";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
 import type { MessageHandler, NetworkAccessHandler } from "@peerkit/interface";
-import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { createNode, setupTestLogger } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
 
 beforeEach(setupTestLogger);
@@ -39,7 +39,7 @@ test("Opening a message stream without being granted access closes the connectio
     // On Linux the stream is closed so fast that `newStream` throws.
   }
 
-  await retryFnUntilTimeout(async () => connection.status !== "open");
+  await vi.waitUntil(() => connection.status !== "open");
 
   await libp2pNode.stop();
   await node.shutDown();
@@ -65,7 +65,7 @@ test("Send a message after having been granted access", async () => {
 
   await node2.send(node1.getNodeId(), new TextEncoder().encode("hello"));
 
-  await retryFnUntilTimeout(async () => receivedMessages.length === 1);
+  await vi.waitFor(() => expect(receivedMessages.length).toBe(1));
   assert(receivedMessages[0]);
   assert.equal("hello", new TextDecoder().decode(receivedMessages[0]));
 
@@ -100,14 +100,14 @@ test("Send a message both ways on the same stream", async () => {
   // Send and receive message from node 2 to node 1
   await node2.send(node1.getNodeId(), new TextEncoder().encode("hello"));
 
-  await retryFnUntilTimeout(async () => messagesReceived1.length === 1);
+  await vi.waitFor(() => expect(messagesReceived1.length).toBe(1));
   assert(messagesReceived1[0]);
   assert.equal("hello", new TextDecoder().decode(messagesReceived1[0]));
 
   // The other way, send from node 1 to node 2
   await node1.send(node2.getNodeId(), new TextEncoder().encode("bye"));
 
-  await retryFnUntilTimeout(async () => messagesReceived2.length === 1);
+  await vi.waitFor(() => expect(messagesReceived2.length).toBe(1));
   assert(messagesReceived2[0]);
   assert.equal("bye", new TextDecoder().decode(messagesReceived2[0]));
 
@@ -148,7 +148,9 @@ test("Large messages are chunked and received correctly", async () => {
   // Send message that exceeds yamux message limit of 256 KiB.
   messageStream.send(encodeFrame(new Uint8Array(1024 * 300)));
 
-  await retryFnUntilTimeout(async () => receivedMessages.length === 1, 2000);
+  await vi.waitFor(() => expect(receivedMessages.length).toBe(1), {
+    timeout: 2000,
+  });
   assert.deepEqual(receivedMessages[0], new Uint8Array(1024 * 300));
 
   await libp2pNode.stop();

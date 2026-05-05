@@ -4,10 +4,10 @@ import { tcp } from "@libp2p/tcp";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
-import { afterEach, assert, beforeEach, test } from "vitest";
+import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_AGENTS_PROTOCOL } from "../src/index.js";
 import type { NetworkAccessHandler } from "@peerkit/interface";
-import { createNode, retryFnUntilTimeout, setupTestLogger } from "./util.js";
+import { createNode, setupTestLogger } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
 
 beforeEach(setupTestLogger);
@@ -32,7 +32,7 @@ test("Opening an agents stream without being granted access closes the connectio
     // On Linux the stream is closed so fast that `newStream` throws.
   }
 
-  await retryFnUntilTimeout(async () => connection.status !== "open");
+  await vi.waitUntil(() => connection.status !== "open");
 
   await libp2pNode.stop();
   await node.shutDown();
@@ -69,7 +69,7 @@ test("Agents channel round-trip after access handshake", async () => {
     new TextEncoder().encode("agent-info"),
   );
 
-  await retryFnUntilTimeout(async () => receivedAgents.length === 1);
+  await vi.waitFor(() => expect(receivedAgents.length).toBe(1));
   assert(receivedAgents[0]);
   assert.equal(receivedAgents[0].fromPeer, node2.getNodeId().toString());
   assert.equal(new TextDecoder().decode(receivedAgents[0].bytes), "agent-info");
@@ -110,8 +110,8 @@ test("Two nodes can exchange agent infos", async () => {
     new TextEncoder().encode("agents-from-responder"),
   );
 
-  await retryFnUntilTimeout(async () => receivedByResponder.length === 1);
-  await retryFnUntilTimeout(async () => receivedByInitiator.length === 1);
+  await vi.waitFor(() => expect(receivedByResponder.length).toBe(1));
+  await vi.waitFor(() => expect(receivedByInitiator.length).toBe(1));
 
   assert.equal(
     new TextDecoder().decode(receivedByResponder[0]),
