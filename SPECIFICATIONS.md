@@ -253,18 +253,72 @@ A second implementation (iroh, future) would replace the library-specific intern
 **Types**:
 
 ```typescript
-// Opaque peer identifier string (libp2p peer ID multibase encoding).
-// Mapping to peerkit AgentId is the responsibility of the layer above.
-type NodeId = string;
+/**
+ * Opaque node identifier string
+ *
+ * The transport uses this type across its public surface to identify peers.
+ *
+ * Mapping to peerkit AgentId is the responsibility of the caller.
+ */
+export type NodeId = string;
 
-// Byte sequence presented to prove network access has been granted
-type NetworkAccessBytes = Uint8Array;
+/**
+ * Opaque node address string
+ *
+ * Every transport implementation parses it according to its own convention,
+ * to connect to other nodes.
+ */
+export type NodeAddress = string;
 
-// Info associated with an agent
-export interface IAgentInfo {
-  id: AgentId;
-  canRelay: boolean;
-}
+/**
+ * Peerkit-native address for a relay node
+ *
+ * Every transport implementation parses it according to its own convention.
+ */
+export type RelayAddress = string;
+
+/**
+ * Byte sequence to prove access to a network has been granted
+ */
+export type NetworkAccessBytes = Uint8Array;
+
+/**
+ * Interface to handle incoming access streams
+ *
+ * An access stream expects the Network Access Bytes as the first and only message,
+ * to check if a peer has access to the network.
+ */
+export type NetworkAccessHandler = (
+  nodeId: NodeId,
+  bytes: NetworkAccessBytes,
+) => Promise<boolean>;
+
+/**
+ * Interface to handle incoming messages from a message stream
+ */
+export type MessageHandler = (
+  fromNode: NodeId,
+  message: Uint8Array,
+) => Promise<void>;
+
+/**
+ * Called when a connection to the relay is complete, including the network
+ * access handshake, and the node can be contacted through the relay.
+ *
+ * Provides the relay's address and node ID for full address construction.
+ */
+export type ConnectedToRelayCallback = (
+  relayAddress: RelayAddress,
+  relayNodeId: NodeId,
+) => void;
+
+/**
+ * Called when agents have been received from another node
+ */
+export type AgentsReceivedCallback = (
+  fromNode: NodeId,
+  bytes: Uint8Array,
+) => Promise<void>;
 ```
 
 **API**:
