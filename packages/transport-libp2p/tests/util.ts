@@ -11,6 +11,7 @@ import type {
   MessageHandler,
   NetworkAccessBytes,
   NetworkAccessHandler,
+  PeerConnectedCallback,
 } from "@peerkit/interface";
 
 export const setupTestLogger = async () => {
@@ -88,9 +89,13 @@ export interface TestRelayOptions {
    */
   id?: string;
   /**
-   * Optional handler for receiving agents
+   * Optional callback when receiving agents
    */
   agentsReceivedCallback?: AgentsReceivedCallback;
+  /**
+   * Optional callback when peer connected
+   */
+  peerConnectedCallback?: PeerConnectedCallback;
   /**
    * Optional handler for network access checks. Defaults to denying all access
    */
@@ -110,6 +115,8 @@ export const createRelay = async (options: TestRelayOptions) => {
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
+  const peerConnectedCallback =
+    options.peerConnectedCallback ?? (async (_nodeId) => {});
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
   const relay = await TransportLibp2p.createRelay({
@@ -117,6 +124,7 @@ export const createRelay = async (options: TestRelayOptions) => {
     id,
     networkAccessBytes,
     agentsReceivedCallback,
+    peerConnectedCallback,
     networkAccessHandler,
   });
   return { relay, address };
@@ -135,6 +143,10 @@ export interface TestNodeOptions {
    * Optional callback when receiving agents
    */
   agentsReceivedCallback?: AgentsReceivedCallback;
+  /**
+   * Optional callback when peer connected
+   */
+  peerConnectedCallback?: PeerConnectedCallback;
   /**
    * Optional handler for network access checks.
    *
@@ -170,6 +182,8 @@ export const createNode = async (options: TestNodeOptions) => {
     options.connectedToRelayCallback ?? undefined;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
+  const peerConnectedCallback =
+    options.peerConnectedCallback ?? (async (_nodeId) => {});
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
   const networkAccessBytes = options.networkAccessBytes ?? new Uint8Array([0]);
@@ -180,6 +194,7 @@ export const createNode = async (options: TestNodeOptions) => {
     id,
     connectedToRelayCallback,
     agentsReceivedCallback,
+    peerConnectedCallback,
     networkAccessHandler,
     networkAccessBytes,
     messageHandler,
