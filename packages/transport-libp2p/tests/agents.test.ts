@@ -78,6 +78,37 @@ test("Agents channel round-trip after access handshake", async () => {
   await node1.shutDown();
 });
 
+test("Large agents payload can be received", async () => {
+  const receivedAgents: Uint8Array[] = [];
+  const agentsReceivedCallback = async (
+    _fromPeer: string,
+    bytes: Uint8Array,
+  ) => {
+    receivedAgents.push(bytes);
+  };
+  const { node: node1, address: address1 } = await createNode({
+    id: "node1",
+    agentsReceivedCallback,
+  });
+
+  const { node: node2 } = await createNode({ id: "node2" });
+
+  // Both nodes allow access to all
+
+  await node2.connect(address1);
+
+  // Send a 300 KiB message. Yamux frames support up to 256 KiB by default.
+  const largeAgentsMessage = new Uint8Array(1024 * 300).fill(12);
+  await node2.sendAgents(node1.getNodeId(), largeAgentsMessage);
+
+  await vi.waitFor(() => expect(receivedAgents.length).toBe(1));
+  assert(receivedAgents[0]);
+  assert(isDeepStrictEqual(receivedAgents[0], largeAgentsMessage));
+
+  await node2.shutDown();
+  await node1.shutDown();
+});
+
 test("Two nodes can exchange agent infos", async () => {
   const receivedByResponder: Uint8Array[] = [];
   const receivedByInitiator: Uint8Array[] = [];
@@ -90,7 +121,7 @@ test("Two nodes can exchange agent infos", async () => {
     },
   });
 
-  // Initiator node: grants all access, connects to responder as a bootstrap relay
+  // Initiator node: grants all access, connects to responder
   const { node: initiator } = await createNode({
     id: "initiator",
     agentsReceivedCallback: async (_fromPeer, bytes) => {
