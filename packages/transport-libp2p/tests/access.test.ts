@@ -98,6 +98,37 @@ test("Outbound access handshake times out when responder sends no response", asy
   await libp2pNode.stop();
 });
 
+test("Remote node closes connection when host sends invalid ACK byte", async () => {
+  const { node, address } = await createNode({ id: "valid" }); // Grants access to all
+
+  // Create a node that passes correct network access bytes but sends invalid ACK byte.
+  const libp2pNode = await createLibp2p({
+    transports: [tcp()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+  });
+  const connection = await libp2pNode.dial(multiaddr(address));
+  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+  const receiveNabFromRemote = new Promise((resolve) => {
+    accessStream.addEventListener(
+      "message",
+      (_nabResponse) => {
+        accessStream.send(new Uint8Array([0])); // Invalid ACK byte
+        resolve(undefined);
+      },
+      { once: true },
+    );
+  });
+  accessStream.send(new TextEncoder().encode("valid"));
+  await receiveNabFromRemote;
+
+  await vi.waitUntil(() => connection.status === "closed");
+
+  await libp2pNode.stop();
+  await node.shutDown();
+});
+
 test("Valid network access bytes grant connection to other node", async () => {
   // Define an access handler
   const VALID_ACCESS_BYTES = new TextEncoder().encode("pass");

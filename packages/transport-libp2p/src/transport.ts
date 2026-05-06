@@ -91,11 +91,13 @@ export interface NodeOptions {
  * Identifier for the current network access protocol in peerkit.
  *
  * **Stream lifecycle**: opened by the initiator on every new connection.
- * A single request/response exchange:
+ * A request/response exchange, concluded by an ACK byte by the initiator:
  * 1. Initiator sends its `NetworkAccessBytes`.
- * 2. Responder evaluates them, sends back its own `NetworkAccessBytes`,
+ * 2. Responder evaluates them and sends back its own `NetworkAccessBytes`.
+ *    It registers another listener to receive the final ACK byte and
  *    then closes its write end.
- * 3. Initiator receives the response, evaluates it, then closes its write end.
+ * 3. Initiator receives the response and evaluates it. If valid, it sends
+ *    the ACK byte and then closes its write end.
  *
  * The stream is fully reclaimed once both ends close. The connection remains open.
  */
@@ -126,6 +128,8 @@ export const CURRENT_AGENTS_PROTOCOL = "/peerkit/agents/v1";
  */
 export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
 
+const ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE = 1;
+
 /**
  * The official peerkit transport based on Libp2p.
  */
@@ -146,7 +150,7 @@ export class TransportLibp2p implements ITransport {
 
   constructor(libp2p: Libp2p, options: NodeOptions | RelayOptions) {
     this.localNetworkAccessBytes =
-      options?.networkAccessBytes ?? new Uint8Array([0]); // If set to new Uint8Array(0), .send doesn't send anything confuses the hell out of everyone
+      options?.networkAccessBytes ?? new Uint8Array([0]); // If set to new Uint8Array(0), .send doesn't send anything, which confuses the hell out of everyone
     this.handshakeTimeoutMs =
       (options &&
         "handshakeTimeoutMs" in options &&
@@ -251,6 +255,7 @@ export class TransportLibp2p implements ITransport {
     await this.performNetworkAccessHandshake(connection);
 
     // Connection to peer established, run callback.
+    // A failed access check by either side will close the connection.
     if (this.peerConnectedCallback) {
       this.peerConnectedCallback(connection.remotePeer.toString());
     }
@@ -420,6 +425,12 @@ export class TransportLibp2p implements ITransport {
       this.logger.info("Access granted to remote {*}", {
         peerId: connection.remotePeer,
       });
+      // connection.close() gracefully closes all streams, making
+      // the remoteCloseWrite event indistinguishable from a grant-path
+      // stream close. An explicit ACK message avoids the false positive.
+
+      // Sending ACK byte to confirm access
+      stream.send(new Uint8Array([ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE]));
       await stream.close();
       return connection.remotePeer;
     } else {
@@ -478,9 +489,27 @@ export class TransportLibp2p implements ITransport {
         // Register an event listener that notifies about the completed handshake.
         if (this.peerConnectedCallback) {
           const peerConnectedCallback = this.peerConnectedCallback;
+          // Listening for the remoteCloseWrite event here is not
+          // reliable, as it is indistinguishable from a grant-path
+          // stream close. An explicit ACK message brings clarity.
           stream.addEventListener(
-            "remoteCloseWrite",
-            () => peerConnectedCallback(remoteNodeId),
+            "message",
+            async (message) => {
+              const ackMessage = message.data.subarray();
+              // Check if ACK byte matches
+              if (
+                ackMessage.length === 1 &&
+                ackMessage[0] === ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE
+              ) {
+                peerConnectedCallback(remoteNodeId);
+              } else {
+                this.logger.error(
+                  "Unexpected access handshake acknowledge message {*}",
+                  { remoteNodeId, message },
+                );
+                await connection.close();
+              }
+            },
             { once: true },
           );
         }
