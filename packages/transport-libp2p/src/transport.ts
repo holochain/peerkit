@@ -6,7 +6,12 @@ import {
 } from "@libp2p/circuit-relay-v2";
 import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
-import type { Connection, PeerId, Stream } from "@libp2p/interface";
+import type {
+  Connection,
+  PeerId,
+  Stream,
+  StreamMessageEvent,
+} from "@libp2p/interface";
 import { peerIdFromString } from "@libp2p/peer-id";
 import { tcp } from "@libp2p/tcp";
 import { getLogger, type Logger } from "@logtape/logtape";
@@ -76,7 +81,7 @@ export interface NodeOptions {
   /**
    * Handler for incoming message streams
    */
-  messageHandler?: MessageHandler;
+  messageHandler: MessageHandler;
   /**
    * Relay addresses to connect to at startup. Format: {@link @multiformats/multiaddr!Multiaddr}
    */
@@ -100,6 +105,8 @@ export interface NodeOptions {
  *    the ACK byte and then closes its write end.
  *
  * The stream is fully reclaimed once both ends close. The connection remains open.
+ *
+ * Network access bytes must not exceed 256 KiB in size.
  */
 export const CURRENT_ACCESS_PROTOCOL = "/peerkit/access/v1";
 
@@ -399,6 +406,14 @@ export class TransportLibp2p implements ITransport {
         "close",
         () => {
           clearTimeout(timer);
+          stream
+            .close()
+            .catch((error) =>
+              this.logger.info(
+                `Error when closing ${CURRENT_ACCESS_PROTOCOL} stream after remote denied access {*}`,
+                { error },
+              ),
+            );
           reject(new Error("Access denied by remote"));
         },
         { once: true },
@@ -527,25 +542,28 @@ export class TransportLibp2p implements ITransport {
     await this.accessCheck(CURRENT_AGENTS_PROTOCOL, connection);
 
     const decoder = new FrameDecoder();
-    stream.addEventListener(
-      "message",
-      async (message) => {
-        const chunk = message.data.subarray();
-        for (const msg of decoder.feed(chunk)) {
-          this.logger.debug(
-            `Incoming message on stream ${CURRENT_AGENTS_PROTOCOL} {*}`,
-            { peerId: connection.remotePeer, byteLength: msg.byteLength },
-          );
-          await this.agentsReceivedCallback(
-            connection.remotePeer.toString(),
-            msg,
-          );
-        }
-        // Both ends of a stream must be closed for it to be fully released.
-        await stream.close();
-      },
-      { once: true },
-    );
+    const onMessage = async (message: StreamMessageEvent) => {
+      const chunk = message.data.subarray();
+      // Either this is already the complete message or the partial message
+      // is buffered in the decoder and will be completed with one of the
+      // following message events.
+      for (const msg of decoder.feed(chunk)) {
+        this.logger.debug(
+          `Incoming message on stream ${CURRENT_AGENTS_PROTOCOL} {*}`,
+          { peerId: connection.remotePeer, byteLength: msg.byteLength },
+        );
+        await this.agentsReceivedCallback(
+          connection.remotePeer.toString(),
+          msg,
+        );
+      }
+    };
+    stream.addEventListener("message", onMessage);
+    // Close this end of the stream when the remote has closed their end stream.
+    stream.addEventListener("remoteCloseWrite", async () => {
+      // Both ends of a stream must be closed for it to be fully released.
+      await stream.close();
+    });
   };
 
   // Handler for incoming message streams
@@ -584,7 +602,9 @@ export class TransportLibp2p implements ITransport {
         { remoteId: connection.remotePeer },
       );
       await connection.close();
-      return;
+      throw new Error(
+        `Remote peer tried to open a ${protocol} stream without being granted access`,
+      );
     }
   };
 }
