@@ -1,8 +1,16 @@
 {
   "name": "@peerkit/transport-libp2p",
   "version": "0.1.0",
-  "description": "",
+  "description": "Reference peerkit transport implementation based on libp2p",
   "author": "Holochain Dev Team <devcore@holochain.org>",
+  "keywords": [
+    "peerkit",
+    "p2p",
+    "data",
+    "sync",
+    "transport",
+    "libp2p"
+  ],
   "license": "CAL-1.0",
   "bugs": {
     "url": "https://github.com/holochain/peerkit/issues"
@@ -31,7 +39,7 @@
     "@libp2p/tcp": "^11.0.15",
     "@logtape/logtape": "^2.0.5",
     "@multiformats/multiaddr": "^13.0.1",
-    "@peerkit/interface": "*",
+    "@peerkit/api": "*",
     "libp2p": "^3.2.0"
   },
   "devDependencies": {

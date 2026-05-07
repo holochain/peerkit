@@ -1,12 +1,13 @@
 {
-  "name": "@peerkit/interface",
+  "name": "@peerkit/api",
   "version": "0.1.0",
   "description": "Interfaces for the peerkit data sync framework",
   "keywords": [
     "peerkit",
+    "p2p",
     "data",
     "sync",
-    "interface"
+    "api"
   ],
   "bugs": {
     "url": "https://github.com/holochain/peerkit/issues"

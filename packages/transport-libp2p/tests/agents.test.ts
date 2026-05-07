@@ -6,7 +6,7 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_AGENTS_PROTOCOL } from "../src/index.js";
-import type { NetworkAccessHandler } from "@peerkit/interface";
+import type { NetworkAccessHandler } from "@peerkit/api";
 import { createNode, setupTestLogger } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
 

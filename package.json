@@ -24,7 +24,7 @@
   },
   "workspaces": [
     "packages/transport-libp2p",
-    "packages/interface"
+    "packages/api"
   ],
   "engines": {
     "node": ">=22"

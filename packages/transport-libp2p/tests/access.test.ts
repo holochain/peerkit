@@ -3,7 +3,7 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { tcp } from "@libp2p/tcp";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
-import { type NetworkAccessHandler } from "@peerkit/interface";
+import { type NetworkAccessHandler } from "@peerkit/api";
 import { createLibp2p } from "libp2p";
 import { isDeepStrictEqual } from "node:util";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";

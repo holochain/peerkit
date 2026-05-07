@@ -10,7 +10,7 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
-import type { MessageHandler, NetworkAccessHandler } from "@peerkit/interface";
+import type { MessageHandler, NetworkAccessHandler } from "@peerkit/api";
 import { createNode, setupTestLogger } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
 
