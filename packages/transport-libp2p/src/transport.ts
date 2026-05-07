@@ -332,30 +332,34 @@ export class TransportLibp2p implements ITransport {
             this.logger.info("Connected to relay {*}", { relay, relayNodeId });
             if (this.connectedToRelayCallback) {
               const connectedToRelayCallback = this.connectedToRelayCallback;
+              const relayId = relayNodeId.toString();
               // Register event listener for when the dialable relay address has been
               // received through the identify protocol.
-              this.libp2p.addEventListener(
-                "self:peer:update",
-                (evt) => {
-                  const relayAddress = evt.detail.peer.addresses.find(
-                    (address) =>
-                      address.multiaddr
-                        .getComponents()
-                        .some((c) => c.name === "p2p-circuit"),
+              const handler = (
+                evt: CustomEvent<{
+                  peer: {
+                    addresses: Array<{ multiaddr: { toString(): string } }>;
+                  };
+                }>,
+              ) => {
+                const relayAddress = evt.detail.peer.addresses.find((address) =>
+                  address.multiaddr
+                    .toString()
+                    .includes(`/p2p/${relayId}/p2p-circuit`),
+                );
+                this.libp2p.removeEventListener("self:peer:update", handler);
+                if (relayAddress) {
+                  connectedToRelayCallback(
+                    relayAddress.multiaddr.toString(),
+                    relayId,
                   );
-                  if (relayAddress) {
-                    connectedToRelayCallback(
-                      relayAddress.multiaddr.toString(),
-                      relayNodeId.toString(),
-                    );
-                  } else {
-                    this.logger.error(
-                      "Received peer update event but found no relay address.",
-                    );
-                  }
-                },
-                { once: true },
-              );
+                } else {
+                  this.logger.error(
+                    "Received peer update event but found no relay address.",
+                  );
+                }
+              };
+              this.libp2p.addEventListener("self:peer:update", handler);
             }
           })
           .catch((error) => {
