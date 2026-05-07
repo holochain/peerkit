@@ -360,6 +360,11 @@ interface ITransport {
   isDirectConnection(nodeId: NodeId): boolean;
 
   /**
+   * Disconnect from the peer.
+   */
+  disconnect(nodeId: NodeId): Promise<void>;
+
+  /**
    * Shut down the transport and all underlying connections.
    */
   shutDown(): Promise<void>;
