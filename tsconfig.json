@@ -29,6 +29,6 @@
   "files": [],
   "references": [
     { "path": "packages/transport-libp2p" },
-    { "path": "packages/interface" }
+    { "path": "packages/api" }
   ]
 }

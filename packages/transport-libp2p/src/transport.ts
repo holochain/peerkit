@@ -30,7 +30,7 @@ import type {
   ConnectedToRelayCallback,
   NodeAddress,
   PeerConnectedCallback,
-} from "@peerkit/interface";
+} from "@peerkit/api";
 
 export interface RelayOptions {
   addrs?: string[];

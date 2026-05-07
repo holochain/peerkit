@@ -12,7 +12,7 @@ import type {
   NetworkAccessBytes,
   NetworkAccessHandler,
   PeerConnectedCallback,
-} from "@peerkit/interface";
+} from "@peerkit/api";
 
 export const setupTestLogger = async () => {
   await configure({

@@ -21,7 +21,7 @@ Peerkit is a TypeScript peer-to-peer data synchronization framework. It sits abo
 
 npm workspaces. Root is private and orchestrates builds; only published packages live under `packages/`.
 
-- `packages/interface` — `@peerkit/interface`, shared type definitions (`ITransport`, `NodeId`, `NetworkAccessBytes`, callbacks). All other packages import from here.
+- `packages/api` — `@peerkit/api`, shared type definitions (`ITransport`, `NodeId`, `NetworkAccessBytes`, callbacks). All other packages import from here.
 - `packages/transport-libp2p` — `@peerkit/transport-libp2p`, the default transport. Implements `ITransport` on top of libp2p (TCP + noise + yamux + identify).
 
 Workspace root pins Node `>=22` and uses `"type": "module"` + TypeScript `module: nodenext`. Imports inside TS sources use `.js` extensions (ESM resolution), even when importing `.ts` files.
@@ -60,7 +60,7 @@ Do not run CI checks unless explicitly asked. When asked, run the same checks CI
 
 ## Architecture — transport layer
 
-`ITransport` and all public API is defined in `packages/interface/src/transport.ts` and is the contract every transport must satisfy. `TransportLibp2p` in `packages/transport-libp2p` is the reference implementation.
+`ITransport` and all public API is defined in `packages/api/src/transport.ts` and is the contract every transport must satisfy. `TransportLibp2p` in `packages/transport-libp2p` is the reference implementation.
 
 ### Transport public API
 

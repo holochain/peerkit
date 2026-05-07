@@ -2,7 +2,7 @@ import { reset } from "@logtape/logtape";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { TransportLibp2p } from "../src/index.js";
 import { createRelay, setupTestLogger } from "./util.js";
-import { NodeId } from "@peerkit/interface";
+import { NodeId } from "@peerkit/api";
 
 beforeEach(setupTestLogger);
 
