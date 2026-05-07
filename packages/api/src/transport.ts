@@ -126,6 +126,13 @@ export interface ITransport {
   isDirectConnection(nodeId: NodeId): boolean;
 
   /**
+   * Disconnect from the peer.
+   *
+   * @param nodeId The node ID to disconnect from
+   */
+  disconnect(nodeId: NodeId): Promise<void>;
+
+  /**
    * Shut down the transport and all underlying connections.
    */
   shutDown(): Promise<void>;

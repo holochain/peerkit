@@ -1,13 +1,59 @@
 import { reset } from "@logtape/logtape";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
-import { TransportLibp2p } from "../src/index.js";
-import { createRelay, setupTestLogger } from "./util.js";
+import {
+  CURRENT_ACCESS_PROTOCOL,
+  CURRENT_MESSAGE_PROTOCOL,
+  TransportLibp2p,
+} from "../src/index.js";
+import { createNode, createRelay, setupTestLogger } from "./util.js";
 import { NodeId } from "@peerkit/api";
+import { createLibp2p } from "libp2p";
+import { tcp } from "@libp2p/tcp";
+import { noise } from "@chainsafe/libp2p-noise";
+import { yamux } from "@chainsafe/libp2p-yamux";
+import { multiaddr } from "@multiformats/multiaddr";
 
 beforeEach(setupTestLogger);
 
 // Reset logger configuration
 afterEach(reset);
+
+test("Connection can be closed", { timeout: 10_000 }, async () => {
+  const { node: node1, address: address1 } = await createNode({
+    id: "node1",
+    messageHandler: async (message) => {
+      console.log("message", message);
+    },
+  });
+
+  const node2 = await createLibp2p({
+    transports: [tcp()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    addresses: {
+      listen: ["/ip4/0.0.0.0/tcp/0"],
+    },
+  });
+
+  const connection = await node2.dial(multiaddr(address1));
+  // Perform access handshake first. Access is always granted, but the
+  // handshake must be performed.
+  const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+  accessStream.send(new Uint8Array([0]));
+  await accessStream.close();
+
+  const messageStream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
+  messageStream.send(new Uint8Array([1]));
+  await messageStream.close();
+
+  // Node 1 disconnects from node 2.
+  await node1.disconnect(node2.peerId.toString());
+
+  // Wait for connection to be closed on the other end.
+  // node1 closes with ECONNRESET from node2's perspective, which libp2p marks
+  // as 'aborted' rather than 'closed' => check for any non-open status.
+  await vi.waitUntil(() => connection.status !== "open");
+});
 
 test("Bootstrap with relay and 2 nodes and send message over relayed connection", async () => {
   // Create a test agent store for the relay
@@ -44,6 +90,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
     peerConnectedCallback: (nodeId) => {
       peersConnectedToNode1.push(nodeId);
     },
+    messageHandler: async (_message) => {},
     addrs: ["/p2p-circuit"], // Only bind to relay transport
     bootstrapRelays: [relayPublicAddress],
   });
@@ -173,6 +220,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
     peerConnectedCallback: (nodeId) => {
       peersConnectedToNode1.push(nodeId);
     },
+    messageHandler: async (_message) => {},
     addrs: ["/ip4/0.0.0.0/tcp/0", "/p2p-circuit"],
     bootstrapRelays: [relayPublicAddress],
   });

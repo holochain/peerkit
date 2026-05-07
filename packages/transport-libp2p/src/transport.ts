@@ -319,6 +319,26 @@ export class TransportLibp2p implements ITransport {
       .some((c) => c.direct);
   }
 
+  async disconnect(nodeId: NodeId): Promise<void> {
+    const connections = this.libp2p.getConnections(peerIdFromString(nodeId));
+    if (!connections.length) {
+      throw new Error(
+        `No open connection to peer ${nodeId}. Ensure the peer is connected before calling disconnect().`,
+      );
+    }
+    const results = await Promise.allSettled(
+      connections.map((connection) => connection.close()),
+    );
+    for (const result of results) {
+      if (result.status === "rejected") {
+        this.logger.warn(`Disconnecting failed {*}`, {
+          nodeId,
+          error: result.reason,
+        });
+      }
+    }
+  }
+
   async shutDown(): Promise<void> {
     return this.libp2p.stop();
   }

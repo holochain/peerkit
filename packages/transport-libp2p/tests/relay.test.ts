@@ -117,6 +117,7 @@ test("Relay knows node's agent infos after agent exchange", async () => {
       assert.equal(nodeId, relay.getNodeId());
       connectedToRelay = true;
     },
+    messageHandler: async (_message) => {},
   });
 
   await vi.waitUntil(() => connectedToRelay, 3_000);
