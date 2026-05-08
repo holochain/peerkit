@@ -24,13 +24,16 @@ import type {
   MessageHandler,
   NetworkAccessHandler,
   ITransport,
+  IStream,
   NetworkAccessBytes,
   NodeId,
   RelayAddress,
   ConnectedToRelayCallback,
   NodeAddress,
   PeerConnectedCallback,
+  CustomStreamCreatedCallback,
 } from "@peerkit/api";
+import { CustomStream } from "./custom-stream.js";
 
 export interface RelayOptions {
   addrs?: string[];
@@ -82,6 +85,21 @@ export interface NodeOptions {
    * Handler for incoming message streams
    */
   messageHandler: MessageHandler;
+  /**
+   * Callbacks for custom protocol streams.
+   *
+   * The connection to peers is multi-plexed. Data streams can be opened
+   * and closed at runtime. Any kind of data can be sent over a stream,
+   * defined by a protocol.
+   *
+   * Callbacks must be registered when constructing the transport and cannot
+   * be added or removed dynamically.
+   *
+   * Call {@link TransportLibp2p.createStream} to create a stream for a
+   * specific protocol and peer. On the remote side, the corresponding
+   * callback will be executed.
+   */
+  customStreamCreatedCallbacks?: Record<string, CustomStreamCreatedCallback>;
   /**
    * Relay addresses to connect to at startup. Format: {@link @multiformats/multiaddr!Multiaddr}
    */
@@ -172,6 +190,28 @@ export class TransportLibp2p implements ITransport {
       // Regular node that will handle messages. Relay nodes don't handle messages.
       libp2p.handle(CURRENT_MESSAGE_PROTOCOL, this.onMessageConnect);
       this.messageHandler = options.messageHandler;
+    }
+
+    // Register custom stream callbacks
+    if (
+      "customStreamCreatedCallbacks" in options &&
+      options.customStreamCreatedCallbacks
+    ) {
+      for (const [protocol, customStreamCreatedCallback] of Object.entries(
+        options.customStreamCreatedCallbacks,
+      )) {
+        libp2p.handle(protocol, async (stream, connection) => {
+          this.logger.info(`Incoming custom stream {*}`, {
+            remoteId: connection.remotePeer,
+            protocol,
+          });
+          // Make sure that access has been granted before. If not,
+          // `accessCheck` will throw and not call the callback.
+          await this.accessCheck(protocol, connection);
+          const customStream = new CustomStream(stream);
+          customStreamCreatedCallback(customStream);
+        });
+      }
     }
 
     if ("connectedToRelayCallback" in options) {
@@ -337,6 +377,22 @@ export class TransportLibp2p implements ITransport {
         });
       }
     }
+  }
+
+  async createStream(nodeId: NodeId, protocol: string): Promise<IStream> {
+    const connections = this.libp2p.getConnections(peerIdFromString(nodeId));
+    if (connections.length === 0 || !connections[0]) {
+      this.logger.error("No open connection to node when trying to send {*}", {
+        nodeId,
+      });
+      throw new Error("No open connection when trying to send");
+    }
+
+    // Prefer a direct connection; fall back to a relayed one.
+    const connection = connections.find((c) => c.direct) ?? connections[0];
+    const stream = await connection.newStream(protocol);
+    const customStream = new CustomStream(stream);
+    return customStream;
   }
 
   async shutDown(): Promise<void> {

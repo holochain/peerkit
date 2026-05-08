@@ -8,6 +8,7 @@ import { TransportLibp2p } from "../src/index.js";
 import type {
   AgentsReceivedCallback,
   ConnectedToRelayCallback,
+  CustomStreamCreatedCallback,
   MessageHandler,
   NetworkAccessBytes,
   NetworkAccessHandler,
@@ -127,6 +128,10 @@ export interface TestNodeOptions {
    */
   messageHandler?: MessageHandler;
   /**
+   * Optional callbacks for when custom streams are created
+   */
+  customStreamCreatedCallbacks?: Record<string, CustomStreamCreatedCallback>;
+  /**
    * Optional relay addresses to connect to at startup
    */
   bootstrapRelays?: string[];
@@ -140,7 +145,7 @@ export interface TestNodeOptions {
  * Creates a test node transport
  */
 export const createNode = async (options: TestNodeOptions) => {
-  const port = await getPort({ port: portNumbers(40_000, 50_000) });
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   const { id, bootstrapRelays, handshakeTimeoutMs } = options;
   const connectedToRelayCallback =
@@ -154,6 +159,8 @@ export const createNode = async (options: TestNodeOptions) => {
   const networkAccessBytes = options.networkAccessBytes ?? new Uint8Array([0]);
   const messageHandler =
     options.messageHandler ?? (async (_fromPeer, _message) => {});
+  const customStreamCreatedCallbacks =
+    options.customStreamCreatedCallbacks ?? undefined;
   const node = await TransportLibp2p.createNode({
     addrs: [address],
     id,
@@ -163,6 +170,7 @@ export const createNode = async (options: TestNodeOptions) => {
     networkAccessHandler,
     networkAccessBytes,
     messageHandler,
+    customStreamCreatedCallbacks: customStreamCreatedCallbacks,
     bootstrapRelays,
     handshakeTimeoutMs,
   });

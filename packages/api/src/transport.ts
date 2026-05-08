@@ -79,6 +79,67 @@ export type AgentsReceivedCallback = (
   bytes: Uint8Array,
 ) => Promise<void>;
 
+export interface PeerkitStreamEvents {
+  /**
+   * Data was received from the remote end of the message stream
+   */
+  message: (message: Uint8Array) => void;
+
+  /**
+   * The remote has closed their end of the stream.
+   */
+  remoteClose: (event: Event) => void;
+
+  /**
+   * The underlying resource is closed - no further events will be emitted and
+   * the stream cannot be used to send or receive any more data.
+   */
+  close: (error?: Error) => void;
+}
+
+/**
+ * A bi-directional byte stream that allows for sending an receiving any kind
+ * of data.
+ */
+export interface IStream {
+  /**
+   * Send data over the stream.
+   */
+  send(data: Uint8Array): void;
+
+  /**
+   * Register an event listener for the stream.
+   */
+  addEventListener<T extends keyof PeerkitStreamEvents>(
+    type: T,
+    listener: PeerkitStreamEvents[T],
+  ): void;
+
+  /**
+   * Remove an event listener from the stream.
+   */
+  removeEventListener<T extends keyof PeerkitStreamEvents>(
+    type: T,
+    listener: PeerkitStreamEvents[T],
+  ): void;
+
+  /**
+   * Is this stream open?
+   */
+  isOpen(): boolean;
+
+  /**
+   * Close the stream.
+   */
+  close(): Promise<void>;
+}
+
+/**
+ * A callback for when a stream described by a custom protocol was created
+ * by a peer.
+ */
+export type CustomStreamCreatedCallback = (stream: IStream) => void;
+
 /**
  * Interface that defines the methods a peerkit transport needs to implement
  */
@@ -124,6 +185,17 @@ export interface ITransport {
    * @param nodeId The node ID of the connection to check
    */
   isDirectConnection(nodeId: NodeId): boolean;
+
+  /**
+   * Create a new bi-directional byte stream on an open connection.
+   *
+   * Allows for reusing an open connection for exchaning any kind of data,
+   * e.g. audio or video data.
+   *
+   * @param nodeId The node ID of the connection to create a stream for
+   * @param protocol The name and version of the stream protocol
+   */
+  createStream(nodeId: NodeId, protocol: string): Promise<IStream>;
 
   /**
    * Disconnect from the peer.
