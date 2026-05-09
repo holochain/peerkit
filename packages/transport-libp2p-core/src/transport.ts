@@ -144,7 +144,7 @@ const ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE = 1;
  * Platform-agnostic libp2p transport for peerkit.
  *
  * Owns the protocol logic (access handshake, agents, messages) on top of a
- * caller-supplied {@link Libp2p} instance. Platform-specific packages (e.g.
+ * caller-supplied Libp2p instance. Platform-specific packages (e.g.
  * `@peerkit/transport-libp2p-nodejs`) build the libp2p instance with the
  * appropriate transports/services and pass it in.
  */
