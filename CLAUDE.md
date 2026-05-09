@@ -21,7 +21,8 @@ Peerkit is a TypeScript peer-to-peer data synchronization framework. It sits abo
 
 npm workspaces. Root is private and orchestrates builds; only published packages live under `packages/`.
 
-- `packages/api` — `@peerkit/api`, shared type definitions (`ITransport`, `NodeId`, `NetworkAccessBytes`, callbacks). All other packages import from here.
+- `packages/api` — `@peerkit/api`, shared type definitions (`ITransport`, `IKeyPair`, `NodeId`, `AgentId`, `NetworkAccessBytes`, callbacks). All other packages import from here.
+- `packages/peerkit` — `@peerkit/peerkit`, the orchestrator. Owns `AgentKeyPair` (the concrete Ed25519 key implementation) and key lifecycle. Uses `@noble/ed25519` for signing and verification — chosen for zero dependencies and identical behaviour on Node.js, browser, and React Native without polyfills.
 - `packages/transport-libp2p-core` — `@peerkit/transport-libp2p-core`, the platform-agnostic libp2p transport. Owns the access/agents/messages protocol logic on top of a caller-supplied libp2p instance. Imported by the platform impls; not consumed directly by app code.
 - `packages/transport-libp2p-nodejs` — `@peerkit/transport-libp2p-nodejs`, Node.js impl. Builds libp2p with TCP + noise + yamux + identify + dcutr + circuit-relay-v2 and wraps it with `transport-libp2p-core`.
 - `packages/transport-libp2p-react-native` — `@peerkit/transport-libp2p-react-native`, React Native impl (planned: WebSocket + WebRTC + circuit-relay-v2 client).

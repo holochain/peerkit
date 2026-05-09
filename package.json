@@ -27,7 +27,8 @@
     "packages/transport-libp2p-nodejs",
     "packages/transport-libp2p-react-native",
     "packages/transport-libp2p",
-    "packages/api"
+    "packages/api",
+    "packages/agent-store"
   ],
   "engines": {
     "node": ">=22"

@@ -1,11 +1,12 @@
 {
   "entryPointStrategy": "packages",
   "entryPoints": [
+    "packages/agent-store",
     "packages/api",
     "packages/transport-libp2p",
+    "packages/transport-libp2p-core",
     "packages/transport-libp2p-nodejs",
-    "packages/transport-libp2p-react-native",
-    "packages/transport"
+    "packages/transport-libp2p-react-native"
   ],
   "out": "docs",
   "externalSymbolLinkMappings": {
