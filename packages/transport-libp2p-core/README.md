@@ -1,4 +1,4 @@
-# @peerkit/transport-libp2p
+# @peerkit/transport-libp2p-core
 
 libp2p-based transport for Peerkit. Implements `ITransport` on top of TCP + Noise + yamux + identify, with circuit relay support.
 

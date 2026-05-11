@@ -28,6 +28,9 @@
   },
   "files": [],
   "references": [
+    { "path": "packages/transport-libp2p-core" },
+    { "path": "packages/transport-libp2p-nodejs" },
+    { "path": "packages/transport-libp2p-react-native" },
     { "path": "packages/transport-libp2p" },
     { "path": "packages/api" }
   ]

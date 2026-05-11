@@ -1,16 +1,8 @@
 {
   "name": "@peerkit/transport-libp2p",
   "version": "0.1.0",
-  "description": "Reference peerkit transport implementation based on libp2p",
+  "description": "Peerkit transport facade — re-exports the platform-appropriate libp2p transport implementation",
   "author": "Holochain Dev Team <devcore@holochain.org>",
-  "keywords": [
-    "peerkit",
-    "p2p",
-    "data",
-    "sync",
-    "transport",
-    "libp2p"
-  ],
   "license": "CAL-1.0",
   "bugs": {
     "url": "https://github.com/holochain/peerkit/issues"
@@ -23,26 +15,21 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "react-native": {
+        "types": "./dist/index.rn.d.ts",
+        "import": "./dist/index.rn.js"
+      },
+      "default": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
     }
   },
   "scripts": {
-    "test": "vitest --run"
+    "test": "echo \"No tests to run\""
   },
   "dependencies": {
-    "@chainsafe/libp2p-noise": "^17.0.0",
-    "@chainsafe/libp2p-yamux": "^8.0.1",
-    "@libp2p/circuit-relay-v2": "^4.2.3",
-    "@libp2p/dcutr": "^3.0.18",
-    "@libp2p/identify": "^4.1.0",
-    "@libp2p/tcp": "^11.0.15",
-    "@logtape/logtape": "^2.0.5",
-    "@multiformats/multiaddr": "^13.0.1",
-    "@peerkit/api": "*",
-    "libp2p": "^3.2.0"
-  },
-  "devDependencies": {
-    "get-port": "^7.2.0"
+    "@peerkit/transport-libp2p-nodejs": "*",
+    "@peerkit/transport-libp2p-react-native": "*"
   }
 }

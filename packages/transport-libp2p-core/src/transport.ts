@@ -1,11 +1,3 @@
-import { noise } from "@chainsafe/libp2p-noise";
-import { yamux } from "@chainsafe/libp2p-yamux";
-import {
-  circuitRelayServer,
-  circuitRelayTransport,
-} from "@libp2p/circuit-relay-v2";
-import { dcutr } from "@libp2p/dcutr";
-import { identify } from "@libp2p/identify";
 import type {
   Connection,
   PeerId,
@@ -13,11 +5,9 @@ import type {
   StreamMessageEvent,
 } from "@libp2p/interface";
 import { peerIdFromString } from "@libp2p/peer-id";
-import { tcp } from "@libp2p/tcp";
 import { getLogger, type Logger } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import type { Libp2p } from "libp2p";
-import { createLibp2p } from "libp2p";
 import { encodeFrame, FrameDecoder } from "./frame.js";
 import type {
   AgentsReceivedCallback,
@@ -35,54 +25,48 @@ import type {
 } from "@peerkit/api";
 import { CustomStream } from "./custom-stream.js";
 
-export interface RelayOptions {
-  addrs?: string[];
-  id: string | undefined;
+/**
+ * Options shared by node and relay constructions.
+ */
+export interface TransportOptionsBase {
   /**
-   * Network access bytes sent in the counter-handshake response to connecting peers.
+   * Optional human-readable identifier attached to log records.
+   */
+  id?: string;
+  /**
+   * Network access bytes sent in handshake responses (and outbound handshakes
+   * for nodes).
+   *
+   * Defaults to `new Uint8Array([0])` — an empty array breaks the
+   * counter-handshake because `.send()` would be a no-op.
    */
   networkAccessBytes?: NetworkAccessBytes;
   /**
-   * Callback when agent infos have been received
+   * Handler invoked for every incoming access handshake. Returns true to grant
+   * access, false to deny. Denials are sticky for the session.
    */
-  agentsReceivedCallback: AgentsReceivedCallback;
+  networkAccessHandler: NetworkAccessHandler;
   /**
-   * Callback when a peer connection is complete, signaling readiness to
-   * exchange data
+   * Called when an inbound peer completes the access handshake. Fire-and-forget.
    */
   peerConnectedCallback: PeerConnectedCallback;
   /**
-   * Handler for incoming network access streams
+   * Called when agent-info bytes have been received from a peer.
    */
-  networkAccessHandler: NetworkAccessHandler;
+  agentsReceivedCallback: AgentsReceivedCallback;
 }
 
-export interface NodeOptions {
-  addrs?: string[];
-  id: string | undefined;
+/**
+ * Options for relay-mode transports. Relays do not handle messages.
+ */
+export type RelayOptions = TransportOptionsBase;
+
+/**
+ * Options for regular node transports. Nodes handle access, agents, and messages.
+ */
+export interface NodeOptions extends TransportOptionsBase {
   /**
-   * Network access bytes sent to relays during bootstrap handshake and in counter-handshake responses.
-   */
-  networkAccessBytes?: NetworkAccessBytes;
-  /**
-   * Callback when connection to a relay has been completed
-   */
-  connectedToRelayCallback?: ConnectedToRelayCallback;
-  /**
-   * Call when agent infos have been received
-   */
-  agentsReceivedCallback: AgentsReceivedCallback;
-  /**
-   * Callback when a peer connection is complete, signaling readiness to
-   * exchange data
-   */
-  peerConnectedCallback: PeerConnectedCallback;
-  /**
-   * Handler for incoming network access streams
-   */
-  networkAccessHandler: NetworkAccessHandler;
-  /**
-   * Handler for incoming message streams
+   * Handler for incoming application messages.
    */
   messageHandler: MessageHandler;
   /**
@@ -101,11 +85,12 @@ export interface NodeOptions {
    */
   customStreamCreatedCallbacks?: Record<string, CustomStreamCreatedCallback>;
   /**
-   * Relay addresses to connect to at startup. Format: {@link @multiformats/multiaddr!Multiaddr}
+   * Called when the bootstrap connection to a relay is complete.
    */
-  bootstrapRelays?: RelayAddress[];
+  connectedToRelayCallback?: ConnectedToRelayCallback;
   /**
-   * Timeout in milliseconds for the outbound access handshake response. Defaults to 10 000 ms.
+   * Timeout in milliseconds for the outbound access handshake response.
+   * Defaults to 10_000 ms.
    */
   handshakeTimeoutMs?: number;
 }
@@ -156,7 +141,12 @@ export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
 const ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE = 1;
 
 /**
- * The official peerkit transport based on Libp2p.
+ * Platform-agnostic libp2p transport for peerkit.
+ *
+ * Owns the protocol logic (access handshake, agents, messages) on top of a
+ * caller-supplied {@link Libp2p} instance. Platform-specific packages (e.g.
+ * `@peerkit/transport-libp2p-nodejs`) build the libp2p instance with the
+ * appropriate transports/services and pass it in.
  */
 export class TransportLibp2p implements ITransport {
   private libp2p: Libp2p;
@@ -183,6 +173,15 @@ export class TransportLibp2p implements ITransport {
       10_000;
     this.agentsReceivedCallback = options.agentsReceivedCallback;
     this.networkAccessHandler = options.networkAccessHandler;
+
+    // Initialize libp2p and logger before registering protocol handlers, so
+    // arrow-field callbacks (onAccessConnect, onAgentsConnect, onMessageConnect)
+    // can rely on this.logger even if the caller passed an already-started libp2p.
+    this.libp2p = libp2p;
+    this.logger = getLogger(["peerkit", "transport"]).with({
+      peerId: libp2p.peerId,
+      id: options?.id,
+    });
 
     libp2p.handle(CURRENT_ACCESS_PROTOCOL, this.onAccessConnect);
     libp2p.handle(CURRENT_AGENTS_PROTOCOL, this.onAgentsConnect);
@@ -221,74 +220,11 @@ export class TransportLibp2p implements ITransport {
       this.peerConnectedCallback = options.peerConnectedCallback;
     }
 
-    this.libp2p = libp2p;
-    this.logger = getLogger(["peerkit", "transport"]).with({
-      peerId: libp2p.peerId,
-      id: options?.id,
-    });
     this.logger.info("Transport created {*}", {
       addresses: libp2p.getMultiaddrs(),
       id: options?.id,
       handshakeTimeoutMs: this.handshakeTimeoutMs,
     });
-  }
-
-  /**
-   * Create a regular node. Handles all three protocols: access, agents, and messages.
-   * The caller must invoke {@link sendAgents} explicitly to distribute agent-info
-   * (e.g. after bootstrap or when local agent-info changes).
-   */
-  static async createNode(options: NodeOptions): Promise<TransportLibp2p> {
-    const libp2pNode = await createLibp2p({
-      // Circuit relay transport enables connecting to peers through connected relays.
-      transports: [tcp(), circuitRelayTransport()],
-      connectionEncrypters: [noise()],
-      streamMuxers: [yamux()],
-      services: { identify: identify(), dcutr: dcutr() },
-      addresses: {
-        listen: options?.addrs ?? [
-          "/p2p-circuit", // p2p-circuit enables listening for relayed connections
-          "/ip4/0.0.0.0/tcp/0",
-          "/ip6/::/tcp/0",
-        ],
-      },
-    });
-    await libp2pNode.start();
-
-    const transport = new TransportLibp2p(libp2pNode, options);
-    /**
-     * Connect to all provided relays. This doesn't await success. The transport
-     * calls {@link connectedToRelayCallback} on successful connect to a relay.
-     */
-    if (options?.bootstrapRelays?.length) {
-      transport.connectToRelays(options.bootstrapRelays);
-    }
-    return transport;
-  }
-
-  /**
-   * Create a relay node. Handles access and agents protocols; does not handle messages.
-   */
-  static async createRelay(options: RelayOptions): Promise<TransportLibp2p> {
-    const libp2pNode = await createLibp2p({
-      transports: [tcp()],
-      connectionEncrypters: [noise()],
-      streamMuxers: [yamux()],
-      // Circuit relay server enables relay functionality.
-      // applyDefaultLimit: false removes the 2-min / 128 KiB per-connection
-      // caps so the relay can serve as a permanent data-channel fallback.
-      services: {
-        relay: circuitRelayServer({
-          reservations: { applyDefaultLimit: false },
-        }),
-        identify: identify(),
-      },
-      addresses: {
-        listen: options?.addrs ?? ["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"],
-      },
-    });
-    await libp2pNode.start();
-    return new TransportLibp2p(libp2pNode, options);
   }
 
   getNodeId(): NodeId {
@@ -399,7 +335,14 @@ export class TransportLibp2p implements ITransport {
     return this.libp2p.stop();
   }
 
-  private async connectToRelays(relays: RelayAddress[]) {
+  /**
+   * Connect to a list of relay addresses in parallel. Failures are logged but
+   * do not throw. On success, {@link ConnectedToRelayCallback} fires once the
+   * dialable relay-circuit address has been received.
+   *
+   * Fire-and-forget. Platform factories typically call this during bootstrap.
+   */
+  async connectToRelays(relays: RelayAddress[]): Promise<void> {
     // Connect to all relays in parallel
     await Promise.allSettled(
       relays.map((relay) =>

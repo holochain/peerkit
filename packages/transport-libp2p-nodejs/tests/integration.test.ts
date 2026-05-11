@@ -3,7 +3,7 @@ import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
-  TransportLibp2p,
+  createNode as createTransportNode,
 } from "../src/index.js";
 import { createNode, createRelay, setupTestLogger } from "./util.js";
 import { NodeId } from "@peerkit/api";
@@ -77,7 +77,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   let relayNodeId = "";
   let relayAddress1 = "";
   const peersConnectedToNode1: NodeId[] = [];
-  const node1 = await TransportLibp2p.createNode({
+  const node1 = await createTransportNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, nodeId) => {
@@ -117,7 +117,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const peersConnectedToNode2: NodeId[] = [];
   const messagesReceivedByNode2: Uint8Array[] = [];
   let relayAddress2 = "";
-  const node2 = await TransportLibp2p.createNode({
+  const node2 = await createTransportNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, _nodeId) => {
@@ -207,7 +207,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   let relayNodeId = "";
   let relayAddress1 = "";
   const peersConnectedToNode1: NodeId[] = [];
-  const node1 = await TransportLibp2p.createNode({
+  const node1 = await createTransportNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, nodeId) => {
@@ -247,7 +247,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   const messagesReceivedByNode2: Uint8Array[] = [];
   let relayAddress2 = "";
   const peersConnectedToNode2: NodeId[] = [];
-  const node2 = await TransportLibp2p.createNode({
+  const node2 = await createTransportNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, _nodeId) => {

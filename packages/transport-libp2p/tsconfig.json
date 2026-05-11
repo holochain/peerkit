@@ -1,9 +1,13 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "composite": true,
     "rootDir": "src",
     "outDir": "dist"
   },
   "include": ["src"],
-  "references": [{ "path": "../api" }]
+  "references": [
+    { "path": "../transport-libp2p-nodejs" },
+    { "path": "../transport-libp2p-react-native" }
+  ]
 }

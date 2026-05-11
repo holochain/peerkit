@@ -5,11 +5,11 @@ import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
-import { encodeFrame } from "../src/frame.js";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
-} from "../src/index.js";
+  encodeFrame,
+} from "@peerkit/transport-libp2p-core";
 import type { MessageHandler, NetworkAccessHandler } from "@peerkit/api";
 import { createNode, setupTestLogger } from "./util.js";
 import { isDeepStrictEqual } from "node:util";

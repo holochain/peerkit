@@ -22,7 +22,10 @@ Peerkit is a TypeScript peer-to-peer data synchronization framework. It sits abo
 npm workspaces. Root is private and orchestrates builds; only published packages live under `packages/`.
 
 - `packages/api` — `@peerkit/api`, shared type definitions (`ITransport`, `NodeId`, `NetworkAccessBytes`, callbacks). All other packages import from here.
-- `packages/transport-libp2p` — `@peerkit/transport-libp2p`, the default transport. Implements `ITransport` on top of libp2p (TCP + noise + yamux + identify).
+- `packages/transport-libp2p-core` — `@peerkit/transport-libp2p-core`, the platform-agnostic libp2p transport. Owns the access/agents/messages protocol logic on top of a caller-supplied libp2p instance. Imported by the platform impls; not consumed directly by app code.
+- `packages/transport-libp2p-nodejs` — `@peerkit/transport-libp2p-nodejs`, Node.js impl. Builds libp2p with TCP + noise + yamux + identify + dcutr + circuit-relay-v2 and wraps it with `transport-libp2p-core`.
+- `packages/transport-libp2p-react-native` — `@peerkit/transport-libp2p-react-native`, React Native impl (planned: WebSocket + WebRTC + circuit-relay-v2 client).
+- `packages/transport-libp2p` — `@peerkit/transport-libp2p`, the public facade. Conditional `exports` resolve to the React Native impl when the `react-native` condition matches, otherwise to the Node.js impl. App code depends on this package.
 
 Workspace root pins Node `>=22` and uses `"type": "module"` + TypeScript `module: nodenext`. Imports inside TS sources use `.js` extensions (ESM resolution), even when importing `.ts` files.
 
@@ -43,9 +46,9 @@ Run from repo root unless noted.
 - Lint: `npm run lint`
 - Format: `npm run fmt`
 - Test all workspaces: `npm test`
-- Test a single workspace: `npm test -w @peerkit/transport-libp2p`
-- Single test file: `npm test -w @peerkit/transport-libp2p -- tests/access.test.ts`
-- Single test by name: `npm test -w @peerkit/transport-libp2p -- -t "Invalid network access bytes"`
+- Test a single workspace: `npm test -w @peerkit/transport-libp2p-nodejs`
+- Single test file: `npm test -w @peerkit/transport-libp2p-nodejs -- tests/access.test.ts`
+- Single test by name: `npm test -w @peerkit/transport-libp2p-nodejs -- -t "Invalid network access bytes"`
 
 Vitest runs with `--run` by default (CI-style, no watch).
 
@@ -60,7 +63,7 @@ Do not run CI checks unless explicitly asked. When asked, run the same checks CI
 
 ## Architecture — transport layer
 
-`ITransport` and all public API is defined in `packages/api/src/transport.ts` and is the contract every transport must satisfy. `TransportLibp2p` in `packages/transport-libp2p` is the reference implementation.
+`ITransport` and all public API is defined in `packages/api/src/transport.ts` and is the contract every transport must satisfy. `TransportLibp2p` in `packages/transport-libp2p-core` is the reference implementation; the Node.js and React Native impls wrap it with platform-specific libp2p setup.
 
 ### Transport public API
 
