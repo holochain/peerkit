@@ -44,14 +44,6 @@ export const setupTestLogger = async () => {
   });
 };
 
-/**
- * Sleep for the provided duration.
- *
- * @param durationMs Duration in milliseconds
- */
-export const sleep = async (durationMs: number) =>
-  new Promise((resolve) => setTimeout(resolve, durationMs));
-
 export interface TestRelayOptions {
   /**
    * Optional string to identify the node in logs
