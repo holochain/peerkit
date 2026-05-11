@@ -23,6 +23,9 @@
     "doc": "docs"
   },
   "workspaces": [
+    "packages/transport-libp2p-core",
+    "packages/transport-libp2p-nodejs",
+    "packages/transport-libp2p-react-native",
     "packages/transport-libp2p",
     "packages/api"
   ],

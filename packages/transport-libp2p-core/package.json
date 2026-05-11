@@ -1,0 +1,48 @@
+{
+  "name": "@peerkit/transport-libp2p-core",
+  "version": "0.1.0",
+  "description": "Platform-agnostic libp2p transport core for peerkit",
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "keywords": [
+    "peerkit",
+    "p2p",
+    "data",
+    "sync",
+    "transport",
+    "libp2p"
+  ],
+  "license": "CAL-1.0",
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@logtape/logtape": "^2.0.5",
+    "@multiformats/multiaddr": "^13.0.1",
+    "@peerkit/api": "*"
+  },
+  "peerDependencies": {
+    "@libp2p/interface": "^3.0.0",
+    "@libp2p/peer-id": "^6.0.0",
+    "libp2p": "^3.2.0"
+  },
+  "devDependencies": {
+    "@libp2p/interface": "^3.0.0",
+    "@libp2p/peer-id": "^6.0.0",
+    "libp2p": "^3.2.0"
+  }
+}

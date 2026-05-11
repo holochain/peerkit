@@ -9,7 +9,7 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
-  TransportLibp2p,
+  createNode,
 } from "../src/index.js";
 import { createRelay, setupTestLogger } from "./util.js";
 
@@ -104,7 +104,7 @@ test("Relay knows node's agent infos after agent exchange", async () => {
 
   const agentInfosReceivedByNode: Uint8Array[] = [];
   let connectedToRelay = false;
-  const node = await TransportLibp2p.createNode({
+  const node = await createNode({
     id: "node1",
     addrs: ["/p2p-circuit"],
     agentsReceivedCallback: async (_fromPeer, bytes) => {

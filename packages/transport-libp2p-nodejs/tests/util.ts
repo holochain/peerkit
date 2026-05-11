@@ -4,7 +4,10 @@ import {
   getConsoleSink,
 } from "@logtape/logtape";
 import getPort, { portNumbers } from "get-port";
-import { TransportLibp2p } from "../src/index.js";
+import {
+  createNode as createTransportNode,
+  createRelay as createTransportRelay,
+} from "../src/index.js";
 import type {
   AgentsReceivedCallback,
   ConnectedToRelayCallback,
@@ -85,7 +88,7 @@ export const createRelay = async (options: TestRelayOptions) => {
     options.peerConnectedCallback ?? (async (_nodeId) => {});
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
-  const relay = await TransportLibp2p.createRelay({
+  const relay = await createTransportRelay({
     addrs: [address],
     id,
     networkAccessBytes,
@@ -161,7 +164,7 @@ export const createNode = async (options: TestNodeOptions) => {
     options.messageHandler ?? (async (_fromPeer, _message) => {});
   const customStreamCreatedCallbacks =
     options.customStreamCreatedCallbacks ?? undefined;
-  const node = await TransportLibp2p.createNode({
+  const node = await createTransportNode({
     addrs: [address],
     id,
     connectedToRelayCallback,

@@ -1,6 +1,12 @@
 {
   "entryPointStrategy": "packages",
-  "entryPoints": ["packages/api", "packages/transport-libp2p"],
+  "entryPoints": [
+    "packages/api",
+    "packages/transport-libp2p",
+    "packages/transport-libp2p-nodejs",
+    "packages/transport-libp2p-react-native",
+    "packages/transport"
+  ],
   "out": "docs",
   "externalSymbolLinkMappings": {
     "@multiformats/multiaddr": {

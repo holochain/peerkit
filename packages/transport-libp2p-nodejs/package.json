@@ -1,0 +1,45 @@
+{
+  "name": "@peerkit/transport-libp2p-nodejs",
+  "version": "0.1.0",
+  "description": "Node.js libp2p transport for peerkit",
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "license": "CAL-1.0",
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "^17.0.0",
+    "@chainsafe/libp2p-yamux": "^8.0.1",
+    "@libp2p/circuit-relay-v2": "^4.2.3",
+    "@libp2p/dcutr": "^3.0.18",
+    "@libp2p/identify": "^4.1.0",
+    "@libp2p/interface": "^3.0.0",
+    "@libp2p/peer-id": "^6.0.0",
+    "@libp2p/tcp": "^11.0.15",
+    "@peerkit/api": "*",
+    "@peerkit/transport-libp2p-core": "*",
+    "libp2p": "^3.2.0"
+  },
+  "devDependencies": {
+    "@logtape/logtape": "^2.0.5",
+    "get-port": "^7.2.0"
+  }
+}

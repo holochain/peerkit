@@ -1,0 +1,52 @@
+{
+  "name": "@peerkit/transport-libp2p-react-native",
+  "version": "0.1.0",
+  "description": "React Native libp2p transport for peerkit",
+  "keywords": [
+    "peerkit",
+    "transport",
+    "libp2p",
+    "react-native",
+    "p2p"
+  ],
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "license": "CAL-1.0",
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "test": "echo \"No tests to run\""
+  },
+  "dependencies": {
+    "@peerkit/api": "*",
+    "@peerkit/transport-libp2p-core": "*"
+  },
+  "peerDependencies": {
+    "@libp2p/interface": "^3.0.0",
+    "@libp2p/peer-id": "^6.0.0",
+    "libp2p": "^3.2.0",
+    "react-native": ">=0.81.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    }
+  }
+}
