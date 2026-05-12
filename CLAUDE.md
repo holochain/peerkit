@@ -27,6 +27,7 @@ npm workspaces. Root is private and orchestrates builds; only published packages
 - `packages/transport-libp2p-nodejs` — `@peerkit/transport-libp2p-nodejs`, Node.js impl. Builds libp2p with TCP + noise + yamux + identify + dcutr + circuit-relay-v2 and wraps it with `transport-libp2p-core`.
 - `packages/transport-libp2p-react-native` — `@peerkit/transport-libp2p-react-native`, React Native impl (planned: WebSocket + WebRTC + circuit-relay-v2 client).
 - `packages/transport-libp2p` — `@peerkit/transport-libp2p`, the public facade. Conditional `exports` resolve to the React Native impl when the `react-native` condition matches, otherwise to the Node.js impl. App code depends on this package.
+- `packages/metrics` — `@peerkit/metrics`, app-side OpenTelemetry SDK bootstrap. Exposes `initMetrics`/`shutdownMetrics` (OTLP/HTTP export configuration) and bridges OTel diagnostics into the `peerkit.metrics` logtape logger. Per the [OpenTelemetry library guidelines](https://opentelemetry.io/docs/specs/otel/library-guidelines/#api-and-minimal-implementation), library packages depend on `@opentelemetry/api` directly and call `metrics.getMeter(...)`; only applications depend on `@peerkit/metrics` (which transitively pulls the SDK).
 
 Workspace root pins Node `>=22` and uses `"type": "module"` + TypeScript `module: nodenext`. Imports inside TS sources use `.js` extensions (ESM resolution), even when importing `.ts` files.
 
@@ -87,6 +88,20 @@ All runtime methods are keyed by `NodeId` (an opaque `string` — the libp2p pee
 ## Logging
 
 `@logtape/logtape`. The transport attaches `peerId` and optional `id` as structured log properties via `getLogger(["peerkit", "transport"]).with({...})`. Tests configure a console sink in `beforeEach` and `reset()` in `afterEach` — mirror this pattern when adding tests that assert on log output.
+
+## Metrics
+
+`@peerkit/metrics` (OpenTelemetry). Conventions every instrumented package must follow:
+
+- **API vs. SDK split.** Library packages depend on `@opentelemetry/api` only and obtain their meter with `metrics.getMeter("@peerkit/<package>", version)`. Only applications (and `@peerkit/metrics` itself) depend on the OTel SDK. Do not add `@peerkit/metrics` as a dependency of a library package — it would pull the SDK into every consumer's tree.
+- **Lifecycle.** Applications call `initMetrics({ serviceName, ... })` once at startup and `shutdownMetrics()` on teardown. Without `initMetrics`, `metrics.getMeter(...)` returns OTel's no-op meter — instruments are zero-cost.
+- **Instrument creation order.** OTel JS metrics API 1.9 has no proxy meter provider. An instrument captured before `initMetrics()` runs binds permanently to the no-op meter. Therefore instrumented components (e.g. `TransportLibp2p`) create their counters/histograms in the **constructor**, not at module scope. Apps must call `initMetrics()` before constructing instrumented components, and tests must call it in `beforeEach` before `createNode(...)`.
+- **Per-package metrics module.** Each instrumented package defines a `src/metrics.ts` that owns its OTel scope name (`@peerkit/<package>`), version, and instrument descriptors, and exposes a `createXxxMetrics()` factory returning a `XxxMetrics` interface. The factory calls `metrics.getMeter(SCOPE_NAME, SCOPE_VERSION)` from `@opentelemetry/api`. The instrumented class stores the factory's return value in a `private readonly metrics: XxxMetrics` field. This keeps OTel descriptors in one place and lets the class body call `this.metrics.<instrument>.add(...)`.
+- **Typed attributes.** Counters (and other instruments) are generic over an `Attributes` subtype. Each instrument defines a per-package interface (e.g. `BytesAttributes extends Attributes`) for compile-time enforcement of attribute keys and value types at call sites.
+- **Metric naming.** Use OTel semantic conventions when available; otherwise dot-notation `peerkit.<package>.<measure>` (e.g. `peerkit.transport.bytes`). Set `unit` (e.g. `"By"` for bytes) and a `description` that names both dimensions in plain English.
+- **Cardinality.** Be deliberate about label cardinality. `direction: "sent" | "received"` is bounded; per-peer labels (`peer: NodeId`) are unbounded and must not be added without a bucketing/sampling strategy. Document any high-cardinality label in the metric's JSDoc. While investigating cardinality blow-up, lower `MetricsConfig.diagLogLevel` to `DiagLogLevel.DEBUG` to surface SDK warnings.
+- **Diagnostics.** OTel SDK `diag` channel is bridged to the `["peerkit", "metrics"]` logtape logger. `MetricsConfig.diagLogLevel` (default `DiagLogLevel.WARN`) controls verbosity; lower it when investigating export failures.
+- **Tests.** Configure an `InMemoryMetricExporter` + `PeriodicExportingMetricReader` and pass it as `MetricsConfig.reader` in `beforeEach`. Call `shutdownMetrics()` in `afterEach`. Filter metric data via `dataPointType === DataPointType.SUM` (with a type-predicate filter) to narrow the discriminated union before accessing `.value`.
 
 ## TypeScript conventions
 

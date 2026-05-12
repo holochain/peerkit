@@ -23,11 +23,12 @@
     "doc": "docs"
   },
   "workspaces": [
+    "packages/api",
+    "packages/metrics",
     "packages/transport-libp2p-core",
     "packages/transport-libp2p-nodejs",
     "packages/transport-libp2p-react-native",
     "packages/transport-libp2p",
-    "packages/api",
     "packages/agent-store"
   ],
   "engines": {
