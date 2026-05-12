@@ -3,6 +3,7 @@
   "entryPoints": [
     "packages/agent-store",
     "packages/api",
+    "packages/peerkit",
     "packages/transport-libp2p",
     "packages/transport-libp2p-core",
     "packages/transport-libp2p-nodejs",

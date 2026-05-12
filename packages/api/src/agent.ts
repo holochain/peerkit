@@ -6,11 +6,26 @@ import type { NodeAddress } from "./primitives.js";
 export type AgentId = string;
 
 /**
+ * Agent key pair for signing.
+ */
+export interface IKeyPair {
+  /**
+   * Returns this agent's identifier encoded as a string.
+   */
+  agentId(): AgentId;
+
+  /**
+   * Signs data with the agent's private key.
+   */
+  sign(data: Uint8Array): Uint8Array;
+}
+
+/**
  * Shareable descriptor exchanged between peers.
  */
 export interface AgentInfo {
   /**
-   * The agents unique identifier
+   * The agent's unique identifier
    */
   agentId: AgentId;
   /**
@@ -21,7 +36,17 @@ export interface AgentInfo {
    * Unix timestamp (ms) after which this record should be discarded.
    */
   expiresAt: number;
+  /**
+   * Ed25519 signature over the canonical encoding of the remaining properties.
+   * Verify using the public key encoded in {@link agentId}.
+   */
+  signature: Uint8Array;
 }
+
+/**
+ * Factory that creates an {@link IAgentStore} instance.
+ */
+export type AgentStoreFactory = () => IAgentStore;
 
 /**
  * In-memory store for {@link AgentInfo} records.
