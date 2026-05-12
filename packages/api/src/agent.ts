@@ -1,3 +1,5 @@
+import type { NodeAddress } from "./primitives.js";
+
 /**
  * Stable cryptographic identifier for an agent (the agent's public key, opaque string).
  */
@@ -7,8 +9,14 @@ export type AgentId = string;
  * Shareable descriptor exchanged between peers.
  */
 export interface AgentInfo {
+  /**
+   * The agents unique identifier
+   */
   agentId: AgentId;
-  addresses: string[];
+  /**
+   * Transport-specific addresses where this agent can be dialed.
+   */
+  addresses: NodeAddress[];
   /**
    * Unix timestamp (ms) after which this record should be discarded.
    */
