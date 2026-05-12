@@ -24,12 +24,13 @@
   },
   "workspaces": [
     "packages/api",
+    "packages/agent-store",
     "packages/metrics",
     "packages/transport-libp2p-core",
     "packages/transport-libp2p-nodejs",
     "packages/transport-libp2p-react-native",
     "packages/transport-libp2p",
-    "packages/agent-store"
+    "packages/peerkit"
   ],
   "engines": {
     "node": ">=22"
