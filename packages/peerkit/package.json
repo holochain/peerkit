@@ -1,0 +1,38 @@
+{
+  "name": "@peerkit/peerkit",
+  "version": "0.1.0",
+  "description": "Peerkit peer-to-peer data sync orchestrator",
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "keywords": [
+    "peerkit",
+    "p2p",
+    "data",
+    "sync",
+    "framework"
+  ],
+  "license": "CAL-1.0",
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.1.0",
+    "@noble/hashes": "^2.2.0",
+    "@peerkit/api": "*"
+  },
+  "devDependencies": {}
+}
