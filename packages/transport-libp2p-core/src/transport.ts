@@ -24,6 +24,7 @@ import type {
   CustomStreamCreatedCallback,
 } from "@peerkit/api";
 import { CustomStream } from "./custom-stream.js";
+import { createTransportMetrics, type TransportMetrics } from "./metrics.js";
 
 /**
  * Options shared by node and relay constructions.
@@ -158,6 +159,7 @@ export class TransportLibp2p implements ITransport {
   private messageHandler?: MessageHandler;
   private connectedToRelayCallback?: ConnectedToRelayCallback;
   private peerConnectedCallback?: PeerConnectedCallback;
+  private readonly metrics: TransportMetrics;
 
   // Keyed by NodeId string. true = granted, false = denied.
   // Both entries are sticky for the session.
@@ -220,6 +222,7 @@ export class TransportLibp2p implements ITransport {
       this.peerConnectedCallback = options.peerConnectedCallback;
     }
 
+    this.metrics = createTransportMetrics();
     this.logger.info("Transport created {*}", {
       addresses: libp2p.getMultiaddrs(),
       id: options?.id,
@@ -281,12 +284,18 @@ export class TransportLibp2p implements ITransport {
         stream.addEventListener("message", async (message) => {
           const chunk = message.data.subarray();
           for (const msg of decoder.feed(chunk)) {
+            this.metrics.bytesTotal.add(msg.byteLength, {
+              direction: "received",
+            });
             await messageHandler(nodeId, msg);
           }
         });
       }
     }
     stream.send(encodeFrame(data));
+    this.metrics.bytesTotal.add(data.byteLength, {
+      direction: "sent",
+    });
   }
 
   isDirectConnection(nodeId: NodeId): boolean {
@@ -604,12 +613,16 @@ export class TransportLibp2p implements ITransport {
     const decoder = new FrameDecoder();
     stream.addEventListener("message", async (message) => {
       const chunk = message.data.subarray();
+      const remoteNodeId = connection.remotePeer.toString();
       for (const msg of decoder.feed(chunk)) {
         this.logger.debug(
           `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
           { peerId: connection.remotePeer, byteLength: msg.byteLength },
         );
-        await messageHandler(connection.remotePeer.toString(), msg);
+        this.metrics.bytesTotal.add(msg.byteLength, {
+          direction: "received",
+        });
+        await messageHandler(remoteNodeId, msg);
       }
     });
   };

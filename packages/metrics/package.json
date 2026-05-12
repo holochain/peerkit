@@ -1,16 +1,14 @@
 {
-  "name": "@peerkit/transport-libp2p-core",
+  "name": "@peerkit/metrics",
   "version": "0.1.0",
-  "description": "Platform-agnostic libp2p transport core for peerkit",
-  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "description": "OpenTelemetry-based metric collection for peerkit",
   "keywords": [
     "peerkit",
-    "p2p",
-    "data",
-    "sync",
-    "transport",
-    "libp2p"
+    "metrics",
+    "opentelemetry",
+    "otlp"
   ],
+  "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "CAL-1.0",
   "bugs": {
     "url": "https://github.com/holochain/peerkit/issues"
@@ -32,18 +30,11 @@
   },
   "dependencies": {
     "@logtape/logtape": "^2.0.5",
-    "@multiformats/multiaddr": "^13.0.1",
     "@opentelemetry/api": "^1.9.0",
-    "@peerkit/api": "*"
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.217.0",
+    "@opentelemetry/resources": "^2.7.0",
+    "@opentelemetry/sdk-metrics": "^2.7.0",
+    "@opentelemetry/semantic-conventions": "^1.40.0"
   },
-  "peerDependencies": {
-    "@libp2p/interface": "^3.0.0",
-    "@libp2p/peer-id": "^6.0.0",
-    "libp2p": "^3.2.0"
-  },
-  "devDependencies": {
-    "@libp2p/interface": "^3.0.0",
-    "@libp2p/peer-id": "^6.0.0",
-    "libp2p": "^3.2.0"
-  }
+  "devDependencies": {}
 }
