@@ -1,7 +1,7 @@
 import * as ed25519 from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import type { AgentId, IKeyPair, NodeAddress } from "@peerkit/api";
+import type { AgentId, IKeyPair } from "@peerkit/api";
 
 ed25519.hashes.sha512 = sha512;
 
@@ -11,35 +11,6 @@ function encodeAgentId(publicKeyBytes: Uint8Array): AgentId {
 
 export function decodeAgentId(agentId: AgentId): Uint8Array {
   return hexToBytes(agentId);
-}
-
-/**
- * Returns the bytes that are signed over in an {@link AgentInfo}.
- *
- * Both signer and verifier must use this function to produce the canonical
- * representation of the payload fields.
- *
- * TODO: replace with AgentInfo serialization once the wire format is defined.
- */
-export function encodeAgentInfoPayload(
-  agentId: AgentId,
-  addresses: NodeAddress[],
-  expiresAt: number,
-): Uint8Array {
-  return new TextEncoder().encode(
-    JSON.stringify({ agentId, addresses, expiresAt }),
-  );
-}
-
-export function verifyAgentInfo(
-  agentId: AgentId,
-  addresses: NodeAddress[],
-  expiresAt: number,
-  signature: Uint8Array,
-): boolean {
-  const publicKey = decodeAgentId(agentId);
-  const payload = encodeAgentInfoPayload(agentId, addresses, expiresAt);
-  return ed25519.verify(signature, payload, publicKey);
 }
 
 export class AgentKeyPair implements IKeyPair {
