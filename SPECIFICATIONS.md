@@ -187,7 +187,7 @@ The mode is fixed at construction because the underlying networking library cann
 The transport handles three types of messages between peers:
 
 - **Network access handshake**: the first message on every new connection. Carries the connecting agent's `NetworkAccessBytes`. Policy enforcement lives in the transport package.
-- **Agent-info messages**: opaque routing for agent-info exchange. Wire format owned by the agent module; the transport routes payload bytes between connected peers and the agent module's handler.
+- **Agent-info messages**: opaque routing for agent-info exchange. Wire format owned by core peerkit, the transport routes payload bytes between connected peers and peers and relays.
 - **Application messages**: opaque routing for application data. Wire format owned by application code (or higher-level components like data gossip). Available on regular nodes only.
 
 Concrete protocol identifiers and wire formats are documented in the transport package, not here.

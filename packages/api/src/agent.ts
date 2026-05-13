@@ -36,6 +36,12 @@ export interface AgentInfo {
    * Unix timestamp (ms) after which this record should be discarded.
    */
   expiresAt: number;
+}
+
+/**
+ * {@link AgentInfo} signed by the agent.
+ */
+export interface AgentInfoSigned extends AgentInfo {
   /**
    * Ed25519 signature over the canonical encoding of the remaining properties.
    * Verify using the public key encoded in {@link agentId}.
