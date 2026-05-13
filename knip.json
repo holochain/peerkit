@@ -3,6 +3,13 @@
   "workspaces": {
     "packages/transport-libp2p": {
       "ignoreDependencies": ["@peerkit/transport-libp2p-react-native"]
+    },
+    "packages/transport-libp2p-react-native": {
+      "ignoreDependencies": [
+        "react-native-get-random-values",
+        "react-native-quick-crypto",
+        "react-native-webrtc"
+      ]
     }
   }
 }
