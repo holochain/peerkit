@@ -1,12 +1,13 @@
 import { expect, test, vi } from "vitest";
 import { MemoryAgentStore } from "../src/agent-store.js";
-import type { AgentInfo } from "@peerkit/api";
+import type { AgentInfoSigned } from "@peerkit/api";
 
-function makeAgent(agentId: string, expiresInMs = 60_000): AgentInfo {
+function makeAgent(agentId: string, expiresInMs = 60_000): AgentInfoSigned {
   return {
     agentId,
     addresses: ["/ip4/127.0.0.1/tcp/9000"],
     expiresAt: Date.now() + expiresInMs,
+    signature: new Uint8Array(64),
   };
 }
 
@@ -39,15 +40,17 @@ test("get returns undefined for unknown agentId", () => {
 
 test("store overwrites existing entry for same agentId", () => {
   const store = new MemoryAgentStore();
-  const v1: AgentInfo = {
+  const v1: AgentInfoSigned = {
     agentId: "a1",
     addresses: ["/ip4/1.1.1.1/tcp/1"],
     expiresAt: Date.now() + 60_000,
+    signature: new Uint8Array(64),
   };
-  const v2: AgentInfo = {
+  const v2: AgentInfoSigned = {
     agentId: "a1",
     addresses: ["/ip4/2.2.2.2/tcp/2"],
     expiresAt: Date.now() + 60_000,
+    signature: new Uint8Array(64),
   };
   store.store([v1]);
   store.store([v2]);
