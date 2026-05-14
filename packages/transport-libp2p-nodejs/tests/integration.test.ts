@@ -75,13 +75,13 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // Create node 1 that will connect first to the relay and send it its
   // agent info.
   let relayNodeId = "";
-  let relayAddress1 = "";
+  let node1RelayedAddress = "";
   const peersConnectedToNode1: NodeId[] = [];
   const node1 = await createTransportNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, nodeId) => {
-      relayAddress1 = address;
+      node1RelayedAddress = address;
       relayNodeId = nodeId;
     },
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
@@ -98,12 +98,13 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
   await vi.waitUntil(
     () =>
-      !!relayAddress1 && !!relayNodeId && peersConnectedToRelay.length === 1,
+      !!node1RelayedAddress &&
+      !!relayNodeId &&
+      peersConnectedToRelay.length === 1,
     { timeout: 2_000 },
   );
 
-  // Node 1 sends agent infos, including its own, to relay.
-  const node1RelayedAddress = `${relayAddress1}/p2p/${node1.getNodeId()}`;
+  // Node 1 sends its own agent info to relay.
   await node1.sendAgents(
     relayNodeId,
     new TextEncoder().encode(node1RelayedAddress),
@@ -116,12 +117,12 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const node2AgentStore: Uint8Array[] = [];
   const peersConnectedToNode2: NodeId[] = [];
   const messagesReceivedByNode2: Uint8Array[] = [];
-  let relayAddress2 = "";
+  let node2RelayedAddress = "";
   const node2 = await createTransportNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: (address, _nodeId) => {
-      relayAddress2 = address;
+    connectedToRelayCallback: (address, _relayNodeId) => {
+      node2RelayedAddress = address;
     },
     agentsReceivedCallback: async (fromNode, agentInfos) => {
       assert.equal(fromNode, relay.getNodeId());
@@ -142,7 +143,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // Wait for node 2's connection to relay to complete.
   // Node 1 is still connected to relay, so wait for 2 connected peers.
   await vi.waitUntil(
-    () => !!relayAddress2 && peersConnectedToRelay.length === 2,
+    () => !!node2RelayedAddress && peersConnectedToRelay.length === 2,
     { timeout: 5_000 },
   );
 
@@ -185,7 +186,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   await relay.shutDown();
 });
 
-test("Bootstrap with relay and 2 nodes and send message over direct connection", async () => {
+test("relay and 2 nodes and send message over direct connection", async () => {
   // Create a test agent store for the relay
   const relayAgentStore: Uint8Array[] = [];
   // Create the relay with a callback that pushes to the agent store when agent
@@ -205,13 +206,13 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   // Create node 1 that will connect first to the relay and send it its
   // agent info.
   let relayNodeId = "";
-  let relayAddress1 = "";
+  let node1RelayedAddress = "";
   const peersConnectedToNode1: NodeId[] = [];
   const node1 = await createTransportNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, nodeId) => {
-      relayAddress1 = address;
+      node1RelayedAddress = address;
       relayNodeId = nodeId;
     },
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
@@ -228,12 +229,13 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
   await vi.waitUntil(
     () =>
-      !!relayAddress1 && !!relayNodeId && peersConnectedToRelay.length === 1,
+      !!node1RelayedAddress &&
+      !!relayNodeId &&
+      peersConnectedToRelay.length === 1,
     { timeout: 5_000 },
   );
 
-  // Node 1 sends agent infos, including its own, to relay.
-  const node1RelayedAddress = `${relayAddress1}/p2p/${node1.getNodeId()}`;
+  // Node 1 sends its own agent info to relay.
   await node1.sendAgents(
     relayNodeId,
     new TextEncoder().encode(node1RelayedAddress),
@@ -245,13 +247,13 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   // agent infos from it and then connect to node 1 through the relay.
   const node2AgentStore: Uint8Array[] = [];
   const messagesReceivedByNode2: Uint8Array[] = [];
-  let relayAddress2 = "";
+  let node2RelayedAddress = "";
   const peersConnectedToNode2: NodeId[] = [];
   const node2 = await createTransportNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
     connectedToRelayCallback: (address, _nodeId) => {
-      relayAddress2 = address;
+      node2RelayedAddress = address;
     },
     agentsReceivedCallback: async (fromNode, agentInfos) => {
       assert.equal(fromNode, relay.getNodeId());
@@ -278,7 +280,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   // Wait for node 2's connection to relay to complete.
   // Node 1 is still connected to relay, so wait for 2 connected peers.
   await vi.waitUntil(
-    () => !!relayAddress2 && peersConnectedToRelay.length === 2,
+    () => !!node2RelayedAddress && peersConnectedToRelay.length === 2,
     { timeout: 5_000 },
   );
 

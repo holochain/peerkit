@@ -352,6 +352,7 @@ export class TransportLibp2p implements ITransport {
    * Fire-and-forget. Platform factories typically call this during bootstrap.
    */
   async connectToRelays(relays: RelayAddress[]): Promise<void> {
+    const localPeerId = this.libp2p.peerId.toString();
     // Connect to all relays in parallel
     await Promise.allSettled(
       relays.map((relay) =>
@@ -373,8 +374,10 @@ export class TransportLibp2p implements ITransport {
                         .includes(`/p2p/${relayId}/p2p-circuit`),
                   );
                   if (relayAddress) {
+                    // Append the local peer ID so the address is fully dialable:
+                    // /…/p2p/<relayId>/p2p-circuit/p2p/<localId>
                     connectedToRelayCallback(
-                      relayAddress.multiaddr.toString(),
+                      `${relayAddress.multiaddr.toString()}/p2p/${localPeerId}`,
                       relayId,
                     );
                   } else {

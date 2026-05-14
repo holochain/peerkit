@@ -5,6 +5,8 @@ import getPort, { portNumbers } from "get-port";
 import type { RelayAddress } from "@peerkit/api";
 import { setupTestLogger } from "./util.js";
 import { reset } from "@logtape/logtape";
+import { AgentKeyPair } from "../../src/agent.js";
+import { buildOwnAgentInfo } from "../../src/agent-info.js";
 
 beforeEach(setupTestLogger);
 
@@ -69,6 +71,85 @@ test("Relay sends known agents to connecting peer", async () => {
   // By now the relay should have sent node 1's agent info to node 2.
   await vi.waitFor(() =>
     expect(node2.agentStore.get(node1.keyPair.agentId())).toBeTruthy(),
+  );
+
+  await node2.shutDown();
+  await node1.shutDown();
+  await relay.shutDown();
+});
+
+test("Node connects to another node using address learned from relay", async () => {
+  // Create the relay
+  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}`;
+  const relay = await PeerkitRelay.create({
+    id: "relay",
+    addrs: [relayAddress],
+    networkAccessHandler: async () => true,
+  });
+
+  // Create node 1 and wait until it has registered its own agent info via the
+  // relay.
+  const node1 = await PeerkitNode.create({
+    id: "node1",
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+    bootstrapRelays: [relayAddress],
+  });
+  await vi.waitUntil(() => node1.agentStore.get(node1.keyPair.agentId()), {
+    timeout: 5_000,
+  });
+
+  // Add a third agent info to node 1's store, one that the relay will never
+  // forward. When node 2 later connects directly to node 1, receiving this
+  // info proves node 1 sent its full store, not just its own entry.
+  const thirdKeyPair = new AgentKeyPair();
+  const thirdAgentInfo = buildOwnAgentInfo(
+    thirdKeyPair,
+    [],
+    Date.now() + 60_000,
+  );
+  node1.agentStore.store([thirdAgentInfo]);
+
+  // Create node 2
+  const node2 = await PeerkitNode.create({
+    id: "node2",
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+    bootstrapRelays: [relayAddress],
+  });
+  // Wait for node 2 to register its own agent info, to send to node 1 later.
+  const node2AgentInfo = await vi.waitUntil(
+    () => node2.agentStore.get(node2.keyPair.agentId()),
+    {
+      timeout: 5_000,
+    },
+  );
+  // Wait until the relay has forwarded node 1's agent info to node 2.
+  const node1AgentInfo = await vi.waitUntil(
+    () => node2.agentStore.get(node1.keyPair.agentId()),
+    { timeout: 5_000 },
+  );
+
+  // Node 2 connects to node 1 using the agent info the relay provided.
+  const node1CircuitAddress = node1AgentInfo.addresses[0];
+  expect(node1CircuitAddress).toBeDefined();
+  await node2.transport.connect(node1CircuitAddress!);
+
+  // Node 2 must receive the third agent info, the one only node 1 holds.
+  // This confirms node 1 sent its full store.
+  await vi.waitFor(
+    () => expect(node2.agentStore.getAll()).toContainEqual(thirdAgentInfo),
+    { timeout: 5_000 },
+  );
+
+  // Node 1 must receive node 2's agent info too. Node 1 has 2 existing
+  // agent infos, so it will be the 3rd.
+  await vi.waitFor(
+    () => expect(node1.agentStore.getAll()).toContainEqual(node2AgentInfo),
+    {
+      timeout: 5_000,
+    },
   );
 
   await node2.shutDown();
