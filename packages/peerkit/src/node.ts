@@ -1,7 +1,5 @@
 import { MemoryAgentStore } from "@peerkit/agent-store";
 import type {
-  AgentInfo,
-  AgentInfoSigned,
   IAgentStore,
   IKeyPair,
   ITransport,
@@ -13,10 +11,8 @@ import type {
 } from "@peerkit/api";
 import { createNode } from "@peerkit/transport-libp2p";
 import { AgentKeyPair } from "./agent.js";
-import {
-  serializeAgentInfoCanonical,
-  serializeAgentInfoList,
-} from "./serialize.js";
+import { buildOwnAgentInfo } from "./agent-info.js";
+import { serializeAgentInfoList } from "./serialize.js";
 import { getLogger, type Logger } from "@logtape/logtape";
 import { getAgentsReceivedCallback } from "./common.js";
 
@@ -75,27 +71,23 @@ export class PeerkitNode {
         }
       },
       connectedToRelayCallback: async (relayAddress, relayNodeId) => {
-        const agentId = keyPair.agentId();
-        const existing = agentStore.get(agentId);
+        const existing = agentStore.get(keyPair.agentId());
         const addresses = [...(existing?.addresses ?? []), relayAddress];
-        const expiresAt = Date.now() + 60_000;
-        const agentInfo: AgentInfo = {
-          agentId,
+        const agentInfoSigned = buildOwnAgentInfo(
+          keyPair,
           addresses,
-          expiresAt,
-        };
-        const agentInfoSigned: AgentInfoSigned = {
-          signature: keyPair.sign(serializeAgentInfoCanonical(agentInfo)),
-          ...agentInfo,
-        };
+          Date.now() + 60_000,
+        );
         const agentInfos = [agentInfoSigned];
         // Store own agent info in agent store.
         agentStore.store(agentInfos);
 
         // Send own agent info to relay.
-        const agentInfoBytes = serializeAgentInfoList(agentInfos);
         try {
-          await transport.sendAgents(relayNodeId, agentInfoBytes);
+          await transport.sendAgents(
+            relayNodeId,
+            serializeAgentInfoList(agentInfos),
+          );
         } catch (error) {
           logger.error("Failed to send agents to relay {*}", {
             relayAddress,

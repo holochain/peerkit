@@ -27,6 +27,24 @@ export function signAgentInfo(
 }
 
 /**
+ * Build and sign an {@link AgentInfoSigned} for the local agent.
+ *
+ * @param keyPair The local agent's key pair
+ * @param addresses The addresses at which this agent can be reached
+ * @param expiresAt Unix timestamp (ms) after which this info should be discarded
+ */
+export function buildOwnAgentInfo(
+  keyPair: IKeyPair,
+  addresses: NodeAddress[],
+  expiresAt: number,
+): AgentInfoSigned {
+  return signAgentInfo(
+    { agentId: keyPair.agentId(), addresses, expiresAt },
+    keyPair,
+  );
+}
+
+/**
  * Verify the signature of a signed agent info
  *
  * @param agentInfoSigned The signed agent info to verify

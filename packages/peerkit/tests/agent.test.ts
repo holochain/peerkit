@@ -1,7 +1,11 @@
 import { expect, test } from "vitest";
 import { AgentKeyPair, decodeAgentId } from "../src/agent.js";
 import { AgentInfo, AgentInfoSigned } from "@peerkit/api";
-import { signAgentInfo, verifyAgentInfo } from "../src/agent-info.js";
+import {
+  buildOwnAgentInfo,
+  signAgentInfo,
+  verifyAgentInfo,
+} from "../src/agent-info.js";
 
 test("agentId round-trips through decodeAgentId", () => {
   const keyPair = new AgentKeyPair();
@@ -25,6 +29,22 @@ test("Sign and verify agent info", () => {
   };
   const agentInfoSigned = signAgentInfo(agentInfo, keyPair);
   expect(verifyAgentInfo(agentInfoSigned)).toBe(true);
+});
+
+test("buildOwnAgentInfo produces a verifiable signature", () => {
+  const keyPair = new AgentKeyPair();
+  const addresses = ["/ip4/127.0.0.1/tcp/9000"];
+  const expiresAt = Date.now() + 60_000;
+
+  const agentInfo = buildOwnAgentInfo(keyPair, addresses, expiresAt);
+
+  // The agentId must match the key pair's public key.
+  expect(agentInfo.agentId).toBe(keyPair.agentId());
+  // All provided addresses must appear in the result.
+  expect(agentInfo.addresses).toEqual(addresses);
+  expect(agentInfo.expiresAt).toBe(expiresAt);
+  // The signature must be valid.
+  expect(verifyAgentInfo(agentInfo)).toBe(true);
 });
 
 test("Invalid signature fails verification", () => {
