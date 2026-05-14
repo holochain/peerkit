@@ -8,19 +8,21 @@ import type {
   MessageHandler,
   NetworkAccessBytes,
   NetworkAccessHandler,
+  NodeAddress,
   RelayAddress,
 } from "@peerkit/api";
 import { createNode } from "@peerkit/transport-libp2p";
 import { AgentKeyPair } from "./agent.js";
 import {
-  deserializeAgentInfoList,
   serializeAgentInfoCanonical,
   serializeAgentInfoList,
 } from "./serialize.js";
 import { getLogger, type Logger } from "@logtape/logtape";
+import { getAgentsReceivedCallback } from "./common.js";
 
 export type PeerkitCreateOptions = {
   id?: string;
+  addresses?: NodeAddress[];
   networkAccessHandler: NetworkAccessHandler;
   messageHandler: MessageHandler;
   bootstrapRelays: RelayAddress[];
@@ -54,12 +56,24 @@ export class PeerkitNode {
     });
     const transport = await createNode({
       id: options.id,
+      addrs: options.addresses,
       bootstrapRelays: options.bootstrapRelays,
       networkAccessBytes: options.networkAccessBytes,
-      agentsReceivedCallback: async (_, bytes) => {
-        agentStore.store(deserializeAgentInfoList(bytes));
+      agentsReceivedCallback: getAgentsReceivedCallback(logger, agentStore),
+      peerConnectedCallback: async (nodeId) => {
+        const agentInfos = agentStore.getAll();
+        if (agentInfos.length) {
+          const agentInfoBytes = serializeAgentInfoList(agentInfos);
+          try {
+            await transport.sendAgents(nodeId, agentInfoBytes);
+          } catch (error) {
+            logger.error("Failed to send agents to peer {*}", {
+              nodeId,
+              error,
+            });
+          }
+        }
       },
-      peerConnectedCallback: (_nodeId) => {},
       connectedToRelayCallback: async (relayAddress, relayNodeId) => {
         const agentId = keyPair.agentId();
         const existing = agentStore.get(agentId);

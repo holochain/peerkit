@@ -126,9 +126,9 @@ The local agent's public identity is accessible after initialization through the
 
 `AgentInfo` is the shareable, serializable descriptor exchanged between peers. Its schema is owned by the agent module. From the transport's perspective `AgentInfo` is opaque bytes. It carries the `AgentId`, the addresses where the agent can be contacted, an expiry timestamp, and a signature. The expiry timestamp demarcates a point in time after which the agent info should be discarded.
 
-**`AgentId` encoding**: `AgentId` is the base64url encoding of the raw 32-byte Ed25519 public key. This makes `AgentId` self-describing: any peer can reconstruct the public key from the string alone, with no key registry.
+**`AgentId` encoding**: `AgentId` is the hex encoding of the raw 32-byte Ed25519 public key. This makes `AgentId` self-describing: any peer can reconstruct the public key from the string alone, with no key registry.
 
-**`AgentInfo` signature**: every `AgentInfo` record carries a `signature` field — the Ed25519 signature over the canonical encoding of `{agentId, addresses, expiresAt}`. Verification is deterministic: decode the base64url `agentId` to obtain the public key bytes and verify directly. No injected verifier or key lookup is required.
+**`AgentInfo` signature**: every `AgentInfo` record carries a `signature` field — the Ed25519 signature over the canonical encoding of `{agentId, addresses, expiresAt}`. Verification is deterministic: decode the hex `agentId` to obtain the public key bytes and verify directly. No injected verifier or key lookup is required.
 
 **Signing**: signed payloads (e.g. state changes in higher-level components) are signed by their author using the agent's private key. Peers verify the signature using the `AgentId`.
 

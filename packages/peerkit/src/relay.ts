@@ -6,12 +6,9 @@ import type {
   NetworkAccessHandler,
 } from "@peerkit/api";
 import { createRelay } from "@peerkit/transport-libp2p";
-import {
-  deserializeAgentInfoList,
-  serializeAgentInfoList,
-} from "./serialize.js";
-import { verifyAgentInfo } from "./agent-info.js";
+import { serializeAgentInfoList } from "./serialize.js";
 import { getLogger, type Logger } from "@logtape/logtape";
+import { getAgentsReceivedCallback } from "./common.js";
 
 export type PeerkitRelayCreateOptions = {
   id?: string;
@@ -42,13 +39,7 @@ export class PeerkitRelay {
       id: options.id,
       addrs: options.addrs,
       networkAccessBytes: options.networkAccessBytes,
-      agentsReceivedCallback: async (_, bytes) => {
-        const agentList = deserializeAgentInfoList(bytes);
-        const verifiedAgentInfos = agentList.filter((agentInfo) =>
-          verifyAgentInfo(agentInfo),
-        );
-        agentStore.store(verifiedAgentInfos);
-      },
+      agentsReceivedCallback: getAgentsReceivedCallback(logger, agentStore),
       peerConnectedCallback: async (nodeId) => {
         const agents = agentStore.getAll();
         if (agents.length > 0) {
