@@ -70,9 +70,13 @@ export class PeerkitNode {
           }
         }
       },
-      connectedToRelayCallback: async (relayAddress, relayNodeId) => {
-        const existing = agentStore.get(keyPair.agentId());
-        const addresses = [...(existing?.addresses ?? []), relayAddress];
+      connectedToRelayCallback: async (relayedNodeAddress, relayNodeId) => {
+        // Append new address if there are existing ones.
+        const existingAgentInfo = agentStore.get(keyPair.agentId());
+        const addresses = [
+          ...(existingAgentInfo?.addresses ?? []),
+          relayedNodeAddress,
+        ];
         const agentInfoSigned = buildOwnAgentInfo(
           keyPair,
           addresses,
@@ -90,7 +94,7 @@ export class PeerkitNode {
           );
         } catch (error) {
           logger.error("Failed to send agents to relay {*}", {
-            relayAddress,
+            relayAddress: relayedNodeAddress,
             relayNodeId,
             error,
           });
