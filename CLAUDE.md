@@ -85,6 +85,10 @@ All runtime methods are keyed by `NodeId` (an opaque `string` — the libp2p pee
 - **Node** (`TransportLibp2p.create`): handles all three protocols — access, agents, messages. Supports `bootstrapRelays` to connect at startup.
 - **Relay** (`TransportLibp2p.createRelay`): handles access and agents only; message protocol is not registered. Acts as bootstrap and circuit-relay server.
 
+## Testing conventions
+
+- Comment tests to explain the scenario being set up and what each assertion verifies. Integration tests especially benefit from inline comments that narrate the sequence of events.
+
 ## Logging
 
 `@logtape/logtape`. The transport attaches `peerId` and optional `id` as structured log properties via `getLogger(["peerkit", "transport"]).with({...})`. Tests configure a console sink in `beforeEach` and `reset()` in `afterEach` — mirror this pattern when adding tests that assert on log output.
