@@ -61,15 +61,15 @@ export interface IAgentStore {
   /**
    * Returns all non-expired agents.
    */
-  getAll(): AgentInfo[];
+  getAll(): AgentInfoSigned[];
 
   /**
    * Returns the non-expired {@link AgentInfo} for the given id, or undefined.
    */
-  get(agentId: AgentId): AgentInfo | undefined;
+  get(agentId: AgentId): AgentInfoSigned | undefined;
 
   /**
    * Stores agents, overwriting any existing record with the same agentId.
    */
-  store(agents: AgentInfo[]): void;
+  store(agents: AgentInfoSigned[]): void;
 }

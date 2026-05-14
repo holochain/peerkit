@@ -30,10 +30,12 @@ test("Relay sends known agents to connecting peer", async () => {
 
   // Wait for node 1 to connect to relay and add its own address to
   // its agent store.
-  await vi.waitFor(() => expect(node1.agentStore.getAll().length).toBe(1), {
-    timeout: 5_000,
-  });
-  const node1AgentInfoSigned = node1.agentStore.getAll()[0];
+  const node1AgentInfoSigned = await vi.waitUntil(
+    () => node1.agentStore.get(node1.keyPair.agentId()),
+    {
+      timeout: 5_000,
+    },
+  );
   // Wait for the relay to have received node 1's agent info.
   await vi.waitFor(
     () =>
