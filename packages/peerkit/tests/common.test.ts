@@ -102,3 +102,14 @@ test("Only valid agent infos are stored from a mixed list", async () => {
 
   expect(agentStore.getAll()).toStrictEqual([valid]);
 });
+
+test("Malformed bytes are discarded without throwing", async () => {
+  const agentStore = new MemoryAgentStore();
+  const callback = getAgentsReceivedCallback(logger, agentStore);
+
+  // Invalid CBOR deserialization must not propagate an exception.
+  await expect(
+    callback("node1", new Uint8Array([0xff, 0xfe])),
+  ).resolves.toBeUndefined();
+  expect(agentStore.getAll()).toHaveLength(0);
+});
