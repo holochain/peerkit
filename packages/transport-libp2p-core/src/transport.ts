@@ -363,31 +363,30 @@ export class TransportLibp2p implements ITransport {
               const relayId = relayNodeId.toString();
               // Register event listener for when the dialable relay address has been
               // received through the identify protocol.
-              const handler = (
-                evt: CustomEvent<{
-                  peer: {
-                    addresses: Array<{ multiaddr: { toString(): string } }>;
-                  };
-                }>,
-              ) => {
-                const relayAddress = evt.detail.peer.addresses.find((address) =>
-                  address.multiaddr
-                    .toString()
-                    .includes(`/p2p/${relayId}/p2p-circuit`),
-                );
-                this.libp2p.removeEventListener("self:peer:update", handler);
-                if (relayAddress) {
-                  connectedToRelayCallback(
-                    relayAddress.multiaddr.toString(),
-                    relayId,
+              this.libp2p.addEventListener(
+                "self:peer:update",
+                (evt) => {
+                  const relayAddress = evt.detail.peer.addresses.find(
+                    (address) =>
+                      address.multiaddr
+                        .toString()
+                        .includes(`/p2p/${relayId}/p2p-circuit`),
                   );
-                } else {
-                  this.logger.error(
-                    "Received peer update event but found no relay address.",
-                  );
-                }
-              };
-              this.libp2p.addEventListener("self:peer:update", handler);
+                  if (relayAddress) {
+                    connectedToRelayCallback(
+                      relayAddress.multiaddr.toString(),
+                      relayId,
+                    );
+                  } else {
+                    this.logger.error(
+                      "Received peer update event but found no relay address.",
+                    );
+                  }
+                },
+                {
+                  once: true,
+                },
+              );
             }
           })
           .catch((error) => {

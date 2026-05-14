@@ -30,6 +30,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
+    "@logtape/logtape": "^2.0.5",
     "@noble/ed25519": "^3.1.0",
     "@noble/hashes": "^2.2.0",
     "@peerkit/api": "*",
