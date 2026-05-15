@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { PeerkitNode } from "../../src/node.js";
+import { PeerkitNodeBuilder } from "../../src/node.js";
 import getPort, { portNumbers } from "get-port";
 import { setupTestLogger } from "./util.js";
 import { reset } from "@logtape/logtape";
@@ -13,13 +13,13 @@ test("Two nodes exchange agents bidirectionally", async () => {
   // Create node 1 on a known port so node 2 can dial it directly.
   const node1Port = await getPort({ port: portNumbers(30_000, 40_000) });
   const node1Address = `/ip4/127.0.0.1/tcp/${node1Port}`;
-  const node1 = await PeerkitNode.create({
-    id: "node1",
-    addresses: [node1Address],
+  const node1 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
-    bootstrapRelays: [],
-  });
+  })
+    .withId("node1")
+    .withAddresses([node1Address])
+    .build();
   // Pre-populate node 1's agent store with its own signed agent info, so it
   // has something to send when node 2 connects.
   node1.agentStore.store([
@@ -35,13 +35,13 @@ test("Two nodes exchange agents bidirectionally", async () => {
 
   const node2Port = await getPort({ port: portNumbers(30_000, 40_000) });
   const node2Address = `/ip4/127.0.0.1/tcp/${node2Port}`;
-  const node2 = await PeerkitNode.create({
-    id: "node2",
-    addresses: [node2Address],
+  const node2 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
-    bootstrapRelays: [],
-  });
+  })
+    .withId("node2")
+    .withAddresses([node2Address])
+    .build();
   // Pre-populate node 2's agent store so it also has something to send.
   node2.agentStore.store([
     signAgentInfo(
