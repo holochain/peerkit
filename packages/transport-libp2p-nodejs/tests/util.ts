@@ -77,7 +77,7 @@ export const createRelay = async (options: TestRelayOptions) => {
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const peerConnectedCallback =
-    options.peerConnectedCallback ?? (async (_nodeId) => {});
+    options.peerConnectedCallback ?? (async (_nodeId, _transport) => {});
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
   const relay = await createTransportRelay({
@@ -143,19 +143,17 @@ export const createNode = async (options: TestNodeOptions) => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
   const address = `/ip4/0.0.0.0/tcp/${port}`;
   const { id, bootstrapRelays, handshakeTimeoutMs } = options;
-  const connectedToRelayCallback =
-    options.connectedToRelayCallback ?? undefined;
+  const connectedToRelayCallback = options.connectedToRelayCallback;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const peerConnectedCallback =
-    options.peerConnectedCallback ?? (async (_nodeId) => {});
+    options.peerConnectedCallback ?? (async (_nodeId, _transport) => {});
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
   const networkAccessBytes = options.networkAccessBytes ?? new Uint8Array([0]);
   const messageHandler =
-    options.messageHandler ?? (async (_fromPeer, _message) => {});
-  const customStreamCreatedCallbacks =
-    options.customStreamCreatedCallbacks ?? undefined;
+    options.messageHandler ?? (async (_fromPeer, _message, _transport) => {});
+  const customStreamCreatedCallbacks = options.customStreamCreatedCallbacks;
   const node = await createTransportNode({
     addrs: [address],
     id,
