@@ -8,7 +8,7 @@ import {
 function makeAgent(agentId: string): AgentInfo {
   return {
     agentId,
-    addresses: ["/ip4/127.0.0.1/tcp/9000"],
+    addresses: ["/ip4/127.0.0.1/tcp/9000/ws"],
     expiresAt: Date.now() + 60_000,
   };
 }

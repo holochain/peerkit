@@ -73,7 +73,6 @@ export interface TestRelayOptions {
 export const createRelay = async (options: TestRelayOptions) => {
   const { id, networkAccessBytes } = options;
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/0.0.0.0/tcp/${port}`;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const peerConnectedCallback =
@@ -81,14 +80,14 @@ export const createRelay = async (options: TestRelayOptions) => {
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
   const relay = await createTransportRelay({
-    addrs: [address],
+    addrs: [`/ip4/0.0.0.0/tcp/${port}/ws`],
     id,
     networkAccessBytes,
     agentsReceivedCallback,
     peerConnectedCallback,
     networkAccessHandler,
   });
-  return { relay, address };
+  return { relay, address: `/ip4/127.0.0.1/tcp/${port}/ws` };
 };
 
 export interface TestNodeOptions {
@@ -141,7 +140,6 @@ export interface TestNodeOptions {
  */
 export const createNode = async (options: TestNodeOptions) => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/0.0.0.0/tcp/${port}`;
   const { id, bootstrapRelays, handshakeTimeoutMs } = options;
   const connectedToRelayCallback = options.connectedToRelayCallback;
   const agentsReceivedCallback =
@@ -155,7 +153,7 @@ export const createNode = async (options: TestNodeOptions) => {
     options.messageHandler ?? (async (_fromPeer, _message, _transport) => {});
   const customStreamCreatedCallbacks = options.customStreamCreatedCallbacks;
   const node = await createTransportNode({
-    addrs: [address],
+    addrs: [`/ip4/0.0.0.0/tcp/${port}/ws`],
     id,
     connectedToRelayCallback,
     agentsReceivedCallback,
@@ -167,5 +165,5 @@ export const createNode = async (options: TestNodeOptions) => {
     bootstrapRelays,
     handshakeTimeoutMs,
   });
-  return { node, address };
+  return { node, address: `/ip4/127.0.0.1/tcp/${port}/ws` };
 };

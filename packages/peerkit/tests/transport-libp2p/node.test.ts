@@ -12,7 +12,7 @@ afterEach(reset);
 test("Two nodes exchange agents bidirectionally", async () => {
   // Create node 1 on a known port so node 2 can dial it directly.
   const node1Port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${node1Port}`;
+  const node1Address = `/ip4/127.0.0.1/tcp/${node1Port}/ws`;
   const node1 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
@@ -34,7 +34,7 @@ test("Two nodes exchange agents bidirectionally", async () => {
   ]);
 
   const node2Port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node2Address = `/ip4/127.0.0.1/tcp/${node2Port}`;
+  const node2Address = `/ip4/127.0.0.1/tcp/${node2Port}/ws`;
   const node2 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},

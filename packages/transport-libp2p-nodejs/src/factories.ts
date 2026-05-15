@@ -6,7 +6,7 @@ import {
 } from "@libp2p/circuit-relay-v2";
 import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
-import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
 import { createLibp2p } from "libp2p";
 import {
   TransportLibp2p,
@@ -21,9 +21,9 @@ import type { RelayAddress } from "@peerkit/api";
  */
 export interface CreateNodeOptions extends NodeOptions {
   /**
-   * Listening multiaddrs. Defaults to `/p2p-circuit`, `/ip4/0.0.0.0/tcp/0`,
-   * `/ip6/::/tcp/0` — circuit listening enables relayed inbound, TCP enables
-   * direct inbound.
+   * Listening multiaddrs. Defaults to `/p2p-circuit`, `/ip4/0.0.0.0/tcp/0/ws`,
+   * `/ip6/::/tcp/0/ws` — circuit listening enables relayed inbound, WebSocket
+   * enables direct inbound.
    */
   addrs?: string[];
   /**
@@ -40,13 +40,13 @@ export interface CreateNodeOptions extends NodeOptions {
  */
 export interface CreateRelayOptions extends RelayOptions {
   /**
-   * Listening multiaddrs. Defaults to `/ip4/0.0.0.0/tcp/0`, `/ip6/::/tcp/0`.
+   * Listening multiaddrs. Defaults to `/ip4/0.0.0.0/tcp/0/ws`, `/ip6/::/tcp/0/ws`.
    */
   addrs?: string[];
 }
 
 /**
- * Build a Node.js peerkit transport. Configures libp2p with TCP +
+ * Build a Node.js peerkit transport. Configures libp2p with WebSocket +
  * circuit-relay-v2 client + noise + yamux + identify + dcutr.
  *
  * Handles all three protocols (access, agents, messages). The caller invokes
@@ -60,15 +60,15 @@ export async function createNode(
     // (including /peerkit/access/v1) before any inbound connection arrives.
     start: false,
     // Circuit relay transport enables connecting to peers through connected relays.
-    transports: [tcp(), circuitRelayTransport()],
+    transports: [webSockets(), circuitRelayTransport()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: { identify: identify(), dcutr: dcutr() },
     addresses: {
       listen: options?.addrs ?? [
         "/p2p-circuit", // p2p-circuit enables listening for relayed connections
-        "/ip4/0.0.0.0/tcp/0",
-        "/ip6/::/tcp/0",
+        "/ip4/0.0.0.0/tcp/0/ws",
+        "/ip6/::/tcp/0/ws",
       ],
     },
   });
@@ -83,7 +83,7 @@ export async function createNode(
 }
 
 /**
- * Build a Node.js peerkit relay transport. Configures libp2p with TCP +
+ * Build a Node.js peerkit relay transport. Configures libp2p with WebSocket +
  * circuit-relay-v2 server + noise + yamux + identify.
  *
  * Handles access and agents protocols; does not register the message
@@ -97,7 +97,7 @@ export async function createRelay(
     // Defer listening so TransportLibp2p can register protocol handlers
     // (including /peerkit/access/v1) before any inbound connection arrives.
     start: false,
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     // Circuit relay server enables relay functionality.
@@ -110,7 +110,7 @@ export async function createRelay(
       identify: identify(),
     },
     addresses: {
-      listen: options?.addrs ?? ["/ip4/0.0.0.0/tcp/0", "/ip6/::/tcp/0"],
+      listen: options?.addrs ?? ["/ip4/0.0.0.0/tcp/0/ws", "/ip6/::/tcp/0/ws"],
     },
   });
   const transport = new TransportLibp2p(libp2pNode, options);
