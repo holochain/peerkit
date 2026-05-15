@@ -243,7 +243,7 @@ export class TransportLibp2p implements ITransport {
     // Connection to peer established, run callback.
     // A failed access check by either side will close the connection.
     if (this.peerConnectedCallback) {
-      this.peerConnectedCallback(connection.remotePeer.toString()).catch(
+      this.peerConnectedCallback(connection.remotePeer.toString(), this).catch(
         (error) => {
           this.logger.error("PeerConnectedCallback produced an error {*}", {
             error,
@@ -293,7 +293,7 @@ export class TransportLibp2p implements ITransport {
             this.metrics.bytesTotal.add(msg.byteLength, {
               direction: "received",
             });
-            await messageHandler(nodeId, msg);
+            await messageHandler(nodeId, msg, this);
           }
         });
       }
@@ -385,6 +385,7 @@ export class TransportLibp2p implements ITransport {
                     connectedToRelayCallback(
                       `${relayAddress.multiaddr.toString()}/p2p/${localPeerId}`,
                       relayId,
+                      this,
                     ).catch((error) => {
                       this.logger.error(
                         "ConnectedToRelayCallback produced an error {*}",
@@ -561,7 +562,7 @@ export class TransportLibp2p implements ITransport {
                 ackMessage.length === 1 &&
                 ackMessage[0] === ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE
               ) {
-                peerConnectedCallback(remoteNodeId).catch((error) => {
+                peerConnectedCallback(remoteNodeId, this).catch((error) => {
                   this.logger.error(
                     "PeerConnectedCallback produced an error {*}",
                     { error },
@@ -640,7 +641,7 @@ export class TransportLibp2p implements ITransport {
         this.metrics.bytesTotal.add(msg.byteLength, {
           direction: "received",
         });
-        await messageHandler(remoteNodeId, msg);
+        await messageHandler(remoteNodeId, msg, this);
       }
     });
   };

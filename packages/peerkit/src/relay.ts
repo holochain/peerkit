@@ -77,7 +77,10 @@ export class PeerkitRelayBuilder {
     });
     const agentsReceivedCallback: AgentsReceivedCallback =
       getAgentsReceivedCallback(logger, agentStore);
-    const peerConnectedCallback: PeerConnectedCallback = async (nodeId) => {
+    const peerConnectedCallback: PeerConnectedCallback = async (
+      nodeId,
+      transport,
+    ) => {
       const agents = agentStore.getAll();
       if (agents.length > 0) {
         try {

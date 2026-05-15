@@ -33,7 +33,7 @@ export type PeerkitNodeTransportFactory = (
  * ```ts
  * const node = await new PeerkitNodeBuilder({
  *   networkAccessHandler: async () => true,
- *   messageHandler: async (nodeId, data) => { ... },
+ *   messageHandler: async (nodeId, data, transport) => { ... },
  * })
  *   .withId("node1")
  *   .withBootstrapRelays([relayAddress])
@@ -101,7 +101,10 @@ export class PeerkitNodeBuilder {
     });
     const agentsReceivedCallback: AgentsReceivedCallback =
       getAgentsReceivedCallback(logger, agentStore);
-    const peerConnectedCallback: PeerConnectedCallback = async (nodeId) => {
+    const peerConnectedCallback: PeerConnectedCallback = async (
+      nodeId,
+      transport,
+    ) => {
       const agentInfos = agentStore.getAll();
       if (agentInfos.length) {
         try {
@@ -117,6 +120,7 @@ export class PeerkitNodeBuilder {
     const connectedToRelayCallback = async (
       relayedNodeAddress: NodeAddress,
       relayNodeId: string,
+      transport: ITransport,
     ) => {
       const existingAgentInfo = agentStore.get(keyPair.agentId());
       const addresses = [

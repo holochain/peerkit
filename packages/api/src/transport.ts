@@ -24,6 +24,7 @@ export type NetworkAccessHandler = (
 export type MessageHandler = (
   fromNode: NodeId,
   message: Uint8Array,
+  transport: ITransport,
 ) => Promise<void>;
 
 /**
@@ -38,6 +39,7 @@ export type MessageHandler = (
 export type ConnectedToRelayCallback = (
   relayAddress: RelayAddress,
   relayNodeId: NodeId,
+  transport: ITransport,
 ) => Promise<void>;
 
 /**
@@ -50,7 +52,10 @@ export type ConnectedToRelayCallback = (
  * Fire-and-forget notification. The transport does not await this, but logs
  * errors.
  */
-export type PeerConnectedCallback = (nodeId: NodeId) => Promise<void>;
+export type PeerConnectedCallback = (
+  nodeId: NodeId,
+  transport: ITransport,
+) => Promise<void>;
 
 /**
  * Processing hook for incoming agent-info bytes.

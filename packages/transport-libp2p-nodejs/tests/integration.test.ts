@@ -21,9 +21,7 @@ afterEach(reset);
 test("Connection can be closed", { timeout: 10_000 }, async () => {
   const { node: node1, address: address1 } = await createNode({
     id: "node1",
-    messageHandler: async (message) => {
-      console.log("message", message);
-    },
+    messageHandler: async () => {},
   });
 
   const node2 = await createLibp2p({
@@ -67,7 +65,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);
     },
-    peerConnectedCallback: (nodeId) => {
+    peerConnectedCallback: async (nodeId, _transport) => {
       peersConnectedToRelay.push(nodeId);
     },
   });
@@ -80,14 +78,14 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const node1 = await createTransportNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: (address, nodeId) => {
+    connectedToRelayCallback: async (address, nodeId, _transport) => {
       node1RelayedAddress = address;
       relayNodeId = nodeId;
     },
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
       throw new Error("Node 1 shouldn't be sent agents");
     },
-    peerConnectedCallback: (nodeId) => {
+    peerConnectedCallback: async (nodeId, _transport) => {
       peersConnectedToNode1.push(nodeId);
     },
     messageHandler: async (_message) => {},
@@ -121,18 +119,18 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const node2 = await createTransportNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: (address, _relayNodeId) => {
+    connectedToRelayCallback: async (address, _relayNodeId, _transport) => {
       node2RelayedAddress = address;
     },
     agentsReceivedCallback: async (fromNode, agentInfos) => {
       assert.equal(fromNode, relay.getNodeId());
       node2AgentStore.push(agentInfos);
     },
-    peerConnectedCallback: (nodeId) => {
+    peerConnectedCallback: async (nodeId, _transport) => {
       assert.equal(nodeId, node1.getNodeId());
       peersConnectedToNode2.push(nodeId);
     },
-    messageHandler: async (fromNode, message) => {
+    messageHandler: async (fromNode, message, _transport) => {
       assert.equal(fromNode, node1.getNodeId());
       messagesReceivedByNode2.push(message);
     },
@@ -198,7 +196,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);
     },
-    peerConnectedCallback: (nodeId) => {
+    peerConnectedCallback: async (nodeId, _transport) => {
       peersConnectedToRelay.push(nodeId);
     },
   });
@@ -211,14 +209,14 @@ test("relay and 2 nodes and send message over direct connection", async () => {
   const node1 = await createTransportNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: (address, nodeId) => {
+    connectedToRelayCallback: async (address, nodeId, _transport) => {
       node1RelayedAddress = address;
       relayNodeId = nodeId;
     },
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
       throw new Error("Node 1 shouldn't be sent agents");
     },
-    peerConnectedCallback: (nodeId) => {
+    peerConnectedCallback: async (nodeId, _transport) => {
       peersConnectedToNode1.push(nodeId);
     },
     messageHandler: async (_message) => {},
@@ -252,18 +250,18 @@ test("relay and 2 nodes and send message over direct connection", async () => {
   const node2 = await createTransportNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: (address, _nodeId) => {
+    connectedToRelayCallback: async (address, _nodeId, _transport) => {
       node2RelayedAddress = address;
     },
     agentsReceivedCallback: async (fromNode, agentInfos) => {
       assert.equal(fromNode, relay.getNodeId());
       node2AgentStore.push(agentInfos);
     },
-    peerConnectedCallback: (nodeId) => {
+    peerConnectedCallback: async (nodeId, _transport) => {
       assert.equal(nodeId, node1.getNodeId());
       peersConnectedToNode2.push(nodeId);
     },
-    messageHandler: async (fromNode, message) => {
+    messageHandler: async (fromNode, message, _transport) => {
       assert.equal(fromNode, node1.getNodeId());
       messagesReceivedByNode2.push(message);
     },

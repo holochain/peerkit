@@ -110,10 +110,10 @@ test("Relay knows node's agent infos after agent exchange", async () => {
     agentsReceivedCallback: async (_fromPeer, bytes) => {
       agentInfosReceivedByNode.push(bytes);
     },
-    peerConnectedCallback: async (_nodeId) => {},
+    peerConnectedCallback: async (_nodeId, _transport) => {},
     networkAccessHandler: async () => true,
     bootstrapRelays: [relayAddress],
-    connectedToRelayCallback: (_address, nodeId) => {
+    connectedToRelayCallback: async (_address, nodeId, _transport) => {
       assert.equal(nodeId, relay.getNodeId());
       connectedToRelay = true;
     },
