@@ -4,5 +4,6 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     testTimeout: 30_000,
+    projects: ["packages/*"],
   },
 });
