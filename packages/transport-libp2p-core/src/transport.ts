@@ -243,7 +243,13 @@ export class TransportLibp2p implements ITransport {
     // Connection to peer established, run callback.
     // A failed access check by either side will close the connection.
     if (this.peerConnectedCallback) {
-      this.peerConnectedCallback(connection.remotePeer.toString());
+      this.peerConnectedCallback(connection.remotePeer.toString()).catch(
+        (error) => {
+          this.logger.error("PeerConnectedCallback produced an error {*}", {
+            error,
+          });
+        },
+      );
     }
   }
 
@@ -379,7 +385,12 @@ export class TransportLibp2p implements ITransport {
                     connectedToRelayCallback(
                       `${relayAddress.multiaddr.toString()}/p2p/${localPeerId}`,
                       relayId,
-                    );
+                    ).catch((error) => {
+                      this.logger.error(
+                        "ConnectedToRelayCallback produced an error {*}",
+                        { error },
+                      );
+                    });
                   } else {
                     this.logger.error(
                       "Received peer update event but found no relay address.",
@@ -550,7 +561,12 @@ export class TransportLibp2p implements ITransport {
                 ackMessage.length === 1 &&
                 ackMessage[0] === ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE
               ) {
-                peerConnectedCallback(remoteNodeId);
+                peerConnectedCallback(remoteNodeId).catch((error) => {
+                  this.logger.error(
+                    "PeerConnectedCallback produced an error {*}",
+                    { error },
+                  );
+                });
               } else {
                 this.logger.error(
                   "Unexpected access handshake acknowledge message {*}",
