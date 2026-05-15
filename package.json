@@ -40,7 +40,7 @@
     "lint": "eslint",
     "fmt": "prettier . --write",
     "fmt:check": "prettier . --check",
-    "test": "npm test --workspaces",
+    "test": "vitest --run",
     "build:docs": "typedoc",
     "build:dist": "tsc --build",
     "build": "npm run build:dist && npm run build:docs",
