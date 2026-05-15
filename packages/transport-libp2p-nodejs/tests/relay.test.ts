@@ -1,6 +1,6 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
@@ -26,10 +26,10 @@ test("Invalid network access bytes closes connection to relay", async () => {
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
@@ -46,10 +46,10 @@ test("Opening an agents stream without being granted access closes the connectio
   const { relay, address } = await createRelay({ id: "relay" });
 
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   assert(connection.status === "open");
@@ -73,10 +73,10 @@ test("Relay rejects message protocol streams", async () => {
 
   // Create a node, connect to relay, perform access handshake and check that opening a message stream fails.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);

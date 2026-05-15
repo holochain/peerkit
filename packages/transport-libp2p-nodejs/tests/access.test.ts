@@ -1,6 +1,6 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { type NetworkAccessHandler } from "@peerkit/api";
@@ -24,10 +24,10 @@ test("Remote node closes connection when host sends invalid network access bytes
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
@@ -68,10 +68,10 @@ test("Access handshake initiator closes connection when responder is denied", as
 test("Outbound access handshake times out when responder sends no response", async () => {
   // Libp2p node that opens the access stream but never sends a response back.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   await libp2pNode.handle(CURRENT_ACCESS_PROTOCOL, async (stream) => {
     // Receive the initiator's handshake but never respond — causes timeout.
@@ -103,10 +103,10 @@ test("Remote node closes connection when host sends invalid ACK byte", async () 
 
   // Create a node that passes correct network access bytes but sends invalid ACK byte.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
@@ -140,7 +140,7 @@ test("Valid network access bytes grant connection to other node", async () => {
     return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   };
 
-  const peerConnectedCallback1 = vi.fn().mockRejectedValue(undefined);
+  const peerConnectedCallback1 = vi.fn().mockResolvedValue(undefined);
   const { node: node1, address: address1 } = await createNode({
     id: "node1",
     networkAccessHandler,
@@ -148,7 +148,7 @@ test("Valid network access bytes grant connection to other node", async () => {
     peerConnectedCallback: peerConnectedCallback1,
   });
 
-  const peerConnectedCallback2 = vi.fn().mockRejectedValue(undefined);
+  const peerConnectedCallback2 = vi.fn().mockResolvedValue(undefined);
   const { node: node2 } = await createNode({
     id: "node2",
     networkAccessHandler,
@@ -241,11 +241,11 @@ test("Opening a stream with an unknown protocol fails", async () => {
 
   // Create a node and try to open a stream with an unknown protocol.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     addresses: {
-      listen: ["/ip4/0.0.0.0/tcp/0"],
+      listen: ["/ip4/0.0.0.0/tcp/0/ws"],
     },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
@@ -265,10 +265,10 @@ test("Network access handler is not repeatedly called for previously rejected pe
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);

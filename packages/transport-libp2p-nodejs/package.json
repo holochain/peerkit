@@ -33,7 +33,7 @@
     "@libp2p/identify": "^4.1.0",
     "@libp2p/interface": "^3.0.0",
     "@libp2p/peer-id": "^6.0.0",
-    "@libp2p/tcp": "^11.0.15",
+    "@libp2p/websockets": "^10.1.12",
     "@peerkit/api": "*",
     "@peerkit/transport-libp2p-core": "*",
     "libp2p": "^3.2.0"

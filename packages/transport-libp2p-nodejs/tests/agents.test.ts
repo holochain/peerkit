@@ -1,6 +1,6 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
@@ -19,10 +19,10 @@ test("Opening an agents stream without being granted access closes the connectio
   const { node, address } = await createNode({ id: "node1" });
 
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   assert(connection.status === "open");

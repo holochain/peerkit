@@ -15,7 +15,7 @@ afterEach(reset);
 test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive", async () => {
   // Node 1 listens on a known port.
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/127.0.0.1/tcp/${port}`;
+  const address = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
@@ -68,7 +68,7 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
 
 test("withRelayConnectedObserver on node fires with the relay address", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}`;
+  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
 
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
@@ -98,7 +98,7 @@ test("withRelayConnectedObserver on node fires with the relay address", async ()
 
 test("withAgentsReceivedObserver on relay fires when a node sends agent info", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}`;
+  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
 
   const receivedAgentIds: string[] = [];
   const relay = await new PeerkitRelayBuilder(async () => true)
@@ -130,7 +130,7 @@ test("withAgentsReceivedObserver on relay fires when a node sends agent info", a
 
 test("message handler has the sender's AgentId", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const receivedMessages: Array<{ fromAgent: string; text: string }> = [];
 
@@ -179,7 +179,7 @@ test("message handler has the sender's AgentId", async () => {
 
 test("message is dropped when peer does not send an AgentId prefix and access is granted", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   // Track when the transport-level message handler fires on node1 so we know
   // the message arrived and was processed and dropped by the internal handler
@@ -238,7 +238,7 @@ test("message is dropped when peer does not send an AgentId prefix and access is
 
 test("access is denied when network access bytes are wrong even though AgentId is valid", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const VALID_NAB = 0xab;
   const INVALID_NAB = 0xcd;
