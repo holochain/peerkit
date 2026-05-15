@@ -140,7 +140,7 @@ test("Valid network access bytes grant connection to other node", async () => {
     return isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   };
 
-  const peerConnectedCallback1 = vi.fn();
+  const peerConnectedCallback1 = vi.fn().mockRejectedValue(undefined);
   const { node: node1, address: address1 } = await createNode({
     id: "node1",
     networkAccessHandler,
@@ -148,7 +148,7 @@ test("Valid network access bytes grant connection to other node", async () => {
     peerConnectedCallback: peerConnectedCallback1,
   });
 
-  const peerConnectedCallback2 = vi.fn();
+  const peerConnectedCallback2 = vi.fn().mockRejectedValue(undefined);
   const { node: node2 } = await createNode({
     id: "node2",
     networkAccessHandler,
@@ -160,6 +160,7 @@ test("Valid network access bytes grant connection to other node", async () => {
 
   await vi.waitFor(() => expect(peerConnectedCallback1).toHaveBeenCalled());
   await vi.waitFor(() => expect(peerConnectedCallback2).toHaveBeenCalled());
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
   await node1.shutDown();
   await node2.shutDown();
