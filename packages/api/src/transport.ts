@@ -32,21 +32,25 @@ export type MessageHandler = (
  *
  * Provides the relay's address and node ID for full address construction.
  *
- * Fire-and-forget notification. The transport does not await this.
+ * Fire-and-forget notification. The transport does not await this, but logs
+ * errors.
  */
 export type ConnectedToRelayCallback = (
   relayAddress: RelayAddress,
   relayNodeId: NodeId,
-) => void;
+) => Promise<void>;
 
 /**
- * Fire-and-forget notification — the transport does not await this.
  *
  * Called when a connection to a peer is complete, including the network
  * access handshake, and the node can exchange data.
+ *
  * Provides the node ID as identification.
+ *
+ * Fire-and-forget notification. The transport does not await this, but logs
+ * errors.
  */
-export type PeerConnectedCallback = (nodeId: NodeId) => void;
+export type PeerConnectedCallback = (nodeId: NodeId) => Promise<void>;
 
 /**
  * Processing hook for incoming agent-info bytes.
