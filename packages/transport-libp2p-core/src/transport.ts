@@ -242,9 +242,13 @@ export class TransportLibp2p implements ITransport {
 
     // Connection to peer established, run callback.
     // A failed access check by either side will close the connection.
-    if (this.peerConnectedCallback) {
-      this.peerConnectedCallback(connection.remotePeer.toString());
-    }
+    this.peerConnectedCallback?.(connection.remotePeer.toString(), this).catch(
+      (error) => {
+        this.logger.error("PeerConnectedCallback produced an error {*}", {
+          error,
+        });
+      },
+    );
   }
 
   async sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void> {
@@ -287,7 +291,7 @@ export class TransportLibp2p implements ITransport {
             this.metrics.bytesTotal.add(msg.byteLength, {
               direction: "received",
             });
-            await messageHandler(nodeId, msg);
+            await messageHandler(nodeId, msg, this);
           }
         });
       }
@@ -352,6 +356,7 @@ export class TransportLibp2p implements ITransport {
    * Fire-and-forget. Platform factories typically call this during bootstrap.
    */
   async connectToRelays(relays: RelayAddress[]): Promise<void> {
+    const localPeerId = this.libp2p.peerId.toString();
     // Connect to all relays in parallel
     await Promise.allSettled(
       relays.map((relay) =>
@@ -363,31 +368,38 @@ export class TransportLibp2p implements ITransport {
               const relayId = relayNodeId.toString();
               // Register event listener for when the dialable relay address has been
               // received through the identify protocol.
-              const handler = (
-                evt: CustomEvent<{
-                  peer: {
-                    addresses: Array<{ multiaddr: { toString(): string } }>;
-                  };
-                }>,
-              ) => {
-                const relayAddress = evt.detail.peer.addresses.find((address) =>
-                  address.multiaddr
-                    .toString()
-                    .includes(`/p2p/${relayId}/p2p-circuit`),
-                );
-                this.libp2p.removeEventListener("self:peer:update", handler);
-                if (relayAddress) {
-                  connectedToRelayCallback(
-                    relayAddress.multiaddr.toString(),
-                    relayId,
+              this.libp2p.addEventListener(
+                "self:peer:update",
+                (evt) => {
+                  const relayAddress = evt.detail.peer.addresses.find(
+                    (address) =>
+                      address.multiaddr
+                        .toString()
+                        .includes(`/p2p/${relayId}/p2p-circuit`),
                   );
-                } else {
-                  this.logger.error(
-                    "Received peer update event but found no relay address.",
-                  );
-                }
-              };
-              this.libp2p.addEventListener("self:peer:update", handler);
+                  if (relayAddress) {
+                    // Append the local peer ID so the address is fully dialable:
+                    // /…/p2p/<relayId>/p2p-circuit/p2p/<localId>
+                    connectedToRelayCallback(
+                      `${relayAddress.multiaddr.toString()}/p2p/${localPeerId}`,
+                      relayId,
+                      this,
+                    ).catch((error) => {
+                      this.logger.error(
+                        "ConnectedToRelayCallback produced an error {*}",
+                        { error },
+                      );
+                    });
+                  } else {
+                    this.logger.error(
+                      "Received peer update event but found no relay address.",
+                    );
+                  }
+                },
+                {
+                  once: true,
+                },
+              );
             }
           })
           .catch((error) => {
@@ -548,7 +560,12 @@ export class TransportLibp2p implements ITransport {
                 ackMessage.length === 1 &&
                 ackMessage[0] === ACCESS_HANDSHAKE_COMPLETE_ACK_BYTE
               ) {
-                peerConnectedCallback(remoteNodeId);
+                peerConnectedCallback(remoteNodeId, this).catch((error) => {
+                  this.logger.error(
+                    "PeerConnectedCallback produced an error {*}",
+                    { error },
+                  );
+                });
               } else {
                 this.logger.error(
                   "Unexpected access handshake acknowledge message {*}",
@@ -622,7 +639,7 @@ export class TransportLibp2p implements ITransport {
         this.metrics.bytesTotal.add(msg.byteLength, {
           direction: "received",
         });
-        await messageHandler(remoteNodeId, msg);
+        await messageHandler(remoteNodeId, msg, this);
       }
     });
   };

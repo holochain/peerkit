@@ -48,7 +48,11 @@ test("Opening a message stream without being granted access closes the connectio
 test("Send a message after having been granted access", async () => {
   const receivedMessages: Uint8Array[] = [];
   // Define a message handler that stores received message for later assertion
-  const messageHandler: MessageHandler = async (_fromAgent, message) => {
+  const messageHandler: MessageHandler = async (
+    _fromAgent,
+    message,
+    _transport,
+  ) => {
     receivedMessages.push(message);
   };
   // Create a node that will receive the message
@@ -76,7 +80,11 @@ test("Send a message after having been granted access", async () => {
 test("Send a message both ways on the same stream", async () => {
   const messagesReceived1: Uint8Array[] = [];
   // Define a message handler that stores received message for later assertion
-  const messageHandler1: MessageHandler = async (_fromAgent, message) => {
+  const messageHandler1: MessageHandler = async (
+    _fromAgent,
+    message,
+    _transport,
+  ) => {
     messagesReceived1.push(message);
   };
   // Create a node that will receive the message
@@ -122,7 +130,11 @@ test("Large messages are chunked and received correctly", async () => {
     isDeepStrictEqual(new Uint8Array(bytes), VALID_ACCESS_BYTES);
   // Define a message handler that stores received message for later assertion
   const receivedMessages: Uint8Array[] = [];
-  const messageHandler: MessageHandler = async (_fromAgent, message) => {
+  const messageHandler: MessageHandler = async (
+    _fromAgent,
+    message,
+    _transport,
+  ) => {
     receivedMessages.push(message);
   };
   // Create a node that will receive the message

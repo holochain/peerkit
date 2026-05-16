@@ -1,7 +1,12 @@
-import type { AgentId, AgentInfo, IAgentStore } from "@peerkit/api";
+import type { AgentId, AgentInfoSigned, IAgentStore } from "@peerkit/api";
 
+/**
+ * In-memory implementation of {@link IAgentStore} with TTL-based expiry.
+ *
+ * Expired entries are pruned from memory at an interval (default 60 s).
+ */
 export class MemoryAgentStore implements IAgentStore {
-  private readonly agents = new Map<AgentId, AgentInfo>();
+  private readonly agents = new Map<AgentId, AgentInfoSigned>();
   private readonly pruneTimer: ReturnType<typeof setInterval>;
 
   constructor(pruneIntervalMs = 60_000) {
@@ -10,9 +15,9 @@ export class MemoryAgentStore implements IAgentStore {
     (this.pruneTimer as { unref?: () => void }).unref?.();
   }
 
-  getAll(): AgentInfo[] {
+  getAll(): AgentInfoSigned[] {
     const now = Date.now();
-    const result: AgentInfo[] = [];
+    const result: AgentInfoSigned[] = [];
     for (const info of this.agents.values()) {
       if (info.expiresAt > now) {
         result.push(info);
@@ -21,13 +26,15 @@ export class MemoryAgentStore implements IAgentStore {
     return result;
   }
 
-  get(agentId: AgentId): AgentInfo | undefined {
+  get(agentId: AgentId): AgentInfoSigned | undefined {
     const info = this.agents.get(agentId);
-    if (!info || info.expiresAt <= Date.now()) return undefined;
+    if (!info || info.expiresAt <= Date.now()) {
+      return undefined;
+    }
     return info;
   }
 
-  store(agents: AgentInfo[]): void {
+  store(agents: AgentInfoSigned[]): void {
     const now = Date.now();
     for (const agent of agents) {
       if (agent.expiresAt > now) {

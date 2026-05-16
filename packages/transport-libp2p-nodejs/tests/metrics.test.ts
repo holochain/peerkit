@@ -46,7 +46,7 @@ const collectBytesPoints = async () => {
 
 test("peerkit.transport.bytes records sent and received bytes", async () => {
   const received: Uint8Array[] = [];
-  const messageHandler: MessageHandler = async (_from, message) => {
+  const messageHandler: MessageHandler = async (_from, message, _transport) => {
     received.push(message);
   };
   const { node: node1, address } = await createNode({
