@@ -1,15 +1,27 @@
-import type { AgentsReceivedCallback, IAgentStore } from "@peerkit/api";
+import type {
+  AgentInfoSigned,
+  AgentsReceivedCallback,
+  IAgentStore,
+  NodeId,
+} from "@peerkit/api";
 import { deserializeAgentInfoList } from "./serialize.js";
 import type { Logger } from "@logtape/logtape";
 import { verifyAgentInfo } from "./agent-info.js";
 
+export type AgentsReceivedObserver = (
+  fromNode: NodeId,
+  agentInfos: AgentInfoSigned[],
+) => void;
+
 /**
  * Creates an {@link AgentsReceivedCallback} with a passed in logger and
- * agent store.
+ * agent store. If an observer is provided, it is called after valid agents have
+ * been stored, receiving the node ID and the IDs of the stored agents.
  */
 export const getAgentsReceivedCallback = (
   logger: Logger,
   agentStore: IAgentStore,
+  observer?: AgentsReceivedObserver,
 ): AgentsReceivedCallback => {
   return async (fromNode, bytes) => {
     let agentList;
@@ -33,6 +45,9 @@ export const getAgentsReceivedCallback = (
       }
       return valid;
     });
-    agentStore.store(verifiedAgentInfos);
+    if (verifiedAgentInfos.length) {
+      agentStore.store(verifiedAgentInfos);
+      observer?.(fromNode, verifiedAgentInfos);
+    }
   };
 };
