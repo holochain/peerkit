@@ -36,7 +36,7 @@ export const getAgentsReceivedCallback = (
     }
     logger.info("Received agent info {*}", { fromNode, agentList });
     const verifiedAgentInfos = agentList.filter((agentInfo) => {
-      const valid = verifyAgentInfo(agentInfo, logger);
+      const valid = verifyAgentInfo(agentInfo);
       if (!valid) {
         logger.warn("Received an invalid agent info {*}", {
           fromNode,

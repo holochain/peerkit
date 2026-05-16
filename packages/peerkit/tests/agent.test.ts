@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { AgentKeyPair, decodeAgentId } from "../src/agent.js";
-import { AgentInfo, AgentInfoSigned } from "@peerkit/api";
+import type { AgentInfo, AgentInfoSigned } from "@peerkit/api";
 import {
   buildOwnAgentInfo,
   signAgentInfo,

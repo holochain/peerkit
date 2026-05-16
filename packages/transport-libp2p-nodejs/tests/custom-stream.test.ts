@@ -1,5 +1,5 @@
 import { reset } from "@logtape/logtape";
-import { IStream } from "@peerkit/api";
+import type { IStream } from "@peerkit/api";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { createNode, setupTestLogger } from "./util.js";
 import { createLibp2p } from "libp2p";

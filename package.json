@@ -44,6 +44,7 @@
     "build:docs": "typedoc",
     "build:dist": "tsc --build",
     "build": "npm run build:dist && npm run build:docs",
+    "typecheck:tests": "tsc -p packages/peerkit/tsconfig.test.json && tsc -p packages/agent-store/tsconfig.test.json && tsc -p packages/metrics/tsconfig.test.json && tsc -p packages/transport-libp2p-core/tsconfig.test.json && tsc -p packages/transport-libp2p-nodejs/tsconfig.test.json",
     "prepare": "husky"
   },
   "lint-staged": {

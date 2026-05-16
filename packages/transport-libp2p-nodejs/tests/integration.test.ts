@@ -6,7 +6,7 @@ import {
   createNode as createTransportNode,
 } from "../src/index.js";
 import { createNode, createRelay, setupTestLogger } from "./util.js";
-import { NodeId } from "@peerkit/api";
+import type { NodeId } from "@peerkit/api";
 import { createLibp2p } from "libp2p";
 import { webSockets } from "@libp2p/websockets";
 import { noise } from "@chainsafe/libp2p-noise";
@@ -164,6 +164,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
     () =>
       peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
   );
+  assert(peersConnectedToNode1[0]);
 
   // Node 1 sends a message to node 2 over the relay.
   // Node 1 learned node 2's ID from the peersConnectedCallback.
@@ -309,6 +310,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
       node2.isDirectConnection(node1.getNodeId()),
     { timeout: 10_000 },
   );
+  assert(peersConnectedToNode1[0]);
 
   // Node 1 sends a message to node 2 over the direct connection.
   // Node 1 learned node 2's ID from the peersConnectedCallback.
