@@ -1,15 +1,16 @@
-import type { AgentInfo } from "@peerkit/api";
+import type { AgentInfoSigned } from "@peerkit/api";
 import { expect, test } from "vitest";
 import {
   deserializeAgentInfoList,
   serializeAgentInfoList,
 } from "../src/serialize.js";
 
-function makeAgent(agentId: string): AgentInfo {
+function makeAgent(agentId: string): AgentInfoSigned {
   return {
     agentId,
-    addresses: ["/ip4/127.0.0.1/tcp/9000"],
+    addresses: ["/ip4/127.0.0.1/tcp/9000/ws"],
     expiresAt: Date.now() + 60_000,
+    signature: new Uint8Array(64),
   };
 }
 

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { AgentKeyPair, decodeAgentId } from "../src/agent.js";
-import { AgentInfo, AgentInfoSigned } from "@peerkit/api";
+import type { AgentInfo, AgentInfoSigned } from "@peerkit/api";
 import {
   buildOwnAgentInfo,
   signAgentInfo,
@@ -24,7 +24,7 @@ test("Sign and verify agent info", () => {
   const keyPair = new AgentKeyPair();
   const agentInfo: AgentInfo = {
     agentId: keyPair.agentId(),
-    addresses: ["/ip4/127.0.0.1/tcp/9000"],
+    addresses: ["/ip4/127.0.0.1/tcp/9000/ws"],
     expiresAt: Date.now() + 60_000,
   };
   const agentInfoSigned = signAgentInfo(agentInfo, keyPair);
@@ -33,7 +33,7 @@ test("Sign and verify agent info", () => {
 
 test("buildOwnAgentInfo produces a verifiable signature", () => {
   const keyPair = new AgentKeyPair();
-  const addresses = ["/ip4/127.0.0.1/tcp/9000"];
+  const addresses = ["/ip4/127.0.0.1/tcp/9000/ws"];
   const expiresAt = Date.now() + 60_000;
 
   const agentInfo = buildOwnAgentInfo(keyPair, addresses, expiresAt);
@@ -51,7 +51,7 @@ test("Invalid signature fails verification", () => {
   const keyPair = new AgentKeyPair();
   const agentInfoWithInvalidSignature: AgentInfoSigned = {
     agentId: keyPair.agentId(),
-    addresses: ["/ip4/127.0.0.1/tcp/9000"],
+    addresses: ["/ip4/127.0.0.1/tcp/9000/ws"],
     expiresAt: Date.now() + 60_000,
     signature: new Uint8Array(64),
   };

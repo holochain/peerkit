@@ -33,7 +33,7 @@ export type PeerkitRelayTransportFactory = (
  * ```ts
  * const relay = await new PeerkitRelayBuilder(async () => true)
  *   .withId("relay")
- *   .withAddresses(["/ip4/0.0.0.0/tcp/9000"])
+ *   .withAddresses(["/ip4/0.0.0.0/tcp/9000/ws"])
  *   .build();
  * ```
  */

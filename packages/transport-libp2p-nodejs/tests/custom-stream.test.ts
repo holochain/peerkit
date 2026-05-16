@@ -1,9 +1,9 @@
 import { reset } from "@logtape/logtape";
-import { IStream } from "@peerkit/api";
+import type { IStream } from "@peerkit/api";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { createNode, setupTestLogger } from "./util.js";
 import { createLibp2p } from "libp2p";
-import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { noise } from "@chainsafe/libp2p-noise";
 import { multiaddr } from "@multiformats/multiaddr";
@@ -25,8 +25,8 @@ test("Opening a custom stream without being granted access closes the connection
   });
 
   const node2 = await createLibp2p({
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
-    transports: [tcp()],
+    addresses: { listen: ["/ip4/0.0.0.0/tcp/0/ws"] },
+    transports: [webSockets()],
     streamMuxers: [yamux()],
     connectionEncrypters: [noise()],
   });

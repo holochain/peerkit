@@ -6,9 +6,9 @@ import {
   createNode as createTransportNode,
 } from "../src/index.js";
 import { createNode, createRelay, setupTestLogger } from "./util.js";
-import { NodeId } from "@peerkit/api";
+import type { NodeId } from "@peerkit/api";
 import { createLibp2p } from "libp2p";
-import { tcp } from "@libp2p/tcp";
+import { webSockets } from "@libp2p/websockets";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { multiaddr } from "@multiformats/multiaddr";
@@ -25,11 +25,11 @@ test("Connection can be closed", { timeout: 10_000 }, async () => {
   });
 
   const node2 = await createLibp2p({
-    transports: [tcp()],
+    transports: [webSockets()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     addresses: {
-      listen: ["/ip4/0.0.0.0/tcp/0"],
+      listen: ["/ip4/0.0.0.0/tcp/0/ws"],
     },
   });
 
@@ -164,6 +164,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
     () =>
       peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
   );
+  assert(peersConnectedToNode1[0]);
 
   // Node 1 sends a message to node 2 over the relay.
   // Node 1 learned node 2's ID from the peersConnectedCallback.
@@ -220,7 +221,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
       peersConnectedToNode1.push(nodeId);
     },
     messageHandler: async (_message) => {},
-    addrs: ["/ip4/0.0.0.0/tcp/0", "/p2p-circuit"],
+    addrs: ["/ip4/0.0.0.0/tcp/0/ws", "/p2p-circuit"],
     bootstrapRelays: [relayPublicAddress],
   });
 
@@ -271,7 +272,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
     // Therefore a TCP address is required in addition to the p2p-circuit relay
     // protocol. If, however, a TCP address is provided with 0.0.0.0, it will be
     // filtered out. The same applies to loopback addresses like 127.0.0.1.
-    addrs: ["/dns/localhost/tcp/0", "/p2p-circuit"],
+    addrs: ["/dns/localhost/tcp/0/ws", "/p2p-circuit"],
     bootstrapRelays: [relayPublicAddress],
   });
 
@@ -309,6 +310,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
       node2.isDirectConnection(node1.getNodeId()),
     { timeout: 10_000 },
   );
+  assert(peersConnectedToNode1[0]);
 
   // Node 1 sends a message to node 2 over the direct connection.
   // Node 1 learned node 2's ID from the peersConnectedCallback.

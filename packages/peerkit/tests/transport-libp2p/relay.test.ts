@@ -15,7 +15,7 @@ afterEach(reset);
 test("Relay sends known agents to connecting peer", async () => {
   // Create the relay
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}`;
+  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
     .withAddresses([relayAddress])
@@ -82,7 +82,7 @@ test("Relay sends known agents to connecting peer", async () => {
 test("Node connects to another node using address learned from relay", async () => {
   // Create the relay
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}`;
+  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
     .withAddresses([relayAddress])
