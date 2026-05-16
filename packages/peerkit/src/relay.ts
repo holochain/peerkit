@@ -1,6 +1,7 @@
 import { getLogger } from "@logtape/logtape";
 import { MemoryAgentStore } from "@peerkit/agent-store";
 import type {
+  AgentId,
   AgentsReceivedCallback,
   IAgentStore,
   ITransport,
@@ -12,7 +13,10 @@ import {
   createRelay,
   type CreateRelayOptions,
 } from "@peerkit/transport-libp2p";
-import { getAgentsReceivedCallback } from "./common.js";
+import {
+  getAgentsReceivedCallback,
+  type AgentsReceivedObserver,
+} from "./common.js";
 import { serializeAgentInfoList } from "./serialize.js";
 
 export type PeerkitRelayTransportFactory = (
@@ -40,6 +44,7 @@ export class PeerkitRelayBuilder {
   networkAccessBytes?: NetworkAccessBytes;
   agentStore?: IAgentStore;
   relayTransportFactory?: PeerkitRelayTransportFactory;
+  agentsReceivedObserver?: (agentIds: AgentId[]) => void;
 
   constructor(networkAccessHandler: NetworkAccessHandler) {
     this.networkAccessHandler = networkAccessHandler;
@@ -70,13 +75,24 @@ export class PeerkitRelayBuilder {
     return this;
   }
 
+  withAgentsReceivedObserver(fn: (agentIds: AgentId[]) => void): this {
+    this.agentsReceivedObserver = fn;
+    return this;
+  }
+
   async build(): Promise<PeerkitRelay> {
     const agentStore = this.agentStore ?? new MemoryAgentStore();
     const logger = getLogger(["peerkit", "relay"]).with({
       id: this.id,
     });
+    const userAgentsObserver = this.agentsReceivedObserver;
+    const wrappedObserver: AgentsReceivedObserver | undefined =
+      userAgentsObserver
+        ? (_fromNode, agentInfos) =>
+            userAgentsObserver(agentInfos.map((info) => info.agentId))
+        : undefined;
     const agentsReceivedCallback: AgentsReceivedCallback =
-      getAgentsReceivedCallback(logger, agentStore);
+      getAgentsReceivedCallback(logger, agentStore, wrappedObserver);
     const peerConnectedCallback: PeerConnectedCallback = async (
       nodeId,
       transport,
