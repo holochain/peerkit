@@ -72,3 +72,67 @@ test("Two nodes exchange agents bidirectionally", async () => {
   await node2.shutDown();
   await node1.shutDown();
 });
+
+test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+
+  const receivedMessages: Array<{ fromAgent: string; text: string }> = [];
+
+  // Node 1 records incoming messages with the sender's AgentId.
+  const node1 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async (fromAgent, data) => {
+      receivedMessages.push({
+        fromAgent,
+        text: new TextDecoder().decode(data),
+      });
+    },
+  })
+    .withId("node1")
+    .withAddresses([node1Address])
+    .build();
+
+  const node2 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node2")
+    .build();
+
+  await node2.transport.connect(node1Address);
+
+  // node2.send() resolves node1's AgentId to a NodeId internally — the caller
+  // never needs to know the transport-level NodeId.
+  await node2.send(node1.keyPair.agentId(), new TextEncoder().encode("hello"));
+
+  await vi.waitFor(
+    () => {
+      expect(receivedMessages).toHaveLength(1);
+      // Message arrives attributed to node2's AgentId, not its NodeId.
+      expect(receivedMessages[0]?.fromAgent).toBe(node2.keyPair.agentId());
+      expect(receivedMessages[0]?.text).toBe("hello");
+    },
+    { timeout: 5_000 },
+  );
+
+  await node2.shutDown();
+  await node1.shutDown();
+});
+
+test("PeerkitNode.send throws when there is no connection to the agent", async () => {
+  const node = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node")
+    .build();
+
+  // An AgentId with no established connection has no NodeId mapping.
+  const unknownAgentId = node.keyPair.agentId(); // own key — never connected to self
+  await expect(node.send(unknownAgentId, new Uint8Array([1]))).rejects.toThrow(
+    `No connection to agent ${unknownAgentId}`,
+  );
+
+  await node.shutDown();
+});

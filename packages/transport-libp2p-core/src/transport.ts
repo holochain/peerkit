@@ -242,15 +242,13 @@ export class TransportLibp2p implements ITransport {
 
     // Connection to peer established, run callback.
     // A failed access check by either side will close the connection.
-    if (this.peerConnectedCallback) {
-      this.peerConnectedCallback(connection.remotePeer.toString(), this).catch(
-        (error) => {
-          this.logger.error("PeerConnectedCallback produced an error {*}", {
-            error,
-          });
-        },
-      );
-    }
+    this.peerConnectedCallback?.(connection.remotePeer.toString(), this).catch(
+      (error) => {
+        this.logger.error("PeerConnectedCallback produced an error {*}", {
+          error,
+        });
+      },
+    );
   }
 
   async sendAgents(nodeId: NodeId, data: Uint8Array): Promise<void> {

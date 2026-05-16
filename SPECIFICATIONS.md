@@ -124,7 +124,7 @@ The framework generates the agent's keypair on first run and persists it through
 
 The local agent's public identity is accessible after initialization through the orchestrator.
 
-`AgentInfo` is the shareable, serializable descriptor exchanged between peers. Its schema is owned by the agent module. From the transport's perspective `AgentInfo` is opaque bytes. It carries the `AgentId`, the addresses where the agent can be contacted, an expiry timestamp, and a signature. The expiry timestamp demarcates a point in time after which the agent info should be discarded.
+`AgentInfo` is the shareable, serializable descriptor exchanged between peers. Its schema is defined in the API package. From the transport's perspective `AgentInfo` is opaque bytes. It carries the `AgentId`, the addresses where the agent can be contacted, an expiry timestamp, and a signature. The expiry timestamp demarcates a point in time after which the agent info should be discarded.
 
 **`AgentId` encoding**: `AgentId` is the hex encoding of the raw 32-byte Ed25519 public key. This makes `AgentId` self-describing: any peer can reconstruct the public key from the string alone, with no key registry.
 
@@ -187,7 +187,7 @@ The mode is fixed at construction because the underlying networking library cann
 The transport handles three types of messages between peers:
 
 - **Network access handshake**: the first message on every new connection. Carries the connecting agent's `NetworkAccessBytes`. Policy enforcement lives in the transport package.
-- **Agent-info messages**: opaque routing for agent-info exchange. Wire format owned by core peerkit, the transport routes payload bytes between connected peers and peers and relays.
+- **Agent-info messages**: opaque routing for agent-info exchange. Wire format being owned by core peerkit, the transport routes payload bytes between connected peers and peers and relays.
 - **Application messages**: opaque routing for application data. Wire format owned by application code (or higher-level components like data gossip). Available on regular nodes only.
 
 Concrete protocol identifiers and wire formats are documented in the transport package, not here.
@@ -377,9 +377,9 @@ interface ITransport {
 
 This interface enables replacement of js-libp2p with iroh or another networking library without affecting higher layers.
 
-### Layer 1: P2P networking
+### Peerkit core
 
-Routing opaque blobs to the right peers so that layers above can create eventually consistent shared state.
+Routing opaque blobs to the right peers so that layers above can create eventually consistent shared state. This package introduces the notion of a persistent agent identity that survives transport restarts.
 
 **Capabilities**:
 
@@ -388,6 +388,14 @@ Routing opaque blobs to the right peers so that layers above can create eventual
 - Does not store blobs itself, but tracks what blobs have been received and integrated
 - Implements evaluation of incoming network access bytes to allow or deny connections
 - Resource budgets (future): each peer advertises its willingness to relay data
+
+#### Agent identity
+
+Operations between peers make use of the agent ID instead of the transport's node ID. Mapping between both is the responsibility of the core package. When a node learns about peers, their agent ID will be known from the agent info, as well as the node address. Outbound connections are thus possible by knowing the agent info of the peer.
+
+Inbound connections, however, are only aware of the node ID at the transport level. The agent ID is not known to the remote, and incoming messages can not be associated to an agent. Therefore it becomes a contract of the access handshake to exchange agent ID along with the network access bytes. Not encoded at the transport level which has no notion of agents, but at the core level that holds agent identity and manages mappings from node ID to agent ID.
+
+The core package therefore exposes a `send(agentId, bytes)` method to enable consumers to address messages to agents instead of transport-level node IDs.
 
 #### Data distribution interface
 
