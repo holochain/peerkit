@@ -342,12 +342,36 @@ export class PeerkitNode {
     this.nodeByAgentId = nodeByAgentId;
   }
 
+  isDirectConnection(toAgent: AgentId): boolean {
+    const nodeId = this.nodeByAgentId.get(toAgent);
+    if (nodeId === undefined) {
+      throw new Error(`No connection to agent ${toAgent}`);
+    }
+    return this.transport.isDirectConnection(nodeId);
+  }
+
   async send(toAgent: AgentId, message: Uint8Array): Promise<void> {
     const nodeId = this.nodeByAgentId.get(toAgent);
     if (nodeId === undefined) {
       throw new Error(`No connection to agent ${toAgent}`);
     }
     await this.transport.send(nodeId, message);
+  }
+
+  async sendAgents(toAgent: AgentId, agents: Uint8Array): Promise<void> {
+    const nodeId = this.nodeByAgentId.get(toAgent);
+    if (nodeId === undefined) {
+      throw new Error(`No connection to agent ${toAgent}`);
+    }
+    await this.transport.sendAgents(nodeId, agents);
+  }
+
+  async disconnect(fromAgent: AgentId): Promise<void> {
+    const nodeId = this.nodeByAgentId.get(fromAgent);
+    if (nodeId === undefined) {
+      throw new Error(`No connection to agent ${fromAgent}`);
+    }
+    await this.transport.disconnect(nodeId);
   }
 
   async shutDown(): Promise<void> {
