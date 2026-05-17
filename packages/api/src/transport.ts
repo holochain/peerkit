@@ -58,6 +58,16 @@ export type PeerConnectedCallback = (
 ) => Promise<void>;
 
 /**
+ * Called when a peer disconnects
+ *
+ * Provides the node ID as identification.
+ *
+ * Fire-and-forget notification. The transport does not await this, but logs
+ * errors.
+ */
+export type PeerDisconnectedCallback = (nodeId: NodeId) => Promise<void>;
+
+/**
  * Processing hook for incoming agent-info bytes.
  *
  * The transport awaits this. Return a rejected promise to surface errors.

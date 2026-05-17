@@ -21,6 +21,7 @@ import type {
   ConnectedToRelayCallback,
   NodeAddress,
   PeerConnectedCallback,
+  PeerDisconnectedCallback,
   CustomStreamCreatedCallback,
 } from "@peerkit/api";
 import { CustomStream } from "./custom-stream.js";
@@ -51,6 +52,10 @@ export interface TransportOptionsBase {
    * Called when an inbound peer completes the access handshake. Fire-and-forget.
    */
   peerConnectedCallback: PeerConnectedCallback;
+  /**
+   * Called when a peer disconnects. Fire-and-forget.
+   */
+  peerDisconnectedCallback?: PeerDisconnectedCallback;
   /**
    * Called when agent-info bytes have been received from a peer.
    */
@@ -159,6 +164,7 @@ export class TransportLibp2p implements ITransport {
   private messageHandler?: MessageHandler;
   private connectedToRelayCallback?: ConnectedToRelayCallback;
   private peerConnectedCallback?: PeerConnectedCallback;
+  private peerDisconnectedCallback?: PeerDisconnectedCallback;
   private readonly metrics: TransportMetrics;
 
   // Keyed by NodeId string. true = granted, false = denied.
@@ -220,6 +226,17 @@ export class TransportLibp2p implements ITransport {
     }
     if ("peerConnectedCallback" in options) {
       this.peerConnectedCallback = options.peerConnectedCallback;
+    }
+    if (options.peerDisconnectedCallback) {
+      this.peerDisconnectedCallback = options.peerDisconnectedCallback;
+      libp2p.addEventListener("peer:disconnect", (evt) => {
+        const nodeId = evt.detail.toString();
+        this.peerDisconnectedCallback?.(nodeId).catch((error) => {
+          this.logger.error("PeerDisconnectedCallback produced an error {*}", {
+            error,
+          });
+        });
+      });
     }
 
     this.metrics = createTransportMetrics();

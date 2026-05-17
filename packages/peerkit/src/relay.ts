@@ -9,6 +9,7 @@ import type {
   NetworkAccessHandler,
   NodeId,
   PeerConnectedCallback,
+  PeerDisconnectedCallback,
 } from "@peerkit/api";
 import {
   createRelay,
@@ -47,6 +48,7 @@ export class PeerkitRelayBuilder {
   relayTransportFactory?: PeerkitRelayTransportFactory;
   agentsReceivedObserver?: (agentIds: AgentId[]) => void;
   peerConnectedObserver?: (nodeId: NodeId) => void;
+  peerDisconnectedObserver?: (nodeId: NodeId) => void;
 
   constructor(networkAccessHandler: NetworkAccessHandler) {
     this.networkAccessHandler = networkAccessHandler;
@@ -87,6 +89,11 @@ export class PeerkitRelayBuilder {
     return this;
   }
 
+  withPeerDisconnectedObserver(fn: (nodeId: NodeId) => void): this {
+    this.peerDisconnectedObserver = fn;
+    return this;
+  }
+
   async build(): Promise<PeerkitRelay> {
     const agentStore = this.agentStore ?? new MemoryAgentStore();
     const logger = getLogger(["peerkit", "relay"]).with({
@@ -100,11 +107,13 @@ export class PeerkitRelayBuilder {
         : undefined;
     const agentsReceivedCallback: AgentsReceivedCallback =
       getAgentsReceivedCallback(logger, agentStore, wrappedObserver);
+    const connectedPeers = new Set<NodeId>();
     const peerConnectedObserver = this.peerConnectedObserver;
     const peerConnectedCallback: PeerConnectedCallback = async (
       nodeId,
       transport,
     ) => {
+      connectedPeers.add(nodeId);
       const agents = agentStore.getAll();
       if (agents.length > 0) {
         try {
@@ -118,10 +127,18 @@ export class PeerkitRelayBuilder {
       }
       peerConnectedObserver?.(nodeId);
     };
+    const peerDisconnectedObserver = this.peerDisconnectedObserver;
+    const peerDisconnectedCallback: PeerDisconnectedCallback = async (
+      nodeId,
+    ) => {
+      connectedPeers.delete(nodeId);
+      peerDisconnectedObserver?.(nodeId);
+    };
     const transport = this.relayTransportFactory
       ? await this.relayTransportFactory({
           agentsReceivedCallback,
           peerConnectedCallback,
+          peerDisconnectedCallback,
           networkAccessHandler: this.networkAccessHandler,
           addrs: this.addresses,
           id: this.id,
@@ -133,19 +150,26 @@ export class PeerkitRelayBuilder {
           networkAccessBytes: this.networkAccessBytes,
           agentsReceivedCallback,
           peerConnectedCallback,
+          peerDisconnectedCallback,
           networkAccessHandler: this.networkAccessHandler,
         });
-    return new PeerkitRelay(transport, agentStore);
+    return new PeerkitRelay(transport, agentStore, connectedPeers);
   }
 }
 
 export class PeerkitRelay {
   readonly transport: ITransport;
   readonly agentStore: IAgentStore;
+  readonly connectedPeers: Set<NodeId>;
 
-  constructor(transport: ITransport, agentStore: IAgentStore) {
+  constructor(
+    transport: ITransport,
+    agentStore: IAgentStore,
+    connectedPeers: Set<NodeId>,
+  ) {
     this.transport = transport;
     this.agentStore = agentStore;
+    this.connectedPeers = connectedPeers;
   }
 
   async shutDown(): Promise<void> {
