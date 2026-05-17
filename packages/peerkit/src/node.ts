@@ -63,7 +63,7 @@ export class PeerkitNodeBuilder {
   networkAccessBytes?: NetworkAccessBytes;
   agentStore?: IAgentStore;
   nodeTransportFactory?: PeerkitNodeTransportFactory;
-  agentsReceivedObserver?: (fromAgent: AgentId, agentIds: AgentId[]) => void;
+  agentsReceivedObserver?: (agentIds: AgentId[]) => void;
   peerConnectedObserver?: (fromAgent: AgentId) => void;
   peerDisconnectedObserver?: (fromAgent: AgentId) => void;
   connectedToRelayObserver?: (address: RelayAddress) => void;
@@ -112,9 +112,7 @@ export class PeerkitNodeBuilder {
     return this;
   }
 
-  withAgentsReceivedObserver(
-    fn: (fromAgent: AgentId, agentIds: AgentId[]) => void,
-  ): this {
+  withAgentsReceivedObserver(fn: (agentIds: AgentId[]) => void): this {
     this.agentsReceivedObserver = fn;
     return this;
   }
@@ -152,7 +150,7 @@ export class PeerkitNodeBuilder {
     const nodeByAgentId = new Map<AgentId, NodeId>();
 
     // Prepend this node's public key to the access bytes, so
-    // the remote can map our NodeId to our AgentId at handshake time.
+    // the remote can map NodeId to AgentId at handshake time.
     const publicKeyBytes = decodeAgentId(keyPair.agentId());
     const networkAccessBytes = this.networkAccessBytes ?? new Uint8Array(0); // empty if none set
     const networkAccessBytesWithKey = new Uint8Array(
@@ -205,14 +203,8 @@ export class PeerkitNodeBuilder {
 
     const appAgentsObserver = this.agentsReceivedObserver;
     const agentsObserver: AgentsReceivedObserver | undefined = appAgentsObserver
-      ? (fromNode, agentInfos) => {
-          const fromAgent = agentByNodeId.get(fromNode);
-          if (fromAgent !== undefined) {
-            appAgentsObserver(
-              fromAgent,
-              agentInfos.map((info) => info.agentId),
-            );
-          }
+      ? (_fromNode, agentInfos) => {
+          appAgentsObserver(agentInfos.map((info) => info.agentId));
         }
       : undefined;
 
