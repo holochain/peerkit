@@ -16,6 +16,7 @@ import type {
   NetworkAccessBytes,
   NetworkAccessHandler,
   PeerConnectedCallback,
+  PeerDisconnectedCallback,
 } from "@peerkit/api";
 
 export const setupTestLogger = async () => {
@@ -109,6 +110,10 @@ export interface TestNodeOptions {
    */
   peerConnectedCallback?: PeerConnectedCallback;
   /**
+   * Optional callback when peer disconnected
+   */
+  peerDisconnectedCallback?: PeerDisconnectedCallback;
+  /**
    * Optional handler for network access checks.
    *
    * Defaults to allowing all access.
@@ -148,6 +153,7 @@ export const createNode = async (options: TestNodeOptions) => {
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const peerConnectedCallback =
     options.peerConnectedCallback ?? (async (_nodeId, _transport) => {});
+  const peerDisconnectedCallback = options.peerDisconnectedCallback;
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
   const networkAccessBytes = options.networkAccessBytes ?? new Uint8Array([0]);
@@ -160,6 +166,7 @@ export const createNode = async (options: TestNodeOptions) => {
     connectedToRelayCallback,
     agentsReceivedCallback,
     peerConnectedCallback,
+    peerDisconnectedCallback,
     networkAccessHandler,
     networkAccessBytes,
     messageHandler,

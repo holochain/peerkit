@@ -12,6 +12,7 @@ import type {
   NodeAddress,
   NodeId,
   PeerConnectedCallback,
+  PeerDisconnectedCallback,
   RelayAddress,
 } from "@peerkit/api";
 import { createNode, type CreateNodeOptions } from "@peerkit/transport-libp2p";
@@ -64,6 +65,7 @@ export class PeerkitNodeBuilder {
   nodeTransportFactory?: PeerkitNodeTransportFactory;
   agentsReceivedObserver?: (fromAgent: AgentId, agentIds: AgentId[]) => void;
   peerConnectedObserver?: (fromAgent: AgentId) => void;
+  peerDisconnectedObserver?: (fromAgent: AgentId) => void;
   connectedToRelayObserver?: (address: RelayAddress) => void;
 
   readonly networkAccessHandler: NetworkAccessHandler;
@@ -119,6 +121,11 @@ export class PeerkitNodeBuilder {
 
   withPeerConnectedObserver(fn: (fromAgent: AgentId) => void): this {
     this.peerConnectedObserver = fn;
+    return this;
+  }
+
+  withPeerDisconnectedObserver(fn: (fromAgent: AgentId) => void): this {
+    this.peerDisconnectedObserver = fn;
     return this;
   }
 
@@ -264,6 +271,18 @@ export class PeerkitNodeBuilder {
       }
     };
 
+    const peerDisconnectedObserver = this.peerDisconnectedObserver;
+    const peerDisconnectedCallback: PeerDisconnectedCallback = async (
+      nodeId,
+    ) => {
+      const agentId = agentByNodeId.get(nodeId);
+      agentByNodeId.delete(nodeId);
+      if (agentId !== undefined) {
+        nodeByAgentId.delete(agentId);
+        peerDisconnectedObserver?.(agentId);
+      }
+    };
+
     const relayConnectedObserver = this.connectedToRelayObserver;
     const connectedToRelayCallback = async (
       relayedNodeAddress: NodeAddress,
@@ -305,6 +324,7 @@ export class PeerkitNodeBuilder {
           networkAccessBytes: networkAccessBytesWithKey,
           agentsReceivedCallback,
           peerConnectedCallback,
+          peerDisconnectedCallback,
           connectedToRelayCallback,
           networkAccessHandler,
           messageHandler,
@@ -316,6 +336,7 @@ export class PeerkitNodeBuilder {
           networkAccessBytes: networkAccessBytesWithKey,
           agentsReceivedCallback,
           peerConnectedCallback,
+          peerDisconnectedCallback,
           connectedToRelayCallback,
           networkAccessHandler,
           messageHandler,

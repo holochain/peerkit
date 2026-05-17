@@ -18,6 +18,77 @@ beforeEach(setupTestLogger);
 // Reset logger configuration
 afterEach(reset);
 
+test("peerDisconnectedCallback fires when connected peer disconnects", async () => {
+  // node2 will be notified when node1 disconnects from it.
+  const disconnectedNodeIds: string[] = [];
+  const connectedNodeIds: string[] = [];
+
+  const { node: node1, address: address1 } = await createNode({ id: "node1" });
+  const { node: node2 } = await createNode({
+    id: "node2",
+    peerConnectedCallback: async (nodeId) => {
+      connectedNodeIds.push(nodeId);
+    },
+    peerDisconnectedCallback: async (nodeId) => {
+      disconnectedNodeIds.push(nodeId);
+    },
+  });
+
+  await node2.connect(address1);
+
+  // Wait for the access handshake to complete so peerConnectedCallback has fired.
+  await vi.waitFor(() => expect(connectedNodeIds).toHaveLength(1), {
+    timeout: 5_000,
+  });
+
+  // node1 closes the connection; node2 should receive the disconnect event.
+  await node1.disconnect(node2.getNodeId());
+
+  await vi.waitFor(() => expect(disconnectedNodeIds).toHaveLength(1), {
+    timeout: 5_000,
+  });
+  assert.equal(disconnectedNodeIds[0], node1.getNodeId());
+
+  await node1.shutDown();
+  await node2.shutDown();
+});
+
+test("peerDisconnectedCallback fires when peer shuts down abruptly", async () => {
+  // Peer shuts down without calling disconnect().
+  const disconnectedNodeIds: string[] = [];
+  const connectedNodeIds: string[] = [];
+
+  const { node: node1, address: address1 } = await createNode({ id: "node1" });
+  const { node: node2 } = await createNode({
+    id: "node2",
+    peerConnectedCallback: async (nodeId) => {
+      connectedNodeIds.push(nodeId);
+    },
+    peerDisconnectedCallback: async (nodeId) => {
+      disconnectedNodeIds.push(nodeId);
+    },
+  });
+
+  await node2.connect(address1);
+
+  // Wait for the access handshake to complete so the mapping is established.
+  await vi.waitFor(() => expect(connectedNodeIds).toHaveLength(1), {
+    timeout: 5_000,
+  });
+
+  // node1 shuts down entirely without calling disconnect() first.
+  await node1.shutDown();
+
+  // node2 must still receive the peer:disconnect event even though node1 never
+  // sent a graceful close.
+  await vi.waitFor(() => expect(disconnectedNodeIds).toHaveLength(1), {
+    timeout: 5_000,
+  });
+  assert.equal(disconnectedNodeIds[0], node1.getNodeId());
+
+  await node2.shutDown();
+});
+
 test("Connection can be closed", { timeout: 10_000 }, async () => {
   const { node: node1, address: address1 } = await createNode({
     id: "node1",

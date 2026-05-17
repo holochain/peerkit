@@ -236,6 +236,184 @@ test("message is dropped when peer does not send an AgentId prefix and access is
   await node1.shutDown();
 });
 
+test("withPeerDisconnectedObserver on node fires with AgentId when peer disconnects", async () => {
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+
+  // node1 records connected and disconnected agent IDs so it can be asserted
+  // the disconnect observer fires with the correct AgentId and cleans up
+  // mappings.
+  const connectedAgents: string[] = [];
+  const disconnectedAgents: string[] = [];
+
+  const node1 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node1")
+    .withAddresses([node1Address])
+    .withPeerConnectedObserver((fromAgent) => {
+      connectedAgents.push(fromAgent);
+    })
+    .withPeerDisconnectedObserver((fromAgent) => {
+      disconnectedAgents.push(fromAgent);
+    })
+    .build();
+
+  const node2 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node2")
+    .build();
+
+  await node2.transport.connect(node1Address);
+
+  // Wait for the access handshake to complete, so node1 has the AgentId mapping.
+  await vi.waitFor(() => expect(connectedAgents).toHaveLength(1), {
+    timeout: 5_000,
+  });
+  expect(connectedAgents[0]).toBe(node2.keyPair.agentId());
+
+  // node2 closes the connection; node1's disconnect observer must fire.
+  await node2.transport.disconnect(node1.transport.getNodeId());
+
+  await vi.waitFor(() => expect(disconnectedAgents).toHaveLength(1), {
+    timeout: 5_000,
+  });
+  // The observer reports node2's AgentId, not a transport-level NodeId.
+  expect(disconnectedAgents[0]).toBe(node2.keyPair.agentId());
+
+  await node2.shutDown();
+  await node1.shutDown();
+});
+
+test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts down abruptly", async () => {
+  // Peer shuts down rather than a graceful disconnect().
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+
+  const connectedAgents: string[] = [];
+  const disconnectedAgents: string[] = [];
+
+  const node1 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node1")
+    .withAddresses([node1Address])
+    .withPeerConnectedObserver((fromAgent) => {
+      connectedAgents.push(fromAgent);
+    })
+    .withPeerDisconnectedObserver((fromAgent) => {
+      disconnectedAgents.push(fromAgent);
+    })
+    .build();
+
+  const node2 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node2")
+    .build();
+
+  await node2.transport.connect(node1Address);
+
+  // Wait for the handshake so node1 has node2's AgentId in its maps.
+  await vi.waitFor(() => expect(connectedAgents).toHaveLength(1), {
+    timeout: 5_000,
+  });
+
+  // node2 vanishes: shutDown() aborts connections without a graceful close.
+  const node2AgentId = node2.keyPair.agentId();
+  await node2.shutDown();
+
+  await vi.waitFor(() => expect(disconnectedAgents).toHaveLength(1), {
+    timeout: 5_000,
+  });
+  expect(disconnectedAgents[0]).toBe(node2AgentId);
+
+  await node1.shutDown();
+});
+
+test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect", async () => {
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+
+  const node1 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node1")
+    .withAddresses([node1Address])
+    .build();
+
+  const disconnectedAgents: string[] = [];
+  const node2 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node2")
+    .withPeerDisconnectedObserver((fromAgent) => {
+      disconnectedAgents.push(fromAgent);
+    })
+    .build();
+
+  await node2.transport.connect(node1Address);
+
+  // After disconnect, send() via the AgentId should throw because the mapping
+  // has been pruned — a stale NodeId would otherwise silently fail later.
+  await node1.transport.disconnect(node2.transport.getNodeId());
+
+  await vi.waitFor(() => expect(disconnectedAgents).toHaveLength(1), {
+    timeout: 5_000,
+  });
+
+  // The AgentId→NodeId mapping is gone, so node2.send() throws.
+  await expect(
+    node2.send(node1.keyPair.agentId(), new Uint8Array([1])),
+  ).rejects.toThrow();
+
+  await node2.shutDown();
+  await node1.shutDown();
+});
+
+test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections", async () => {
+  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const relayAddress = `/ip4/0.0.0.0/tcp/${relayPort}`;
+
+  const relay = await new PeerkitRelayBuilder(async () => true)
+    .withId("relay")
+    .withAddresses([relayAddress])
+    .build();
+
+  const nodePort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const node = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node")
+    .withAddresses([`/ip4/127.0.0.1/tcp/${nodePort}`])
+    .build();
+
+  await node.transport.connect(relayAddress);
+
+  // The relay should record the node as connected after the handshake.
+  await vi.waitFor(() => expect(relay.connectedPeers.size).toBe(1), {
+    timeout: 5_000,
+  });
+
+  // Disconnect node from relay; relay's connectedPeers must be pruned.
+  await node.transport.disconnect(relay.transport.getNodeId());
+
+  await vi.waitFor(() => expect(relay.connectedPeers.size).toBe(0), {
+    timeout: 5_000,
+  });
+
+  await node.shutDown();
+  await relay.shutDown();
+});
+
 test("access is denied when network access bytes are wrong even though AgentId is valid", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
   const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
