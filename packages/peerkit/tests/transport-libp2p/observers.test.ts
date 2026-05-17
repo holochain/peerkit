@@ -38,25 +38,22 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
     ),
   ]);
 
-  let observedFromAgent: string | undefined;
   const receivedAgentIds: string[] = [];
   const node2 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node2")
-    .withAgentsReceivedObserver((fromAgent, agentIds) => {
-      observedFromAgent = fromAgent;
+    .withAgentsReceivedObserver((agentIds) => {
       receivedAgentIds.push(...agentIds);
     })
     .build();
 
   await node2.transport.connect(address);
 
-  // Observer must fire with node 1's agent ID as both sender and advertised agent.
+  // Observer must fire with node 1's agent ID as the advertised agent.
   await vi.waitFor(
     () => {
-      expect(observedFromAgent).toBe(node1.keyPair.agentId());
       expect(receivedAgentIds).toStrictEqual([node1.keyPair.agentId()]);
     },
     { timeout: 5_000 },
