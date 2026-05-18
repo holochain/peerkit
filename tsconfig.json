@@ -36,6 +36,7 @@
     { "path": "packages/transport-libp2p-react-native" },
     { "path": "packages/transport-libp2p" },
     { "path": "packages/peerkit" },
-    { "path": "packages/peer-session" }
+    { "path": "packages/peer-session" },
+    { "path": "packages/cli" }
   ]
 }

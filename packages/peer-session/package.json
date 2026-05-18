@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/peer-session",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.8",
   "description": "Peer session management for peerkit to start relays and nodes",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "CAL-1.0",

@@ -282,10 +282,35 @@ export class PeerkitNodeBuilder {
       }
     };
 
+    const AGENT_INFO_TTL_MS = 15 * 60 * 1000; // 15 minutes
+    // Renew well before expiry so peers always have a live entry.
+    const RENEWAL_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+    // Tracks relay connections, so the renewal timer can re-send fresh agent
+    // info to each relay the node is connected to.
+    const relayConnections = new Map<NodeId, ITransport>();
+
+    const signAndSendAgentInfo = async (
+      addresses: NodeAddress[],
+      relayId: NodeId,
+      relayTransport: ITransport,
+    ): Promise<void> => {
+      const agentInfoSigned = buildOwnAgentInfo(
+        keyPair,
+        addresses,
+        Date.now() + AGENT_INFO_TTL_MS,
+      );
+      agentStore.store([agentInfoSigned]);
+      await relayTransport.sendAgents(
+        relayId,
+        serializeAgentInfoList([agentInfoSigned]),
+      );
+    };
+
     const relayConnectedObserver = this.connectedToRelayObserver;
     const connectedToRelayCallback = async (
       relayedNodeAddress: NodeAddress,
-      relayNodeId: string,
+      relayNodeId: NodeId,
       transport: ITransport,
     ) => {
       const existingAgentInfo = agentStore.get(keyPair.agentId());
@@ -293,18 +318,8 @@ export class PeerkitNodeBuilder {
         ...(existingAgentInfo?.addresses ?? []),
         relayedNodeAddress,
       ];
-      const agentInfoSigned = buildOwnAgentInfo(
-        keyPair,
-        addresses,
-        Date.now() + 60_000,
-      );
-      const agentInfos = [agentInfoSigned];
-      agentStore.store(agentInfos);
       try {
-        await transport.sendAgents(
-          relayNodeId,
-          serializeAgentInfoList(agentInfos),
-        );
+        await signAndSendAgentInfo(addresses, relayNodeId, transport);
       } catch (error) {
         logger.error("Failed to send agents to relay {*}", {
           relayedNodeAddress,
@@ -312,6 +327,7 @@ export class PeerkitNodeBuilder {
           error,
         });
       }
+      relayConnections.set(relayNodeId, transport);
       relayConnectedObserver?.(relayedNodeAddress);
     };
 
@@ -340,7 +356,37 @@ export class PeerkitNodeBuilder {
           networkAccessHandler,
           messageHandler,
         });
-    return new PeerkitNode(keyPair, transport, agentStore, nodeByAgentId);
+
+    const renewalTimer = setInterval(() => {
+      const ownInfo = agentStore.get(keyPair.agentId());
+      if (!ownInfo || relayConnections.size === 0) return;
+      for (const [relayId, transport] of relayConnections) {
+        if (!transport.isConnected(relayId)) {
+          relayConnections.delete(relayId);
+          continue;
+        }
+        signAndSendAgentInfo(ownInfo.addresses, relayId, transport).catch(
+          (error) => {
+            logger.error("Failed to renew agent info with relay {*}", {
+              relayId,
+              error,
+            });
+          },
+        );
+      }
+    }, RENEWAL_INTERVAL_MS);
+    // Do not let the interval prevent the process from termination.
+    (
+      renewalTimer as ReturnType<typeof setInterval> & { unref?: () => void }
+    ).unref?.();
+
+    return new PeerkitNode(
+      keyPair,
+      transport,
+      agentStore,
+      nodeByAgentId,
+      renewalTimer,
+    );
   }
 }
 
@@ -349,17 +395,20 @@ export class PeerkitNode {
   readonly agentStore: IAgentStore;
   readonly keyPair: IKeyPair;
   private readonly nodeByAgentId: Map<AgentId, NodeId>;
+  private readonly renewalTimer: ReturnType<typeof setInterval>;
 
   constructor(
     keyPair: IKeyPair,
     transport: ITransport,
     agentStore: IAgentStore,
     nodeByAgentId: Map<AgentId, NodeId>,
+    renewalTimer: ReturnType<typeof setInterval>,
   ) {
     this.keyPair = keyPair;
     this.transport = transport;
     this.agentStore = agentStore;
     this.nodeByAgentId = nodeByAgentId;
+    this.renewalTimer = renewalTimer;
   }
 
   isDirectConnection(toAgent: AgentId): boolean {
@@ -395,6 +444,7 @@ export class PeerkitNode {
   }
 
   async shutDown(): Promise<void> {
+    clearInterval(this.renewalTimer);
     await this.transport.shutDown();
   }
 }
