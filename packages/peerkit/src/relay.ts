@@ -106,7 +106,7 @@ export class PeerkitRelayBuilder {
             userAgentsObserver(agentInfos.map((info) => info.agentId))
         : undefined;
     const agentsReceivedCallback: AgentsReceivedCallback =
-      getAgentsReceivedCallback(logger, agentStore, wrappedObserver);
+      getAgentsReceivedCallback(agentStore, wrappedObserver);
     const connectedPeers = new Set<NodeId>();
     const peerConnectedObserver = this.peerConnectedObserver;
     const peerConnectedCallback: PeerConnectedCallback = async (

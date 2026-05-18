@@ -5,8 +5,10 @@ import type {
   NodeId,
 } from "@peerkit/api";
 import { deserializeAgentInfoList } from "./serialize.js";
-import type { Logger } from "@logtape/logtape";
+import { getLogger } from "@logtape/logtape";
 import { verifyAgentInfo } from "./agent-info.js";
+
+const logger = getLogger(["peerkit", "common"]);
 
 export type AgentsReceivedObserver = (
   fromNode: NodeId,
@@ -19,7 +21,6 @@ export type AgentsReceivedObserver = (
  * been stored, receiving the node ID and the IDs of the stored agents.
  */
 export const getAgentsReceivedCallback = (
-  logger: Logger,
   agentStore: IAgentStore,
   observer?: AgentsReceivedObserver,
 ): AgentsReceivedCallback => {
@@ -36,7 +37,7 @@ export const getAgentsReceivedCallback = (
     }
     logger.info("Received agent info {*}", { fromNode, agentList });
     const verifiedAgentInfos = agentList.filter((agentInfo) => {
-      const valid = verifyAgentInfo(agentInfo, logger);
+      const valid = verifyAgentInfo(agentInfo);
       if (!valid) {
         logger.warn("Received an invalid agent info {*}", {
           fromNode,
