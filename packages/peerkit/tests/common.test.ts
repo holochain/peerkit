@@ -4,14 +4,11 @@ import { MemoryAgentStore } from "@peerkit/agent-store";
 import { AgentKeyPair } from "../src/agent.js";
 import { signAgentInfo } from "../src/agent-info.js";
 import { serializeAgentInfoList } from "../src/serialize.js";
-import { getLogger } from "@logtape/logtape";
 import { hexToBytes } from "@noble/hashes/utils.js";
-
-const logger = getLogger(["peerkit", "test"]);
 
 test("Valid agent info is stored", async () => {
   const agentStore = new MemoryAgentStore();
-  const callback = getAgentsReceivedCallback(logger, agentStore);
+  const callback = getAgentsReceivedCallback(agentStore);
   const keyPair = new AgentKeyPair();
   const agentInfo = signAgentInfo(
     {
@@ -30,7 +27,7 @@ test("Valid agent info is stored", async () => {
 
 test("Agent info with invalid signature is discarded", async () => {
   const agentStore = new MemoryAgentStore();
-  const callback = getAgentsReceivedCallback(logger, agentStore);
+  const callback = getAgentsReceivedCallback(agentStore);
 
   // Signature is 64 bytes but does not match the agentId's public key.
   await callback(
@@ -53,7 +50,7 @@ test("Agent info with invalid signature is discarded", async () => {
 
 test("Agent info with wrong-size signature is discarded", async () => {
   const agentStore = new MemoryAgentStore();
-  const callback = getAgentsReceivedCallback(logger, agentStore);
+  const callback = getAgentsReceivedCallback(agentStore);
 
   // Ed25519 signatures are 64 bytes; 32 bytes is structurally invalid.
   await callback(
@@ -74,7 +71,7 @@ test("Agent info with wrong-size signature is discarded", async () => {
 
 test("Only valid agent infos are stored from a mixed list", async () => {
   const agentStore = new MemoryAgentStore();
-  const callback = getAgentsReceivedCallback(logger, agentStore);
+  const callback = getAgentsReceivedCallback(agentStore);
   const keyPair = new AgentKeyPair();
   const valid = signAgentInfo(
     {
@@ -105,7 +102,7 @@ test("Only valid agent infos are stored from a mixed list", async () => {
 
 test("Malformed bytes are discarded without throwing", async () => {
   const agentStore = new MemoryAgentStore();
-  const callback = getAgentsReceivedCallback(logger, agentStore);
+  const callback = getAgentsReceivedCallback(agentStore);
 
   // Invalid CBOR deserialization must not propagate an exception.
   await expect(

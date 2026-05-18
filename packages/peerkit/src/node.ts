@@ -217,7 +217,6 @@ export class PeerkitNodeBuilder {
       : undefined;
 
     const agentsReceivedCallback = getAgentsReceivedCallback(
-      logger,
       agentStore,
       agentsObserver,
     );
