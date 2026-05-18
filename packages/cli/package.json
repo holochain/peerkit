@@ -1,0 +1,33 @@
+{
+  "name": "@peerkit/cli",
+  "version": "0.1.0-alpha.8",
+  "description": "Developer CLI for peerkit — run relay nodes and test peer connectivity",
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "license": "CAL-1.0",
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "bin": {
+    "peerkit": "./dist/main.js"
+  },
+  "scripts": {
+    "relay": "PEERKIT_LOG=warning node dist/main.js relay",
+    "node": "PEERKIT_LOG=debug DEBUG=libp2p:* DEBUG_COLORS=false node dist/main.js node"
+  },
+  "dependencies": {
+    "@logtape/file": "^2.1.1",
+    "@logtape/logtape": "^2.0.7",
+    "@peerkit/peer-session": "*",
+    "@peerkit/transport-libp2p-nodejs": "*",
+    "commander": "^14.0.0"
+  }
+}

@@ -383,40 +383,45 @@ export class TransportLibp2p implements ITransport {
             if (this.connectedToRelayCallback) {
               const connectedToRelayCallback = this.connectedToRelayCallback;
               const relayId = relayNodeId.toString();
-              // Register event listener for when the dialable relay address has been
-              // received through the identify protocol.
-              this.libp2p.addEventListener(
-                "self:peer:update",
-                (evt) => {
-                  const relayAddress = evt.detail.peer.addresses.find(
-                    (address) =>
-                      address.multiaddr
-                        .toString()
-                        .includes(`/p2p/${relayId}/p2p-circuit`),
-                  );
-                  if (relayAddress) {
-                    // Append the local peer ID so the address is fully dialable:
-                    // /…/p2p/<relayId>/p2p-circuit/p2p/<localId>
-                    connectedToRelayCallback(
-                      `${relayAddress.multiaddr.toString()}/p2p/${localPeerId}`,
-                      relayId,
-                      this,
-                    ).catch((error) => {
-                      this.logger.error(
-                        "ConnectedToRelayCallback produced an error {*}",
-                        { error },
-                      );
-                    });
-                  } else {
-                    this.logger.error(
-                      "Received peer update event but found no relay address.",
+              // Register a once-listener for the dialable relay address.
+              // When the node has a direct TCP listener, the first
+              // update may carry only the TCP address. The circuit-relay address
+              // arrives in a later update. Re-register with { once: true } after
+              // each non-matching update so we keep listening without leaking the
+              // listener (libp2p wraps listeners internally, so removeEventListener
+              // with the original reference is not reliable).
+              const registerWatcher = (): void => {
+                this.libp2p.addEventListener(
+                  "self:peer:update",
+                  (evt) => {
+                    const relayAddress = evt.detail.peer.addresses.find(
+                      (address) =>
+                        address.multiaddr
+                          .toString()
+                          .includes(`/p2p/${relayId}/p2p-circuit`),
                     );
-                  }
-                },
-                {
-                  once: true,
-                },
-              );
+                    if (relayAddress) {
+                      // Append the local peer ID so the address is fully dialable:
+                      // /…/p2p/<relayId>/p2p-circuit/p2p/<localId>
+                      connectedToRelayCallback(
+                        `${relayAddress.multiaddr.toString()}/p2p/${localPeerId}`,
+                        relayId,
+                        this,
+                      ).catch((error) => {
+                        this.logger.error(
+                          "ConnectedToRelayCallback produced an error {*}",
+                          { error },
+                        );
+                      });
+                    } else {
+                      // Circuit relay address not in this update yet — wait for next.
+                      registerWatcher();
+                    }
+                  },
+                  { once: true },
+                );
+              };
+              registerWatcher();
             }
           })
           .catch((error) => {

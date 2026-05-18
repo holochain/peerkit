@@ -8,12 +8,69 @@ import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
 import { tcp } from "@libp2p/tcp";
 import { createLibp2p } from "libp2p";
+import { isIP } from "node:net";
 import {
   TransportLibp2p,
   type NodeOptions,
   type RelayOptions,
 } from "@peerkit/transport-libp2p-core";
 import type { RelayAddress } from "@peerkit/api";
+
+/**
+ * Default libp2p listen addresses for a peerkit node.
+ *
+ * `/p2p-circuit` enables inbound relayed connections. TCP enables direct
+ * inbound connections (required for hole-punching to work).
+ */
+export const defaultNodeListenAddrs: string[] = [
+  "/p2p-circuit",
+  "/ip4/0.0.0.0/tcp/0",
+  "/ip6/::/tcp/0",
+];
+
+/**
+ * Like {@link defaultNodeListenAddrs} but also includes `/dns4/localhost`,
+ * which identify will advertise to peers and allows relayed
+ * connections to upgrade to direct ones when all peers are on the same machine.
+ *
+ * Use this as the default in local-development tools.
+ * Do not use in production.
+ */
+export const localDevNodeListenAddrs: string[] = [
+  "/p2p-circuit",
+  "/dns4/localhost/tcp/0",
+  "/ip4/0.0.0.0/tcp/0",
+  "/ip6/::/tcp/0",
+];
+
+/**
+ * Default listen address for a peerkit relay, suitable for local development.
+ * Binds to all interfaces on port 9000.
+ */
+export const defaultRelayListenAddr = "/ip4/0.0.0.0/tcp/9000";
+
+/**
+ * Build the public announce address for a relay sitting behind NAT.
+ * Peers use this address to dial the relay; the relay itself still binds
+ * to `listenAddr`.
+ *
+ * @param listenAddr  The relay's local listen address.
+ * @param publicIp    The relay's externally-reachable IP address.
+ */
+export function buildRelayAnnounceAddr(
+  listenAddr: string,
+  publicIp: string,
+): string {
+  const version = isIP(publicIp);
+  if (version === 0) {
+    throw new Error(
+      `buildRelayAnnounceAddr: "${publicIp}" is not a valid IP address`,
+    );
+  }
+  const prefix = version === 6 ? "/ip6" : "/ip4";
+  const port = /\/tcp\/(\d+)/.exec(listenAddr)?.[1] ?? "9000";
+  return `${prefix}/${publicIp}/tcp/${port}`;
+}
 
 /**
  * Node-specific options accepted by {@link createNode}, on top of the
@@ -65,11 +122,7 @@ export async function createNode(
     streamMuxers: [yamux()],
     services: { identify: identify(), dcutr: dcutr() },
     addresses: {
-      listen: options?.addrs ?? [
-        "/p2p-circuit", // p2p-circuit enables listening for relayed connections
-        "/ip4/0.0.0.0/tcp/0",
-        "/ip6/::/tcp/0",
-      ],
+      listen: options?.addrs ?? defaultNodeListenAddrs,
     },
   });
   const transport = new TransportLibp2p(libp2pNode, options);

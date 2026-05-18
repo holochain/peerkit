@@ -30,7 +30,8 @@
     "packages/transport-libp2p-react-native",
     "packages/transport-libp2p",
     "packages/peerkit",
-    "packages/peer-session"
+    "packages/peer-session",
+    "packages/cli"
   ],
   "engines": {
     "node": ">=22"

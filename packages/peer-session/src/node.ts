@@ -21,6 +21,7 @@ export interface NodeSession {
     connected: boolean;
     connectionType: "direct" | "relayed" | null;
   }>;
+  disconnect(alias: string): Promise<void>;
   shutdown(): Promise<void>;
 }
 
@@ -40,11 +41,14 @@ class ObservableAgentStore extends MemoryAgentStore {
 export async function startNode(options: {
   bootstrapRelays: string[];
   callbacks: NodeEventCallbacks;
+  /** Override libp2p listen addresses. Defaults to the factory defaults when omitted. */
+  addresses?: string[];
 }): Promise<NodeSession> {
   let nextAlias = 1;
   const aliasToAgent = new Map<string, AgentId>();
   const agentToAlias = new Map<AgentId, string>();
   const connectedAgents = new Set<AgentId>();
+  const knownAgentIds = new Set<AgentId>();
 
   const agentStore: IAgentStore = new ObservableAgentStore((agents) => {
     for (const agent of agents) {
@@ -52,7 +56,7 @@ export async function startNode(options: {
     }
   });
 
-  const node = await new PeerkitNodeBuilder({
+  const builder = new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: createTextMessageHandler((fromAgent, text) => {
       // assignAlias here covers a timing race: peerConnectedCallback is
@@ -73,10 +77,17 @@ export async function startNode(options: {
     .withBootstrapRelays(options.bootstrapRelays)
     .withAgentsReceivedObserver((agentIds) => {
       // Aliases are already assigned in ObservableAgentStore.store().
-      // Skip own agent ID before surfacing the list to the caller.
-      const peerIds = agentIds.filter((id) => id !== myAgentId);
-      if (peerIds.length > 0) {
-        options.callbacks.onAgentsReceived(peerIds);
+      // Skip own agent ID and agents already reported to the caller.
+      // Cannot query agentStore here — store() runs before this observer fires,
+      // so all newly received agents would already appear as "known".
+      const newPeerIds = agentIds.filter(
+        (id) => id !== myAgentId && !knownAgentIds.has(id),
+      );
+      for (const id of newPeerIds) {
+        knownAgentIds.add(id);
+      }
+      if (newPeerIds.length > 0) {
+        options.callbacks.onAgentsReceived(newPeerIds);
       }
     })
     .withPeerConnectedObserver((fromAgent) => {
@@ -97,8 +108,11 @@ export async function startNode(options: {
     })
     .withRelayConnectedObserver((address) => {
       options.callbacks.onRelayConnected(address);
-    })
-    .build();
+    });
+  if (options.addresses) {
+    builder.withAddresses(options.addresses);
+  }
+  const node = await builder.build();
 
   // assignAlias is declared here so myAgentId can be const. Function
   // declarations are hoisted, so the callbacks above can reference it safely,
@@ -149,6 +163,18 @@ export async function startNode(options: {
             : null;
           return { alias, agentId, connected, connectionType };
         });
+    },
+
+    async disconnect(alias: string): Promise<void> {
+      const agentId = aliasToAgent.get(alias);
+      if (agentId === undefined) {
+        throw new Error(`Unknown alias: ${alias}`);
+      }
+      if (!connectedAgents.has(agentId)) {
+        throw new Error(`No address known for alias ${alias}`);
+      }
+      await node.disconnect(agentId);
+      connectedAgents.delete(agentId);
     },
 
     async shutdown(): Promise<void> {
