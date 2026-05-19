@@ -41,9 +41,10 @@
     "fmt": "prettier . --write",
     "fmt:check": "prettier . --check",
     "test": "vitest --run",
-    "build:docs": "typedoc",
     "build:dist": "tsc --build",
-    "build": "npm run build:dist && npm run build:docs",
+    "prebuild:docs": "npm run build:dist",
+    "build:docs": "typedoc",
+    "build": "npm run build:docs",
     "prepare": "husky"
   },
   "lint-staged": {
