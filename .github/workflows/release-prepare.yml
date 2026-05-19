@@ -69,4 +69,5 @@ jobs:
 
             Review the changelog and version bumps, then merge to publish to npm.
           labels: release
+          team-reviewers: holochain-devs
           delete-branch: true
