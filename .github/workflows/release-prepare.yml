@@ -1,0 +1,71 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact version to release (e.g. 1.2.3). Leave empty to infer from commits."
+        required: false
+        type: string
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Determine next version from commits
+        if: inputs.version == ''
+        id: cliff-version
+        uses: orhun/git-cliff-action@v4
+        with:
+          args: --config-url="https://raw.githubusercontent.com/holochain/release-integration/refs/heads/main/pre-1.0-cliff.toml" --bumped-version
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          CLIFF_VERSION: ${{ steps.cliff-version.outputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            echo "value=$INPUT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "value=${CLIFF_VERSION#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump package versions
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: npx release-it "$RELEASE_VERSION" --no-git --no-npm --ci
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        env:
+          OUTPUT: CHANGELOG.md
+        with:
+          args: --config-url="https://raw.githubusercontent.com/holochain/release-integration/refs/heads/main/pre-1.0-cliff.toml" --tag v${{ steps.version.outputs.value }}
+
+      - name: Create release PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: release v${{ steps.version.outputs.value }}"
+          branch: release/v${{ steps.version.outputs.value }}
+          title: "chore: release v${{ steps.version.outputs.value }}"
+          body: |
+            Automated release PR for **v${{ steps.version.outputs.value }}**.
+
+            Review the changelog and version bumps, then merge to publish to npm.
+          labels: release
+          delete-branch: true
