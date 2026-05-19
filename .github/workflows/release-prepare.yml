@@ -62,7 +62,7 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore: release v${{ steps.version.outputs.value }}"
-          branch: release-${{ steps.version.outputs.value }}
+          branch: automated-release-${{ steps.version.outputs.value }}
           title: "chore: release v${{ steps.version.outputs.value }}"
           body: |
             Automated release PR for **v${{ steps.version.outputs.value }}**.
