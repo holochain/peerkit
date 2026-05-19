@@ -4,6 +4,6 @@ peerkit is a peer-to-peer data synchronization framework. It enables developers 
 
 Groups of users get full control over their data and participation. peerkit can be integrated incrementally into existing apps, synchronizing only the data you specify.
 
-See [Specifications.md](./Specifications.md) for the full specification.
+See [SPECIFICATIONS.md](./SPECIFICATIONS.md) for the full specification.
 
-See [docs](./docs/index.html) for API documentation.
+See the [API documentation](https://holochain.github.io/peerkit/) for reference.

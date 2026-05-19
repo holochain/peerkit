@@ -10,6 +10,7 @@
     "packages/transport-libp2p-react-native"
   ],
   "out": "docs",
+  "projectDocuments": ["SPECIFICATIONS.md"],
   "externalSymbolLinkMappings": {
     "@multiformats/multiaddr": {
       "Multiaddr": "https://multiformats.github.io/js-multiaddr/interfaces/Multiaddr.html"
