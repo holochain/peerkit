@@ -40,11 +40,8 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
           CLIFF_VERSION: ${{ steps.cliff-version.outputs.version }}
         run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            echo "value=$INPUT_VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "value=${CLIFF_VERSION#v}" >> $GITHUB_OUTPUT
-          fi
+          RAW_VERSION="${INPUT_VERSION:-$CLIFF_VERSION}"
+          echo "value=${RAW_VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Bump package versions
         env:
