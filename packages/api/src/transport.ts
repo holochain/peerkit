@@ -176,6 +176,18 @@ export interface ITransport {
   send(nodeId: NodeId, message: Uint8Array): Promise<void>;
 
   /**
+   * Is there an active connection to the provided node?
+   *
+   * @param nodeId The node ID to check
+   */
+  isConnected(nodeId: NodeId): boolean;
+
+  /**
+   * Return the node IDs of all currently connected peers.
+   */
+  getConnectedPeers(): NodeId[];
+
+  /**
    * Is the connection to the provided node a direct connection?
    *
    * `false` means the connection is relayed.

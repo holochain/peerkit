@@ -47,7 +47,6 @@ export async function startNode(options: {
   let nextAlias = 1;
   const aliasToAgent = new Map<string, AgentId>();
   const agentToAlias = new Map<AgentId, string>();
-  const connectedAgents = new Set<AgentId>();
   const knownAgentIds = new Set<AgentId>();
 
   const agentStore: IAgentStore = new ObservableAgentStore((agents) => {
@@ -93,14 +92,12 @@ export async function startNode(options: {
     .withPeerConnectedObserver((fromAgent) => {
       // Assign alias eagerly — the peer may have dialed us directly.
       assignAlias(fromAgent);
-      connectedAgents.add(fromAgent);
       const alias = agentToAlias.get(fromAgent);
       if (alias !== undefined) {
         options.callbacks.onPeerConnected(alias, fromAgent);
       }
     })
     .withPeerDisconnectedObserver((fromAgent) => {
-      connectedAgents.delete(fromAgent);
       const alias = agentToAlias.get(fromAgent);
       if (alias !== undefined) {
         options.callbacks.onPeerDisconnected(alias);
@@ -136,17 +133,13 @@ export async function startNode(options: {
       if (agentId === undefined) {
         throw new Error(`Unknown alias: ${alias}`);
       }
-      if (!connectedAgents.has(agentId)) {
+      if (!node.isConnected(agentId)) {
         const info = agentStore.get(agentId);
         const address = info?.addresses[0];
         if (!address) {
           throw new Error(`No address known for alias ${alias}`);
         }
         await node.transport.connect(address);
-        // transport.connect() resolves after the access handshake, so
-        // sendTextMessage() is safe immediately. connectedAgents is updated
-        // asynchronously by peerConnectedObserver.
-        connectedAgents.add(agentId);
       }
       await sendTextMessage(node, agentId, text);
     },
@@ -155,7 +148,7 @@ export async function startNode(options: {
       return Array.from(aliasToAgent.entries())
         .filter(([, agentId]) => agentId !== myAgentId)
         .map(([alias, agentId]) => {
-          const connected = connectedAgents.has(agentId);
+          const connected = node.isConnected(agentId);
           const connectionType = connected
             ? node.isDirectConnection(agentId)
               ? "direct"
@@ -170,11 +163,10 @@ export async function startNode(options: {
       if (agentId === undefined) {
         throw new Error(`Unknown alias: ${alias}`);
       }
-      if (!connectedAgents.has(agentId)) {
-        throw new Error(`No address known for alias ${alias}`);
+      if (!node.isConnected(agentId)) {
+        throw new Error(`Not connected to ${alias}`);
       }
       await node.disconnect(agentId);
-      connectedAgents.delete(agentId);
     },
 
     async shutdown(): Promise<void> {

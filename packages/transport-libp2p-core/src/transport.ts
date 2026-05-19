@@ -319,6 +319,18 @@ export class TransportLibp2p implements ITransport {
     });
   }
 
+  isConnected(nodeId: NodeId): boolean {
+    return this.libp2p.getConnections(peerIdFromString(nodeId)).length > 0;
+  }
+
+  getConnectedPeers(): NodeId[] {
+    return [
+      ...new Set(
+        this.libp2p.getConnections().map((c) => c.remotePeer.toString()),
+      ),
+    ];
+  }
+
   isDirectConnection(nodeId: NodeId): boolean {
     return this.libp2p
       .getConnections(peerIdFromString(nodeId))
@@ -384,12 +396,12 @@ export class TransportLibp2p implements ITransport {
               const connectedToRelayCallback = this.connectedToRelayCallback;
               const relayId = relayNodeId.toString();
               // Register a once-listener for the dialable relay address.
-              // When the node has a direct TCP listener, the first
-              // update may carry only the TCP address. The circuit-relay address
+              // When the node has a direct network listener, the first
+              // update may carry only the local address. The circuit-relay address
               // arrives in a later update. Re-register with { once: true } after
-              // each non-matching update so we keep listening without leaking the
-              // listener (libp2p wraps listeners internally, so removeEventListener
-              // with the original reference is not reliable).
+              // each non-matching update, to keep listening without leaking the
+              // listener, as libp2p wraps listeners internally, which makes
+              // removeEventListener with the original reference impossible.
               const registerWatcher = (): void => {
                 this.libp2p.addEventListener(
                   "self:peer:update",

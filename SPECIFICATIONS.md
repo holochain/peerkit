@@ -166,7 +166,7 @@ Infrastructure is openly runnable: there is no privileged operator, no central a
 
 ### Layer 0: transport
 
-Layer 0 is responsible for establishing connections between peers, enforcing network access control, and routing application-level messages. The reference implementation is [`@peerkit/transport-libp2p`](packages/transport-libp2p/), built on libp2p.
+Layer 0 is responsible for establishing connections between peers, enforcing network access control, and routing application-level messages. The reference implementation is `@peerkit/transport-libp2p`, built on libp2p.
 
 #### Public API: NodeId only
 
