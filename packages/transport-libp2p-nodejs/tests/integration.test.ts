@@ -399,3 +399,70 @@ test("relay and 2 nodes and send message over direct connection", async () => {
   await node2.shutDown();
   await relay.shutDown();
 });
+
+test("isConnected returns false before connect, true while connected, false after disconnect", async () => {
+  // node1 listens; node2 connects to it and verifies the live connection state.
+  const { node: node1, address: address1 } = await createNode({ id: "node1" });
+  const { node: node2 } = await createNode({ id: "node2" });
+
+  // No connection has been made yet — both directions must report false.
+  expect(node1.isConnected(node2.getNodeId())).toBe(false);
+  expect(node2.isConnected(node1.getNodeId())).toBe(false);
+
+  await node2.connect(address1);
+
+  // connect() resolves after the access handshake, so the connection is live on node2.
+  expect(node2.isConnected(node1.getNodeId())).toBe(true);
+  // node1 accepts the connection asynchronously — wait for the accept to land.
+  await vi.waitFor(
+    () => expect(node1.isConnected(node2.getNodeId())).toBe(true),
+    {
+      timeout: 5_000,
+    },
+  );
+
+  await node2.disconnect(node1.getNodeId());
+
+  // After disconnect, both sides must report false.
+  await vi.waitFor(
+    () => expect(node1.isConnected(node2.getNodeId())).toBe(false),
+    {
+      timeout: 5_000,
+    },
+  );
+  expect(node2.isConnected(node1.getNodeId())).toBe(false);
+
+  await node1.shutDown();
+  await node2.shutDown();
+});
+
+test("getConnectedPeers returns connected peer NodeIds and is empty after disconnect", async () => {
+  // node2 connects to node1; after connect both must see each other in their peer lists.
+  const { node: node1, address: address1 } = await createNode({ id: "node1" });
+  const { node: node2 } = await createNode({ id: "node2" });
+
+  // No connections yet — both peer lists must be empty.
+  expect(node1.getConnectedPeers()).toHaveLength(0);
+  expect(node2.getConnectedPeers()).toHaveLength(0);
+
+  await node2.connect(address1);
+
+  // node2 sees node1 immediately after connect().
+  expect(node2.getConnectedPeers()).toContain(node1.getNodeId());
+  // node1's list is updated asynchronously when the connection is accepted.
+  await vi.waitFor(
+    () => expect(node1.getConnectedPeers()).toContain(node2.getNodeId()),
+    { timeout: 5_000 },
+  );
+
+  await node2.disconnect(node1.getNodeId());
+
+  // After disconnect, both peer lists must be empty.
+  await vi.waitFor(() => expect(node1.getConnectedPeers()).toHaveLength(0), {
+    timeout: 5_000,
+  });
+  expect(node2.getConnectedPeers()).toHaveLength(0);
+
+  await node1.shutDown();
+  await node2.shutDown();
+});

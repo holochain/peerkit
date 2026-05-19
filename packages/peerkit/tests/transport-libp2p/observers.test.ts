@@ -452,3 +452,99 @@ test("access is denied when network access bytes are wrong even though AgentId i
   await node2.shutDown();
   await node1.shutDown();
 });
+
+test("PeerkitNode.isConnected reflects live connection state by AgentId", async () => {
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+
+  const node1 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node1")
+    .withAddresses([node1Address])
+    .build();
+
+  const node2 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node2")
+    .build();
+
+  // Before any connection, neither node knows of the other as an AgentId.
+  expect(node1.isConnected(node2.keyPair.agentId())).toBe(false);
+  expect(node2.isConnected(node1.keyPair.agentId())).toBe(false);
+
+  await node2.transport.connect(node1Address);
+
+  // The AgentId↔NodeId mapping is established during the access handshake, so
+  // node2 can check by AgentId immediately after connect() resolves.
+  expect(node2.isConnected(node1.keyPair.agentId())).toBe(true);
+  // node1 learns node2's AgentId asynchronously via its access handler.
+  await vi.waitFor(
+    () => expect(node1.isConnected(node2.keyPair.agentId())).toBe(true),
+    {
+      timeout: 5_000,
+    },
+  );
+
+  await node2.transport.disconnect(node1.transport.getNodeId());
+
+  // After disconnect, both sides report false by AgentId.
+  await vi.waitFor(
+    () => expect(node1.isConnected(node2.keyPair.agentId())).toBe(false),
+    {
+      timeout: 5_000,
+    },
+  );
+  expect(node2.isConnected(node1.keyPair.agentId())).toBe(false);
+
+  await node2.shutDown();
+  await node1.shutDown();
+});
+
+test("PeerkitNode.getConnectedAgents lists AgentIds of connected peers", async () => {
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
+  const node1Address = `/ip4/127.0.0.1/tcp/${port}`;
+
+  const node1 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node1")
+    .withAddresses([node1Address])
+    .build();
+
+  const node2 = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node2")
+    .build();
+
+  // No connection yet — both lists must be empty.
+  expect(node1.getConnectedAgents()).toHaveLength(0);
+  expect(node2.getConnectedAgents()).toHaveLength(0);
+
+  await node2.transport.connect(node1Address);
+
+  // node2 knows node1's AgentId immediately after connect().
+  expect(node2.getConnectedAgents()).toContain(node1.keyPair.agentId());
+  // node1 learns node2's AgentId asynchronously via its access handler.
+  await vi.waitFor(
+    () => expect(node1.getConnectedAgents()).toContain(node2.keyPair.agentId()),
+    { timeout: 5_000 },
+  );
+
+  await node2.transport.disconnect(node1.transport.getNodeId());
+
+  // After disconnect, both lists must be empty again.
+  await vi.waitFor(() => expect(node1.getConnectedAgents()).toHaveLength(0), {
+    timeout: 5_000,
+  });
+  expect(node2.getConnectedAgents()).toHaveLength(0);
+
+  await node2.shutDown();
+  await node1.shutDown();
+});

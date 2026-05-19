@@ -376,6 +376,7 @@ export class PeerkitNodeBuilder {
       keyPair,
       transport,
       agentStore,
+      agentByNodeId,
       nodeByAgentId,
       renewalTimer,
     );
@@ -386,6 +387,7 @@ export class PeerkitNode {
   readonly transport: ITransport;
   readonly agentStore: IAgentStore;
   readonly keyPair: IKeyPair;
+  private readonly agentByNodeId: Map<NodeId, AgentId>;
   private readonly nodeByAgentId: Map<AgentId, NodeId>;
   private readonly renewalTimer: ReturnType<typeof setInterval>;
 
@@ -393,14 +395,29 @@ export class PeerkitNode {
     keyPair: IKeyPair,
     transport: ITransport,
     agentStore: IAgentStore,
+    agentByNodeId: Map<NodeId, AgentId>,
     nodeByAgentId: Map<AgentId, NodeId>,
     renewalTimer: ReturnType<typeof setInterval>,
   ) {
     this.keyPair = keyPair;
     this.transport = transport;
     this.agentStore = agentStore;
+    this.agentByNodeId = agentByNodeId;
     this.nodeByAgentId = nodeByAgentId;
     this.renewalTimer = renewalTimer;
+  }
+
+  isConnected(toAgent: AgentId): boolean {
+    const nodeId = this.nodeByAgentId.get(toAgent);
+    if (nodeId === undefined) return false;
+    return this.transport.isConnected(nodeId);
+  }
+
+  getConnectedAgents(): AgentId[] {
+    return this.transport
+      .getConnectedPeers()
+      .map((nodeId) => this.agentByNodeId.get(nodeId))
+      .filter((agentId) => agentId !== undefined);
   }
 
   isDirectConnection(toAgent: AgentId): boolean {
