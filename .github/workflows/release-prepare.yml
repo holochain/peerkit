@@ -59,10 +59,10 @@ jobs:
           args: --config-url="https://raw.githubusercontent.com/holochain/release-integration/refs/heads/main/pre-1.0-cliff.toml" --tag v${{ steps.version.outputs.value }}
 
       - name: Create release PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore: release v${{ steps.version.outputs.value }}"
-          branch: release/v${{ steps.version.outputs.value }}
+          branch: release-${{ steps.version.outputs.value }}
           title: "chore: release v${{ steps.version.outputs.value }}"
           body: |
             Automated release PR for **v${{ steps.version.outputs.value }}**.
