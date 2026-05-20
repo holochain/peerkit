@@ -63,5 +63,9 @@ jobs:
           if npm view "@peerkit/api@$RELEASE_VERSION" > /dev/null 2>&1; then
             echo "Version $RELEASE_VERSION already published, skipping."
           else
-            npm publish --workspaces --access public --provenance
+            if [[ "$RELEASE_VERSION" == *"-"* ]]; then
+              npm publish --workspaces --access public --provenance --tag next
+            else
+              npm publish --workspaces --access public --provenance
+            fi
           fi
