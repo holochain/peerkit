@@ -50,8 +50,18 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
           CLIFF_VERSION: ${{ steps.cliff-version.outputs.version }}
+          # Overrides version when triggered by push (testing only — remove with push trigger)
+          PUSH_TEST_VERSION: "0.0.0-alpha.1"
         run: |
-          RAW_VERSION="${INPUT_VERSION:-$CLIFF_VERSION}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            RAW_VERSION="$PUSH_TEST_VERSION"
+          else
+            RAW_VERSION="${INPUT_VERSION:-$CLIFF_VERSION}"
+          fi
+          if [ -z "$RAW_VERSION" ]; then
+            echo "::error::Version could not be determined. Provide an explicit version input or ensure git tags exist for auto-detection."
+            exit 1
+          fi
           echo "value=${RAW_VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Bump package versions
