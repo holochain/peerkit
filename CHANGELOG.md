@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.3](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.2...v0.1.0-alpha.3)\] - 2026-05-20
+
+### Bug Fixes
+
+- Remove registry-url from setup-node to allow OIDC auth for npm publish by @synchwire in [#40](https://github.com/holochain/peerkit/pull/40)
+
 ## \[[0.1.0-alpha.2](https://github.com/holochain/peerkit/commits/v0.1.0-alpha.2)\] - 2026-05-20
 
 ### Features
@@ -51,6 +57,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Miscellaneous Tasks
 
+- Release v0.1.0-alpha.2 by @ThetaSinner in [#39](https://github.com/holochain/peerkit/pull/39)
 - Release v0.1.0-alpha.1 by @ThetaSinner in [#36](https://github.com/holochain/peerkit/pull/36)
 - Mark @peerkit/transport-libp2p-react-native as private by @synchwire
 - Delete unusued function sleep by @jost-s
@@ -113,8 +120,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### First-time Contributors
 
+- @ThetaSinner made their first contribution in [#39](https://github.com/holochain/peerkit/pull/39)
 - @synchwire made their first contribution in [#38](https://github.com/holochain/peerkit/pull/38)
-- @ThetaSinner made their first contribution in [#36](https://github.com/holochain/peerkit/pull/36)
 - @jost-s made their first contribution in [#25](https://github.com/holochain/peerkit/pull/25)
 - @veeso made their first contribution in [#24](https://github.com/holochain/peerkit/pull/24)
 

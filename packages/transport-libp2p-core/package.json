@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-libp2p-core",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Platform-agnostic libp2p transport core for peerkit",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [
