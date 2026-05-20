@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## \[[0.1.0-alpha.1](https://github.com/holochain/peerkit/commits/v0.1.0-alpha.1)\] - 2026-05-20
+## \[[0.1.0-alpha.2](https://github.com/holochain/peerkit/commits/v0.1.0-alpha.2)\] - 2026-05-20
 
 ### Features
 
@@ -43,12 +43,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Bug Fixes
 
+- Add files field to restrict published content to dist by @synchwire in [#38](https://github.com/holochain/peerkit/pull/38)
+- Remove version from root package.json, read from workspace in publish by @synchwire in [#37](https://github.com/holochain/peerkit/pull/37)
 - Work around npm bug where a transitive dev dependency is pruned from lock file by @jost-s
 - Correlate relay-ready callback with the relay that triggered it by @jost-s
 - Close agent stream only after receiving all messages by @jost-s
 
 ### Miscellaneous Tasks
 
+- Release v0.1.0-alpha.1 by @ThetaSinner in [#36](https://github.com/holochain/peerkit/pull/36)
 - Mark @peerkit/transport-libp2p-react-native as private by @synchwire
 - Delete unusued function sleep by @jost-s
 - Rebuild package lock by @jost-s
@@ -110,7 +113,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### First-time Contributors
 
-- @synchwire made their first contribution in [#30](https://github.com/holochain/peerkit/pull/30)
+- @synchwire made their first contribution in [#38](https://github.com/holochain/peerkit/pull/38)
+- @ThetaSinner made their first contribution in [#36](https://github.com/holochain/peerkit/pull/36)
 - @jost-s made their first contribution in [#25](https://github.com/holochain/peerkit/pull/25)
 - @veeso made their first contribution in [#24](https://github.com/holochain/peerkit/pull/24)
 
