@@ -4,11 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.4](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.3...v0.1.0-alpha.4)\] - 2026-05-20
+
+### Bug Fixes
+
+- Follow npm trusted publishers docs — registry-url, no NODE_AUTH_TOKEN, no cache by @synchwire in [#42](https://github.com/holochain/peerkit/pull/42)
+
 ## \[[0.1.0-alpha.3](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.2...v0.1.0-alpha.3)\] - 2026-05-20
 
 ### Bug Fixes
 
 - Remove registry-url from setup-node to allow OIDC auth for npm publish by @synchwire in [#40](https://github.com/holochain/peerkit/pull/40)
+
+### Miscellaneous Tasks
+
+- Release v0.1.0-alpha.3 by @ThetaSinner in [#41](https://github.com/holochain/peerkit/pull/41)
 
 ## \[[0.1.0-alpha.2](https://github.com/holochain/peerkit/commits/v0.1.0-alpha.2)\] - 2026-05-20
 
