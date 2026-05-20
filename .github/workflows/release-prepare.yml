@@ -85,6 +85,6 @@ jobs:
             Automated release PR for **v${{ steps.version.outputs.value }}**.
 
             Review the changelog and version bumps, then merge to publish to npm.
-          labels: release-it
+          labels: release
           team-reviewers: holochain-devs
           delete-branch: true

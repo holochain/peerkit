@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release-it') && startsWith(github.event.pull_request.head.ref, 'automated-release-')
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release') && startsWith(github.event.pull_request.head.ref, 'automated-release-')
     runs-on: ubuntu-latest
     permissions:
       contents: write
