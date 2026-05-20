@@ -1,7 +1,7 @@
 import { metrics, type Attributes, type Counter } from "@opentelemetry/api";
 
 export const SCOPE_NAME = "@peerkit/transport-libp2p-core";
-export const SCOPE_VERSION = "0.1.0-alpha.6";
+export const SCOPE_VERSION = "0.1.0-alpha.7";
 
 /**
  * Attribute set attached to every `peerkit.transport.bytes` data point.
