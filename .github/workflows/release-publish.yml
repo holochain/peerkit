@@ -1,0 +1,52 @@
+name: Publish Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release') && startsWith(github.event.pull_request.head.ref, 'automated-release-')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+      - run: npm run build:dist
+
+      - name: Get version
+        id: version
+        run: echo "value=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --tags origin "v$RELEASE_VERSION" | grep -q .; then
+            echo "Tag v$RELEASE_VERSION already exists, skipping."
+          else
+            git tag "v$RELEASE_VERSION"
+            git push origin "v$RELEASE_VERSION"
+          fi
+
+      - name: Publish to npm
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          if npm view "@peerkit/api@$RELEASE_VERSION" > /dev/null 2>&1; then
+            echo "Version $RELEASE_VERSION already published, skipping."
+          else
+            npm publish --workspaces --access public --provenance
+          fi
