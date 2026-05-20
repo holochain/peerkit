@@ -1,6 +1,6 @@
 {
   "name": "peerkit",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Peer-to-peer data synchronization framework",
   "keywords": [
     "p2p",
