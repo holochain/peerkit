@@ -16,6 +16,9 @@
     "node": ">=22"
   },
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.js",

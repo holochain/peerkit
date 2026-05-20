@@ -19,6 +19,9 @@
   "bin": {
     "peerkit": "./dist/main.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "relay": "PEERKIT_LOG=warning node dist/main.js relay",
     "node": "PEERKIT_LOG=debug DEBUG=libp2p:* DEBUG_COLORS=false node dist/main.js node"
