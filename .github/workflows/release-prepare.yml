@@ -1,0 +1,84 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact version to release (e.g. 1.2.3). Leave empty to infer from commits."
+        required: false
+        type: string
+
+env:
+  CLIFF_CONFIG_URL: "https://raw.githubusercontent.com/holochain/release-integration/refs/heads/main/pre-1.0-cliff.toml"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: Determine next version from commits
+        if: inputs.version == ''
+        id: cliff-version
+        run: |
+          VERSION=$(git-cliff --config-url="$CLIFF_CONFIG_URL" --bumped-version 2>/dev/null)
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          CLIFF_VERSION: ${{ steps.cliff-version.outputs.version }}
+        run: |
+          RAW_VERSION="${INPUT_VERSION:-$CLIFF_VERSION}"
+          if [ -z "$RAW_VERSION" ]; then
+            echo "::error::Version could not be determined. Provide an explicit version input or ensure git tags exist for auto-detection."
+            exit 1
+          fi
+          echo "value=${RAW_VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Bump package versions
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          npm version "$RELEASE_VERSION" --no-git-tag-version --workspaces --workspace-root
+          find packages -name "metrics.ts" -exec \
+            sed -i "s/SCOPE_VERSION = \"[^\"]*\"/SCOPE_VERSION = \"$RELEASE_VERSION\"/" {} \;
+
+      - name: Generate changelog
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: git-cliff --config-url="$CLIFF_CONFIG_URL" --tag "v$RELEASE_VERSION" -o CHANGELOG.md
+
+      - name: Create release PR
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.HRA2_GITHUB_TOKEN }}
+          commit-message: "chore: release v${{ steps.version.outputs.value }}"
+          branch: automated-release-${{ steps.version.outputs.value }}
+          title: "chore: release v${{ steps.version.outputs.value }}"
+          body: |
+            Automated release PR for **v${{ steps.version.outputs.value }}**.
+
+            Review the changelog and version bumps, then merge to publish to npm.
+          labels: release
+          team-reviewers: holochain-devs
+          delete-branch: true
