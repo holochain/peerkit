@@ -1,6 +1,9 @@
 name: Prepare Release
 
 on:
+  push:
+    branches:
+      - worktree-release-automation
   workflow_dispatch:
     inputs:
       version:
@@ -10,6 +13,7 @@ on:
 
 env:
   CLIFF_CONFIG_URL: "https://raw.githubusercontent.com/holochain/release-integration/refs/heads/main/pre-1.0-cliff.toml"
+  PUSH_TEST_VERSION: "0.0.0-alpha.1"
 
 jobs:
   prepare:
@@ -48,7 +52,11 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
           CLIFF_VERSION: ${{ steps.cliff-version.outputs.version }}
         run: |
-          RAW_VERSION="${INPUT_VERSION:-$CLIFF_VERSION}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            RAW_VERSION="$PUSH_TEST_VERSION"
+          else
+            RAW_VERSION="${INPUT_VERSION:-$CLIFF_VERSION}"
+          fi
           if [ -z "$RAW_VERSION" ]; then
             echo "::error::Version could not be determined. Provide an explicit version input or ensure git tags exist for auto-detection."
             exit 1
