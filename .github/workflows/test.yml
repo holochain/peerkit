@@ -54,6 +54,23 @@ jobs:
       - run: npm run build:dist
       - run: npm test
 
+  publish-check:
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build:dist
+      - run: npm run check:knip
+      - run: npm run check:publint
+
   ci_pass:
     if: ${{ always() }}
     runs-on: "ubuntu-latest"
@@ -61,6 +78,7 @@ jobs:
       - lint
       - build
       - test
+      - publish-check
     steps:
       - name: check status
         uses: re-actors/alls-green@release/v1

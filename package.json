@@ -46,6 +46,8 @@
     "prebuild:docs": "npm run build:dist",
     "build:docs": "typedoc",
     "build": "npm run build:docs",
+    "check:knip": "knip --strict --include unlisted",
+    "check:publint": "npm exec --workspaces -- publint",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -58,8 +60,10 @@
     "eslint": "^10.2.0",
     "globals": "^17.5.0",
     "husky": "^9.1.7",
+    "knip": "^6.14.1",
     "lint-staged": "^16.4.0",
     "prettier": "3.8.2",
+    "publint": "^0.3.21",
     "typedoc": "^0.28.19",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.2",
