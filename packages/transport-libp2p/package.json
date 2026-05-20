@@ -32,7 +32,9 @@
     "test": "echo \"No tests to run\""
   },
   "dependencies": {
-    "@peerkit/transport-libp2p-nodejs": "*",
+    "@peerkit/transport-libp2p-nodejs": "*"
+  },
+  "optionalDependencies": {
     "@peerkit/transport-libp2p-react-native": "*"
   }
 }
