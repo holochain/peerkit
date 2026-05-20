@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-libp2p-nodejs",
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "description": "Node.js libp2p transport for peerkit",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "CAL-1.0",

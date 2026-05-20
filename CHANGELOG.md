@@ -4,12 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.7](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.6...v0.1.0-alpha.7)\] - 2026-05-20
+
+### Bug Fixes
+
+- Use Node 24 and clear token for npm trusted publisher OIDC auth by @synchwire in [#50](https://github.com/holochain/peerkit/pull/50)
+
 ## \[[0.1.0-alpha.6](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.5...v0.1.0-alpha.6)\] - 2026-05-20
 
 ### Bug Fixes
 
 - Trigger publish on push to main instead of PR close by @synchwire in [#48](https://github.com/holochain/peerkit/pull/48)
 - Trigger publish on push to main instead of PR close by @synchwire in [#47](https://github.com/holochain/peerkit/pull/47)
+
+### Miscellaneous Tasks
+
+- Release v0.1.0-alpha.6 by @ThetaSinner in [#49](https://github.com/holochain/peerkit/pull/49)
 
 ## \[[0.1.0-alpha.5](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.4...v0.1.0-alpha.5)\] - 2026-05-20
 

@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/agent-store",
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "description": "In-memory agent store for the peerkit framework",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [
