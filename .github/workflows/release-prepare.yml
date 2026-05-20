@@ -59,7 +59,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
         run: |
-          npm version "$RELEASE_VERSION" --no-git-tag-version --workspaces --workspace-root
+          npm version "$RELEASE_VERSION" --no-git-tag-version --workspaces
           find packages -name "metrics.ts" -exec \
             sed -i "s/SCOPE_VERSION = \"[^\"]*\"/SCOPE_VERSION = \"$RELEASE_VERSION\"/" {} \;
 
