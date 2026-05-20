@@ -18,6 +18,9 @@
     "url": "git+https://github.com/holochain/peerkit.git"
   },
   "license": "CAL-1.0",
+  "files": [
+    "dist"
+  ],
   "author": "dev-team@holochain.org",
   "type": "module",
   "exports": {
