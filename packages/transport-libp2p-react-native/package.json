@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-libp2p-react-native",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "React Native libp2p transport for peerkit",
   "keywords": [
@@ -13,7 +13,8 @@
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "CAL-1.0",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "bugs": {
     "url": "https://github.com/holochain/peerkit/issues"
@@ -31,10 +32,6 @@
       "import": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "src"
-  ],
   "scripts": {
     "test": "echo \"No tests to run\""
   },
