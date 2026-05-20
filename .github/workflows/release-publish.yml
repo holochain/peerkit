@@ -1,13 +1,12 @@
 name: Publish Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 jobs:
   publish:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release') && startsWith(github.event.pull_request.head.ref, 'automated-release-')
+    if: startsWith(github.event.head_commit.message, 'chore: release v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,6 +19,7 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
+          token: ""
 
       - run: npm ci
       - run: npm run build:dist
