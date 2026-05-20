@@ -11,6 +11,9 @@
     "agent store"
   ],
   "license": "CAL-1.0",
+  "files": [
+    "dist"
+  ],
   "bugs": {
     "url": "https://github.com/holochain/peerkit/issues"
   },
