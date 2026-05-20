@@ -34,14 +34,9 @@ jobs:
       - run: npm ci
 
       - name: Install git-cliff
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION=$(gh release view --repo orhun/git-cliff --json tagName -q .tagName)
-          ARCHIVE="git-cliff-${VERSION#v}-x86_64-unknown-linux-musl.tar.gz"
-          gh release download "$VERSION" --repo orhun/git-cliff --pattern "$ARCHIVE"
-          tar xz git-cliff -f "$ARCHIVE"
-          sudo mv git-cliff /usr/local/bin/git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
 
       - name: Determine next version from commits
         if: inputs.version == ''
