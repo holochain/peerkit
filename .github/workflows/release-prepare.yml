@@ -67,7 +67,7 @@ jobs:
       - name: Bump package versions
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
-        run: npx release-it "$RELEASE_VERSION" --no-git --no-npm --ci
+        run: npm version "$RELEASE_VERSION" --no-git-tag-version --workspaces --workspace-root
 
       - name: Generate changelog
         env:

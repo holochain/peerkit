@@ -52,8 +52,6 @@
     "*.{ts,tsx,js,mjs,cjs}": "eslint --fix"
   },
   "devDependencies": {
-    "@release-it/bumper": "^7.0.5",
-    "release-it": "^18.1.2",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.6.0",
     "eslint": "^10.2.0",
