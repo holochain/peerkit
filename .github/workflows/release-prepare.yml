@@ -67,7 +67,7 @@ jobs:
       - name: Create release PR
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.HRA2_GITHUB_TOKEN }}
           commit-message: "chore: release v${{ steps.version.outputs.value }}"
           branch: automated-release-${{ steps.version.outputs.value }}
           title: "chore: release v${{ steps.version.outputs.value }}"
