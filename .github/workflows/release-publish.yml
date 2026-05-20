@@ -26,7 +26,7 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "value=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: echo "value=$(node -p "require('./packages/api/package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create and push tag
         env:
