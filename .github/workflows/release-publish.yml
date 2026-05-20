@@ -1,13 +1,27 @@
 name: Publish Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      is-release: ${{ steps.label.outputs.result }}
+    steps:
+      - name: Check for release label on merged PR
+        id: label
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RESULT=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/pulls \
+            --jq 'any(.[].labels[].name; . == "release")' 2>/dev/null || echo "false")
+          echo "result=$RESULT" >> $GITHUB_OUTPUT
+
   publish:
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release') && startsWith(github.event.pull_request.head.ref, 'automated-release-')
+    needs: check
+    if: needs.check.outputs.is-release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
