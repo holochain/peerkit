@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/peerkit",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.5",
   "description": "Peerkit peer-to-peer data sync orchestrator",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [

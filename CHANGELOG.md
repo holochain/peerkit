@@ -10,6 +10,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Follow npm trusted publishers docs — registry-url, no NODE_AUTH_TOKEN, no cache by @synchwire in [#42](https://github.com/holochain/peerkit/pull/42)
 
+### Miscellaneous Tasks
+
+- Release v0.1.0-alpha.4 by @ThetaSinner in [#43](https://github.com/holochain/peerkit/pull/43)
+
 ## \[[0.1.0-alpha.3](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.2...v0.1.0-alpha.3)\] - 2026-05-20
 
 ### Bug Fixes
