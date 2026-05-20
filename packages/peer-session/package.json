@@ -29,12 +29,12 @@
     "test": "vitest --run"
   },
   "dependencies": {
+    "@logtape/logtape": "^2.0.5",
     "@peerkit/agent-store": "*",
     "@peerkit/api": "*",
     "@peerkit/peerkit": "*"
   },
   "devDependencies": {
-    "@logtape/logtape": "^2.0.5",
     "get-port": "^7.2.0"
   }
 }
