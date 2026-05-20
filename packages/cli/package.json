@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/cli",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "description": "Developer CLI for peerkit — run relay nodes and test peer connectivity",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "CAL-1.0",
