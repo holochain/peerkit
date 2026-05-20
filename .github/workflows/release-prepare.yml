@@ -1,6 +1,9 @@
 name: Prepare Release
 
 on:
+  push:
+    branches:
+      - worktree-release-automation
   workflow_dispatch:
     inputs:
       version:
