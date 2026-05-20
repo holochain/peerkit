@@ -22,7 +22,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - run: npm ci
-      - run: npm run build
+      - run: npm run build:dist
 
       - name: Get version
         id: version
