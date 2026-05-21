@@ -25,6 +25,11 @@ import {
 } from "./common.js";
 import { serializeAgentInfoList } from "./serialize.js";
 
+const DEFAULT_ICE_SERVER_URLS = [
+  "stun:stun.cloudflare.com:3478",
+  "stun:stun.services.mozilla.com:3478",
+];
+
 /**
  * App-level message handler. Receives the sender's {@link AgentId} rather than
  * an ephemeral transport-level {@link NodeId}.
@@ -60,6 +65,7 @@ export class PeerkitNodeBuilder {
   bootstrapRelays: RelayAddress[] = [];
   id?: string;
   addresses?: NodeAddress[];
+  iceServerUrls?: string[];
   networkAccessBytes?: NetworkAccessBytes;
   agentStore?: IAgentStore;
   nodeTransportFactory?: PeerkitNodeTransportFactory;
@@ -94,6 +100,11 @@ export class PeerkitNodeBuilder {
 
   withAddresses(addresses: NodeAddress[]): this {
     this.addresses = addresses;
+    return this;
+  }
+
+  withIceServerUrls(urls: string[]): this {
+    this.iceServerUrls = urls;
     return this;
   }
 
@@ -327,6 +338,7 @@ export class PeerkitNodeBuilder {
       ? await this.nodeTransportFactory({
           id: this.id,
           addrs: this.addresses,
+          iceServerUrls: this.iceServerUrls,
           bootstrapRelays: this.bootstrapRelays,
           networkAccessBytes: networkAccessBytesWithKey,
           agentsReceivedCallback,
@@ -339,6 +351,7 @@ export class PeerkitNodeBuilder {
       : await createNode({
           id: this.id,
           addrs: this.addresses,
+          iceServerUrls: this.iceServerUrls || DEFAULT_ICE_SERVER_URLS,
           bootstrapRelays: this.bootstrapRelays,
           networkAccessBytes: networkAccessBytesWithKey,
           agentsReceivedCallback,

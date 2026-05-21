@@ -114,6 +114,9 @@ test("Connection can be closed", { timeout: 10_000 }, async () => {
   // node1 closes with ECONNRESET from node2's perspective, which libp2p marks
   // as 'aborted' rather than 'closed' => check for any non-open status.
   await vi.waitUntil(() => connection.status !== "open");
+
+  await node2.stop();
+  await node1.shutDown();
 });
 
 test("peerDisconnectedCallback fires when connected peer disconnects", async () => {

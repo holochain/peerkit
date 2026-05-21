@@ -11,7 +11,7 @@ import { startNode, startRelay } from "@peerkit/peer-session";
 import {
   buildRelayAnnounceAddr,
   localDevRelayListenAddr,
-  localDevNodeListenAddrs,
+  defaultNodeListenAddrs,
 } from "@peerkit/transport-libp2p-nodejs";
 import { Command } from "commander";
 import { createWriteStream } from "node:fs";
@@ -35,7 +35,7 @@ Default: PEERKIT_LOG=warning",
 program
   .command("relay [addr]")
   .description(
-    "Start a relay (default addr: 0.0.0.0:9000). Prints the dial address peers use to connect.",
+    `Start a relay (default addr: ${localDevRelayListenAddr}). Prints the dial address peers use to connect.`,
   )
   .option(
     "--public-ip <ip>",
@@ -133,7 +133,7 @@ program
 
     const addresses = opts.listen
       ? opts.listen.split(",").map((a) => a.trim())
-      : localDevNodeListenAddrs;
+      : defaultNodeListenAddrs;
 
     // rl is created only after startup succeeds to avoid leaking it on failure.
     const session = await startNode({

@@ -3,6 +3,7 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
+import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
 import type { ITransport, NodeAddress, RelayAddress } from "@peerkit/api";
 import {
@@ -19,23 +20,7 @@ import { createLibp2p } from "libp2p";
  */
 export const defaultNodeListenAddrs: NodeAddress[] = [
   "/p2p-circuit",
-  "/ip4/0.0.0.0/tcp/0/ws",
-  "/ip6/::/tcp/0/ws",
-];
-
-/**
- * Like {@link defaultNodeListenAddrs} but also includes `/dns4/localhost`,
- * which identify will advertise to peers and allows relayed
- * connections to upgrade to direct ones when all peers are on the same machine.
- *
- * Use this as the default in local-development tools.
- * Do not use in production.
- */
-export const localDevNodeListenAddrs: NodeAddress[] = [
-  "/p2p-circuit",
-  "/dns4/localhost/tcp/0/ws",
-  "/ip4/0.0.0.0/tcp/0/ws",
-  "/ip6/::/tcp/0/ws",
+  "/webrtc",
 ];
 
 /**
@@ -55,9 +40,11 @@ export interface CreateNodeOptions extends NodeOptions {
    * address has been received.
    */
   bootstrapRelays?: RelayAddress[];
+  /**
+   * List of ICE server URLs needed for establishing direct connections.
+   */
+  iceServerUrls?: string[];
 }
-
-// function createNodeCommon(): TransportLibp2p {}
 
 /**
  * Build a Node.js peerkit transport node
@@ -71,12 +58,23 @@ export interface CreateNodeOptions extends NodeOptions {
 export async function createNode(
   options: CreateNodeOptions,
 ): Promise<ITransport> {
+  // Build array of ICE servers if provided or leave undefined to use
+  // libp2p default.
+  const iceServers =
+    options.iceServerUrls &&
+    options.iceServerUrls.map((url) => ({
+      urls: url,
+    }));
   const libp2pNode = await createLibp2p({
     // Defer listening so TransportLibp2p can register protocol handlers
     // (including /peerkit/access/v1) before any inbound connection arrives.
     start: false,
     // Circuit relay transport enables connecting to peers through connected relays.
-    transports: [webSockets(), circuitRelayTransport()],
+    transports: [
+      webSockets(),
+      webRTC({ rtcConfiguration: { iceServers } }),
+      circuitRelayTransport(),
+    ],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: { identify: identify(), dcutr: dcutr() },

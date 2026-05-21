@@ -197,6 +197,9 @@ export const createNode = async (options: TestNodeOptions) => {
     addresses: {
       listen: [address],
     },
+    connectionGater: {
+      denyDialMultiaddr: async () => false,
+    },
   });
 
   const node = new TransportLibp2p(libp2p, {
