@@ -30,9 +30,9 @@
   },
   "dependencies": {
     "@logtape/logtape": "^2.0.5",
-    "@peerkit/agent-store": "*",
-    "@peerkit/api": "*",
-    "@peerkit/peerkit": "*"
+    "@peerkit/agent-store": "^0.1.0-alpha.9",
+    "@peerkit/api": "^0.1.0-alpha.9",
+    "@peerkit/peerkit": "^0.1.0-alpha.9"
   },
   "devDependencies": {
     "get-port": "^7.2.0"
