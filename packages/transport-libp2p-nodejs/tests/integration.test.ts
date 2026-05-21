@@ -5,6 +5,9 @@ import { setupTestLogger } from "./util.js";
 import { NodeId } from "@peerkit/api";
 import getPort, { portNumbers } from "get-port";
 
+// These tests exercise peer connections over WebRTC.
+// Connections to the relay use WebSockets.
+
 beforeEach(setupTestLogger);
 
 // Reset logger configuration
@@ -144,7 +147,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   await relay.shutDown();
 });
 
-test("relay and 2 nodes and send message over direct connection", async () => {
+test("Bootstrap with relay and 2 nodes and send message over direct connection", async () => {
   // Create a test agent store for the relay
   const relayAgentStore: Uint8Array[] = [];
   // Create the relay with a callback that pushes to the agent store when agent
@@ -183,7 +186,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
       peersConnectedToNode1.push(nodeId);
     },
     messageHandler: async (_message) => {},
-    addrs: ["/ip4/0.0.0.0/tcp/0/ws", "/p2p-circuit"],
+    addrs: ["/p2p-circuit", "/webrtc"],
     bootstrapRelays: [relayAddress],
   });
 
@@ -228,13 +231,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
       assert.equal(fromNode, node1.getNodeId());
       messagesReceivedByNode2.push(message);
     },
-    // dns protocol is a workaround when testing locally.
-    // When on a relayed connection, the node attempts to establish a direct
-    // connection to the other node and scans for dialable addresses.
-    // Therefore a WebSocket address is required in addition to the p2p-circuit relay
-    // protocol. If, however, a WebSocket address is provided with 0.0.0.0, it will be
-    // filtered out. The same applies to loopback addresses like 127.0.0.1.
-    addrs: ["/dns/localhost/tcp/0/ws", "/p2p-circuit"],
+    addrs: ["/p2p-circuit", "/webrtc"],
     bootstrapRelays: [relayAddress],
   });
 

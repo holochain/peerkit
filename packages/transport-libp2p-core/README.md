@@ -1,6 +1,6 @@
 # @peerkit/transport-libp2p-core
 
-libp2p-based transport for Peerkit. Implements `ITransport` on top of TCP + Noise + yamux + identify, with circuit relay support.
+libp2p-based transport for Peerkit. Implements `ITransport` on top of WebSocket for relay connections + WebRTC for direct connections + Noise + yamux + identify, with circuit relay support.
 
 ## Two construction modes
 
@@ -14,7 +14,7 @@ const transport = await TransportLibp2p.createNode(
   networkAccessHandler,
   networkAccessBytes: myAccessBytes,
   messageHandler,
-  addrs: ["/ip4/0.0.0.0/tcp/0/ws"],
+  addrs: ["/p2p-circuit", "/webrtc"],
   bootstrapRelays: ["/ip4/1.2.3.4/tcp/9000/ws"],
 );
 ```
@@ -49,9 +49,9 @@ For this transport, a `RelayAddress` is a multiaddr string (e.g. `/ip4/1.2.3.4/t
 
 When dialing a circuit relay address such as `/ip4/0.0.0.0/tcp/30000/ws/p2p/<relay-id>/p2p-circuit/p2p/<peer-id>`, libp2p does **not** open a WebSocket connection to `0.0.0.0`. It looks up the relay peer ID in the peerstore, finds the existing connection, and opens the relay hop through that. The IP:port prefix is ignored for this purpose. A circuit relay address with `0.0.0.0` is therefore valid and dialable.
 
-## Direct connection upgrade (dcutr) and listen addresses
+## Direct connection upgrade through relay (DCUtR) and listen addresses
 
-After establishing a connection through the relay, libp2p's dcutr protocol attempts to upgrade it to a direct connection. DCUtR exchanges the node's own WebSocket listen addresses with the remote peer and attempts to dial them. Two address forms are silently filtered out and will cause the direct upgrade to fail:
+After establishing a connection through the relay, libp2p's dcutr protocol attempts to upgrade it to a direct connection. DCUtR exchanges the node's own WebRTC listen addresses with the remote peer and attempts to dial them. Two address forms are silently filtered out and will cause the direct upgrade to fail:
 
 - `0.0.0.0` / `::` — unspecified/wildcard addresses
 - `127.0.0.1` / `::1` — loopback addresses

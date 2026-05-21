@@ -48,6 +48,11 @@ export function buildRelayAnnounceAddr(
   }
   const prefix = version === 6 ? "/ip6" : "/ip4";
   const port = /\/tcp\/(\d+)/.exec(listenAddr)?.[1] ?? "9000";
+  if (port === "0") {
+    throw new Error(
+      `buildRelayAnnounceAddr: listenAddr "${listenAddr}" uses port 0, which is not dialable`,
+    );
+  }
   return `${prefix}/${publicIp}/tcp/${port}/ws`;
 }
 

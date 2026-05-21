@@ -37,6 +37,7 @@
     "@libp2p/interface": "^3.0.0",
     "@libp2p/memory": "^2.0.20",
     "@libp2p/peer-id": "^6.0.0",
+    "@libp2p/webrtc": "^6.0.23",
     "@libp2p/websockets": "^10.1.13",
     "@peerkit/api": "*",
     "@peerkit/transport-libp2p-core": "*",
