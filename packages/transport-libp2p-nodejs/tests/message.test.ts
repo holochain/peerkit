@@ -1,6 +1,6 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
+import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
@@ -11,7 +11,7 @@ import {
   encodeFrame,
 } from "@peerkit/transport-libp2p-core";
 import type { MessageHandler, NetworkAccessHandler } from "@peerkit/api";
-import { createNode, setupTestLogger } from "./util.js";
+import { createNode, setupTestLogger, uniqueTxAddress } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
 
 beforeEach(setupTestLogger);
@@ -24,12 +24,10 @@ test("Opening a message stream without being granted access closes the connectio
 
   // Create a node and try to open a stream with an unknown protocol.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: {
-      listen: ["/ip4/0.0.0.0/tcp/0"],
-    },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   assert(connection.status === "open");
@@ -146,10 +144,10 @@ test("Large messages are chunked and received correctly", async () => {
   });
 
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);

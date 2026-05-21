@@ -1,12 +1,12 @@
-import { reset } from "@logtape/logtape";
-import { IStream } from "@peerkit/api";
-import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
-import { createNode, setupTestLogger } from "./util.js";
-import { createLibp2p } from "libp2p";
-import { tcp } from "@libp2p/tcp";
-import { yamux } from "@chainsafe/libp2p-yamux";
 import { noise } from "@chainsafe/libp2p-noise";
+import { yamux } from "@chainsafe/libp2p-yamux";
+import { memory } from "@libp2p/memory";
+import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
+import { IStream } from "@peerkit/api";
+import { createLibp2p } from "libp2p";
+import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
+import { createNode, setupTestLogger, uniqueTxAddress } from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -25,10 +25,10 @@ test("Opening a custom stream without being granted access closes the connection
   });
 
   const node2 = await createLibp2p({
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
-    transports: [tcp()],
+    transports: [memory()],
     streamMuxers: [yamux()],
     connectionEncrypters: [noise()],
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
 
   const connection = await node2.dial(multiaddr(address1));

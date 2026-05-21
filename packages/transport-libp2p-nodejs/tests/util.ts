@@ -1,13 +1,13 @@
+import { noise } from "@chainsafe/libp2p-noise";
+import { yamux } from "@chainsafe/libp2p-yamux";
+import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
+import { identify } from "@libp2p/identify";
+import { memory } from "@libp2p/memory";
 import {
   configure,
   getAnsiColorFormatter,
   getConsoleSink,
 } from "@logtape/logtape";
-import getPort, { portNumbers } from "get-port";
-import {
-  createNode as createTransportNode,
-  createRelay as createTransportRelay,
-} from "../src/index.js";
 import type {
   AgentsReceivedCallback,
   ConnectedToRelayCallback,
@@ -18,6 +18,11 @@ import type {
   PeerConnectedCallback,
   PeerDisconnectedCallback,
 } from "@peerkit/api";
+import { createLibp2p } from "libp2p";
+import { randomUUID } from "node:crypto";
+import { TransportLibp2p } from "../src/index.js";
+
+export const uniqueTxAddress = () => randomUUID();
 
 export const setupTestLogger = async () => {
   await configure({
@@ -73,22 +78,45 @@ export interface TestRelayOptions {
  */
 export const createRelay = async (options: TestRelayOptions) => {
   const { id, networkAccessBytes } = options;
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/0.0.0.0/tcp/${port}`;
+  const address = `/memory/${uniqueTxAddress()}`;
+  // This is mostly what the production relay is like, with the exception that
+  // an in-memory transport is used.
+  const libp2p = await createLibp2p({
+    // Defer listening so TransportLibp2p can register protocol handlers
+    // (including /peerkit/access/v1) before any inbound connection arrives.
+    start: false,
+    transports: [memory()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    // Circuit relay server enables relay functionality.
+    // applyDefaultLimit: false removes the 2-min / 128 KiB per-connection
+    // caps so the relay can serve as a permanent data-channel fallback.
+    services: {
+      relay: circuitRelayServer({
+        reservations: { applyDefaultLimit: false },
+      }),
+      identify: identify(),
+    },
+    addresses: {
+      listen: [address],
+    },
+  });
+
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
   const peerConnectedCallback =
     options.peerConnectedCallback ?? (async (_nodeId, _transport) => {});
   const networkAccessHandler =
     options.networkAccessHandler ?? (async (_fromPeer, _bytes) => true);
-  const relay = await createTransportRelay({
-    addrs: [address],
+  const relay = new TransportLibp2p(libp2p, {
     id,
     networkAccessBytes,
     agentsReceivedCallback,
     peerConnectedCallback,
     networkAccessHandler,
   });
+  await libp2p.start();
+
   return { relay, address };
 };
 
@@ -132,10 +160,6 @@ export interface TestNodeOptions {
    */
   customStreamCreatedCallbacks?: Record<string, CustomStreamCreatedCallback>;
   /**
-   * Optional relay addresses to connect to at startup
-   */
-  bootstrapRelays?: string[];
-  /**
    * Optional timeout for the outbound access handshake response
    */
   handshakeTimeoutMs?: number;
@@ -145,9 +169,8 @@ export interface TestNodeOptions {
  * Creates a test node transport
  */
 export const createNode = async (options: TestNodeOptions) => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/0.0.0.0/tcp/${port}`;
-  const { id, bootstrapRelays, handshakeTimeoutMs } = options;
+  const address = `/memory/${uniqueTxAddress()}`;
+  const { id, handshakeTimeoutMs } = options;
   const connectedToRelayCallback = options.connectedToRelayCallback;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
@@ -160,8 +183,23 @@ export const createNode = async (options: TestNodeOptions) => {
   const messageHandler =
     options.messageHandler ?? (async (_fromPeer, _message, _transport) => {});
   const customStreamCreatedCallbacks = options.customStreamCreatedCallbacks;
-  const node = await createTransportNode({
-    addrs: [address],
+  // This is mostly what the production node is like, with the exception that
+  // an in-memory transport is used.
+  const libp2p = await createLibp2p({
+    // Defer listening so TransportLibp2p can register protocol handlers
+    // (including /peerkit/access/v1) before any inbound connection arrives.
+    start: false,
+    // Circuit relay transport enables connecting to peers through connected relays.
+    transports: [memory()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    services: { identify: identify() },
+    addresses: {
+      listen: [address],
+    },
+  });
+
+  const node = new TransportLibp2p(libp2p, {
     id,
     connectedToRelayCallback,
     agentsReceivedCallback,
@@ -171,8 +209,10 @@ export const createNode = async (options: TestNodeOptions) => {
     networkAccessBytes,
     messageHandler,
     customStreamCreatedCallbacks: customStreamCreatedCallbacks,
-    bootstrapRelays,
     handshakeTimeoutMs,
   });
+  await libp2p.start();
+  // Connect to all provided relays.
+
   return { node, address };
 };
