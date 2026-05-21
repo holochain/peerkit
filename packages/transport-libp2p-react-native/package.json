@@ -36,8 +36,8 @@
     "test": "echo \"No tests to run\""
   },
   "dependencies": {
-    "@peerkit/api": "*",
-    "@peerkit/transport-libp2p-core": "*"
+    "@peerkit/api": "^0.1.0-alpha.9",
+    "@peerkit/transport-libp2p-core": "^0.1.0-alpha.9"
   },
   "peerDependencies": {
     "@libp2p/interface": "^3.0.0",

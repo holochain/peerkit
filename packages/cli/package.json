@@ -29,8 +29,8 @@
   "dependencies": {
     "@logtape/file": "^2.1.1",
     "@logtape/logtape": "^2.0.7",
-    "@peerkit/peer-session": "*",
-    "@peerkit/transport-libp2p-nodejs": "*",
+    "@peerkit/peer-session": "^0.1.0-alpha.9",
+    "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.9",
     "commander": "^14.0.0"
   }
 }
