@@ -17,7 +17,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // infos have been received.
   const peersConnectedToRelay: NodeId[] = [];
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}`;
+  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await createRelay({
     id: "relay",
     addrs: [relayAddress],
@@ -151,7 +151,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
   // infos have been received.
   const peersConnectedToRelay: NodeId[] = [];
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}`;
+  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await createRelay({
     id: "relay",
     addrs: [relayAddress],
@@ -183,7 +183,7 @@ test("relay and 2 nodes and send message over direct connection", async () => {
       peersConnectedToNode1.push(nodeId);
     },
     messageHandler: async (_message) => {},
-    addrs: ["/ip4/0.0.0.0/tcp/0", "/p2p-circuit"],
+    addrs: ["/ip4/0.0.0.0/tcp/0/ws", "/p2p-circuit"],
     bootstrapRelays: [relayAddress],
   });
 
@@ -231,10 +231,10 @@ test("relay and 2 nodes and send message over direct connection", async () => {
     // dns protocol is a workaround when testing locally.
     // When on a relayed connection, the node attempts to establish a direct
     // connection to the other node and scans for dialable addresses.
-    // Therefore a TCP address is required in addition to the p2p-circuit relay
-    // protocol. If, however, a TCP address is provided with 0.0.0.0, it will be
+    // Therefore a WebSocket address is required in addition to the p2p-circuit relay
+    // protocol. If, however, a WebSocket address is provided with 0.0.0.0, it will be
     // filtered out. The same applies to loopback addresses like 127.0.0.1.
-    addrs: ["/dns/localhost/tcp/0", "/p2p-circuit"],
+    addrs: ["/dns/localhost/tcp/0/ws", "/p2p-circuit"],
     bootstrapRelays: [relayAddress],
   });
 

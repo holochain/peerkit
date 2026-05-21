@@ -9,7 +9,7 @@ import {
 
 export async function startTestRelay() {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const listenAddr = `/ip4/127.0.0.1/tcp/${port}`;
+  const listenAddr = `/ip4/127.0.0.1/tcp/${port}/ws`;
   return startRelay({ listenAddr });
 }
 

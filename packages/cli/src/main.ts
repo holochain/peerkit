@@ -10,7 +10,7 @@ import {
 import { startNode, startRelay } from "@peerkit/peer-session";
 import {
   buildRelayAnnounceAddr,
-  defaultRelayListenAddr,
+  localDevRelayListenAddr,
   localDevNodeListenAddrs,
 } from "@peerkit/transport-libp2p-nodejs";
 import { Command } from "commander";
@@ -54,7 +54,7 @@ program
       ],
     });
 
-    const listenAddr = addr ?? defaultRelayListenAddr;
+    const listenAddr = addr ?? localDevRelayListenAddr;
     let announceAddr: string | undefined;
     if (opts.publicIp) {
       announceAddr = buildRelayAnnounceAddr(listenAddr, opts.publicIp);
