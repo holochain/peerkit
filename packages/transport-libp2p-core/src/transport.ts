@@ -242,7 +242,6 @@ export class TransportLibp2p implements ITransport {
     this.metrics = createTransportMetrics();
     this.logger.info("Transport created {*}", {
       addresses: libp2p.getMultiaddrs(),
-      id: options?.id,
       handshakeTimeoutMs: this.handshakeTimeoutMs,
     });
   }

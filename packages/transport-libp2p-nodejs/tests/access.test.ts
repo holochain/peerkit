@@ -1,6 +1,6 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
+import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { type NetworkAccessHandler } from "@peerkit/api";
@@ -8,7 +8,7 @@ import { createLibp2p } from "libp2p";
 import { isDeepStrictEqual } from "node:util";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_ACCESS_PROTOCOL } from "../src/index.js";
-import { createNode, setupTestLogger } from "./util.js";
+import { createNode, setupTestLogger, uniqueTxAddress } from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -24,10 +24,10 @@ test("Remote node closes connection when host sends invalid network access bytes
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
@@ -52,8 +52,11 @@ test("Access handshake initiator closes connection when responder is denied", as
   const { node: initiator } = await createNode({
     id: "initiator",
     networkAccessHandler: async (_fromPeer, _bytes) => false, // Denies responder
-    bootstrapRelays: [responderAddress],
   });
+
+  await expect(initiator.connect(responderAddress)).rejects.toThrow(
+    /Access denied/,
+  );
 
   // After bootstrap attempt, the initiator should have closed the connection.
   // The responder's peer ID should not be reachable from initiator.
@@ -68,10 +71,10 @@ test("Access handshake initiator closes connection when responder is denied", as
 test("Outbound access handshake times out when responder sends no response", async () => {
   // Libp2p node that opens the access stream but never sends a response back.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   await libp2pNode.handle(CURRENT_ACCESS_PROTOCOL, async (stream) => {
     // Receive the initiator's handshake but never respond — causes timeout.
@@ -80,14 +83,14 @@ test("Outbound access handshake times out when responder sends no response", asy
 
   const silentAddress = libp2pNode.getMultiaddrs()[0]!.toString();
 
-  // Node with a very short timeout so the test doesn't take 10 s.
-  // create() resolves — relay failures are logged but not fatal.
+  // Node with a very short timeout so the test doesn't take 10 s..
   const { node } = await createNode({
     id: "initiator",
     networkAccessHandler: async (_fromPeer, _bytes) => true,
-    bootstrapRelays: [silentAddress],
     handshakeTimeoutMs: 50,
   });
+
+  await expect(node.connect(silentAddress)).rejects.toThrow(/timed out/);
 
   // The silent node's peer ID was never granted access — sendAgents should throw.
   await expect(
@@ -103,10 +106,10 @@ test("Remote node closes connection when host sends invalid ACK byte", async () 
 
   // Create a node that passes correct network access bytes but sends invalid ACK byte.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
@@ -241,12 +244,10 @@ test("Opening a stream with an unknown protocol fails", async () => {
 
   // Create a node and try to open a stream with an unknown protocol.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: {
-      listen: ["/ip4/0.0.0.0/tcp/0"],
-    },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   await expect(connection.newStream("/unknown/protocol")).rejects.toThrow();
@@ -265,10 +266,10 @@ test("Network access handler is not repeatedly called for previously rejected pe
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);

@@ -1,14 +1,14 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
+import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
+import type { NetworkAccessHandler } from "@peerkit/api";
 import { createLibp2p } from "libp2p";
+import { isDeepStrictEqual } from "node:util";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_AGENTS_PROTOCOL } from "../src/index.js";
-import type { NetworkAccessHandler } from "@peerkit/api";
-import { createNode, setupTestLogger } from "./util.js";
-import { isDeepStrictEqual } from "node:util";
+import { createNode, setupTestLogger, uniqueTxAddress } from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -19,10 +19,10 @@ test("Opening an agents stream without being granted access closes the connectio
   const { node, address } = await createNode({ id: "node1" });
 
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   assert(connection.status === "open");

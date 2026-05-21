@@ -1,6 +1,6 @@
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
-import { tcp } from "@libp2p/tcp";
+import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import { createLibp2p } from "libp2p";
@@ -9,9 +9,13 @@ import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
-  createNode,
 } from "../src/index.js";
-import { createRelay, setupTestLogger } from "./util.js";
+import {
+  createNode,
+  createRelay,
+  setupTestLogger,
+  uniqueTxAddress,
+} from "./util.js";
 
 beforeEach(setupTestLogger);
 
@@ -26,10 +30,10 @@ test("Invalid network access bytes closes connection to relay", async () => {
   // Create a node and pass invalid network access bytes to the connection attempt.
   // Connection should not succeed.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
@@ -46,10 +50,10 @@ test("Opening an agents stream without being granted access closes the connectio
   const { relay, address } = await createRelay({ id: "relay" });
 
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   assert(connection.status === "open");
@@ -73,10 +77,10 @@ test("Relay rejects message protocol streams", async () => {
 
   // Create a node, connect to relay, perform access handshake and check that opening a message stream fails.
   const libp2pNode = await createLibp2p({
-    transports: [tcp()],
+    transports: [memory()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
-    addresses: { listen: ["/ip4/0.0.0.0/tcp/0"] },
+    addresses: { listen: [`/memory/${uniqueTxAddress()}`] },
   });
   const connection = await libp2pNode.dial(multiaddr(address));
   const accessStream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
@@ -103,24 +107,17 @@ test("Relay knows node's agent infos after agent exchange", async () => {
   });
 
   const agentInfosReceivedByNode: Uint8Array[] = [];
-  let connectedToRelay = false;
-  const node = await createNode({
+  const { node } = await createNode({
     id: "node1",
-    addrs: ["/p2p-circuit"],
     agentsReceivedCallback: async (_fromPeer, bytes) => {
       agentInfosReceivedByNode.push(bytes);
     },
     peerConnectedCallback: async (_nodeId, _transport) => {},
     networkAccessHandler: async () => true,
-    bootstrapRelays: [relayAddress],
-    connectedToRelayCallback: async (_address, nodeId, _transport) => {
-      assert.equal(nodeId, relay.getNodeId());
-      connectedToRelay = true;
-    },
+    connectedToRelayCallback: async (_address, _nodeId, _transport) => {},
     messageHandler: async (_message) => {},
   });
-
-  await vi.waitUntil(() => connectedToRelay, 3_000);
+  await node.connect(relayAddress);
 
   // Relay sends agent infos to node
   const agentInfosOnRelay = new TextEncoder().encode("relay-initiated");
