@@ -5,7 +5,7 @@ import type { AgentInfoSigned } from "@peerkit/api";
 function makeAgent(agentId: string, expiresInMs = 60_000): AgentInfoSigned {
   return {
     agentId,
-    addresses: ["/ip4/127.0.0.1/tcp/9000"],
+    addresses: ["/ip4/127.0.0.1/tcp/9000/ws"],
     expiresAt: Date.now() + expiresInMs,
     signature: new Uint8Array(64),
   };
@@ -42,13 +42,13 @@ test("store overwrites existing entry for same agentId", () => {
   const store = new MemoryAgentStore();
   const v1: AgentInfoSigned = {
     agentId: "a1",
-    addresses: ["/ip4/1.1.1.1/tcp/1"],
+    addresses: ["/ip4/1.1.1.1/tcp/1/ws"],
     expiresAt: Date.now() + 60_000,
     signature: new Uint8Array(64),
   };
   const v2: AgentInfoSigned = {
     agentId: "a1",
-    addresses: ["/ip4/2.2.2.2/tcp/2"],
+    addresses: ["/ip4/2.2.2.2/tcp/2/ws"],
     expiresAt: Date.now() + 60_000,
     signature: new Uint8Array(64),
   };
