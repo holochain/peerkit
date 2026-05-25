@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-libp2p",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "description": "Peerkit transport facade — re-exports the platform-appropriate libp2p transport implementation",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "CAL-1.0",
@@ -32,9 +32,9 @@
     "test": "echo \"No tests to run\""
   },
   "dependencies": {
-    "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.9"
+    "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.10"
   },
   "optionalDependencies": {
-    "@peerkit/transport-libp2p-react-native": "^0.1.0-alpha.9"
+    "@peerkit/transport-libp2p-react-native": "^0.1.0-alpha.10"
   }
 }
