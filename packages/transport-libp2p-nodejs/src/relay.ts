@@ -2,6 +2,7 @@ import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
+import { ping } from "@libp2p/ping";
 import { webSockets } from "@libp2p/websockets";
 import type { ITransport, RelayAddress } from "@peerkit/api";
 import {
@@ -67,6 +68,21 @@ export interface CreateRelayOptions extends RelayOptions {
    * Defaults to {@link defaultRelayListenAddrs}
    */
   addrs?: string[];
+  /**
+   * Opt into the libp2p ping protocol (`/ipfs/ping/1.0.0`). Defaults to
+   * `false`.
+   *
+   * Ping is a transport-level liveness/RTT probe: a dialer sends a
+   * payload, the relay echoes it, and the dialer measures round-trip time.
+   * Useful for external monitoring of relay liveness, latency measurement
+   * before selecting a bootstrap relay, and keeping NAT/firewall mappings warm.
+   *
+   * Ping runs as a libp2p service handler, independent of the
+   * `/peerkit/access/v1` gate: it is **not** blocked for peers that have not
+   * completed the network-access handshake, so external monitors can health-
+   * check the relay without holding `NetworkAccessBytes`.
+   */
+  enablePing?: boolean;
 }
 
 /**
@@ -92,11 +108,13 @@ export async function createRelay(
     // Circuit relay server enables relay functionality.
     // applyDefaultLimit: false removes the 2-min / 128 KiB per-connection
     // caps so the relay can serve as a permanent data-channel fallback.
+    // ping is opt-in (off by default) for external liveness/RTT health checks.
     services: {
       relay: circuitRelayServer({
         reservations: { applyDefaultLimit: false },
       }),
       identify: identify(),
+      ...(options.enablePing ? { ping: ping() } : {}),
     },
     addresses: {
       listen: options?.addrs ?? defaultRelayListenAddrs,

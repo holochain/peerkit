@@ -3,6 +3,7 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { memory } from "@libp2p/memory";
+import { ping } from "@libp2p/ping";
 import {
   configure,
   getAnsiColorFormatter,
@@ -71,13 +72,17 @@ export interface TestRelayOptions {
    * Optional network access bytes included in counter-handshake responses
    */
   networkAccessBytes?: Uint8Array;
+  /**
+   * Opt into the libp2p ping protocol on the relay. Defaults to `false`.
+   */
+  enablePing?: boolean;
 }
 
 /**
  * Creates a test relay transport
  */
 export const createRelay = async (options: TestRelayOptions) => {
-  const { id, networkAccessBytes } = options;
+  const { id, networkAccessBytes, enablePing } = options;
   const address = `/memory/${uniqueTxAddress()}`;
   // This is mostly what the production relay is like, with the exception that
   // an in-memory transport is used.
@@ -91,11 +96,13 @@ export const createRelay = async (options: TestRelayOptions) => {
     // Circuit relay server enables relay functionality.
     // applyDefaultLimit: false removes the 2-min / 128 KiB per-connection
     // caps so the relay can serve as a permanent data-channel fallback.
+    // ping is opt-in (off by default) for external liveness/RTT health checks.
     services: {
       relay: circuitRelayServer({
         reservations: { applyDefaultLimit: false },
       }),
       identify: identify(),
+      ...(enablePing ? { ping: ping() } : {}),
     },
     addresses: {
       listen: [address],
