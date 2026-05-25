@@ -59,11 +59,11 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}
         run: |
-          OLD_VERSION=$(node -p "require('./packages/api/package.json').version")
           npm version "$RELEASE_VERSION" --no-git-tag-version --workspaces
           find packages -name "metrics.ts" -exec \
             sed -i "s/SCOPE_VERSION = \"[^\"]*\"/SCOPE_VERSION = \"$RELEASE_VERSION\"/" {} \;
-          node scripts/bump-internal-deps.mjs "$OLD_VERSION" "$RELEASE_VERSION"
+          find packages -name "package.json" -not -path "*/node_modules/*" -exec \
+            sed -i "s|\"@peerkit/\([^\"]*\)\": \"[^\"]*\"|\"@peerkit/\1\": \"^${RELEASE_VERSION}\"|g" {} \;
 
       - name: Generate changelog
         env:
