@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.10](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.9...v0.1.0-alpha.10)\] - 2026-05-25
+
+### Bug Fixes
+
+- _(release)_ Bump internal @peerkit/\* dep versions on release by @synchwire in [#62](https://github.com/holochain/peerkit/pull/62)
+  - Use sed to replace any @peerkit/\* dependency version in workspace package.json files with the new release version. This catches packages that fell behind, not just those at the immediately preceding version.
+- _(release)_ Bump internal @peerkit/\* dep versions on release by @synchwire
+
+### Miscellaneous Tasks
+
+- Depend on specific versions of peerkit packages by @jost-s in [#58](https://github.com/holochain/peerkit/pull/58)
+
+### Refactor
+
+- \[**BREAKING**\] _(transport-libp2p-nodejs)_ Switch direct connection transport to WebRTC by @jost-s
+- \[**BREAKING**\] _(transport-libp2p-nodejs)_ Switch from TCP to WebSockets by @jost-s
+- _(transport-libp2p-nodejs)_ Use in-memory transport in tests by @jost-s
+
 ## \[[0.1.0-alpha.9](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.8...v0.1.0-alpha.9)\] - 2026-05-20
 
 ### Features
@@ -20,6 +38,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Miscellaneous Tasks
 
+- Release v0.1.0-alpha.9 by @ThetaSinner in [#55](https://github.com/holochain/peerkit/pull/55)
 - _(packaging)_ Order types condition first in exports map by @synchwire
   - Publint flags `pkg.exports["."].types` appearing after `import` because conditional exports are order-sensitive: TypeScript walks the map in order and matches the first applicable condition, so a `types` entry after `import` is unreachable for the TypeScript resolver. Re-order the two entries in every package whose `exports` had them the wrong way around.
   - No behavior change for non-TypeScript runtimes; the entries point at the same files. Required for publint to pass in the upcoming CI check.
