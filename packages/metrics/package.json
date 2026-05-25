@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/metrics",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "description": "OpenTelemetry-based metric collection for peerkit",
   "keywords": [
     "peerkit",

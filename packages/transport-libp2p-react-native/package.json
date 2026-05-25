@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-libp2p-react-native",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "private": true,
   "description": "React Native libp2p transport for peerkit",
   "keywords": [
