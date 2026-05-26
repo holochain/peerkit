@@ -37,6 +37,7 @@
     { "path": "packages/transport-libp2p" },
     { "path": "packages/peerkit" },
     { "path": "packages/peer-session" },
-    { "path": "packages/cli" }
+    { "path": "packages/cli" },
+    { "path": "packages/relay" }
   ]
 }

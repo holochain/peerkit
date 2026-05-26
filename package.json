@@ -31,7 +31,8 @@
     "packages/transport-libp2p",
     "packages/peerkit",
     "packages/peer-session",
-    "packages/cli"
+    "packages/cli",
+    "packages/relay"
   ],
   "engines": {
     "node": ">=22"
