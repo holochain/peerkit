@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.11](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.10...v0.1.0-alpha.11)\] - 2026-05-27
+
+### Features
+
+- _(relay)_ Add @peerkit/relay quick-setup bootstrap/relay node by @veeso in [#64](https://github.com/holochain/peerkit/pull/64)
+  - Adds the @peerkit/relay package: a quick-setup bootstrap/relay node that wraps PeerkitRelayBuilder with lifecycle wiring (structured logging, OpenTelemetry metrics, in-memory agent store, signal-driven shutdown). The caller supplies a RelayConfig (raw NetworkAccessBytes + handler) and either drives the full process with run() or embeds a relay with startRelay().
+  - Wire package into workspaces, root tsconfig references, and deps - Add README with usage, config table, and metrics notes - Document the package in CLAUDE.md monorepo layout - Export public API (RelayConfig, startRelay, metrics/logger helpers) - Fix integration tests/helpers to the current transport API: /ws relay listen addrs, /webrtc node addrs, and the WebRTC circuit-address format
+
 ## \[[0.1.0-alpha.10](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.9...v0.1.0-alpha.10)\] - 2026-05-25
 
 ### Bug Fixes
@@ -14,6 +22,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Miscellaneous Tasks
 
+- Release v0.1.0-alpha.10 by @ThetaSinner in [#63](https://github.com/holochain/peerkit/pull/63)
 - Depend on specific versions of peerkit packages by @jost-s in [#58](https://github.com/holochain/peerkit/pull/58)
 
 ### Refactor
