@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/agent-store",
-  "version": "0.1.0-alpha.11",
+  "version": "0.1.0-alpha.12",
   "description": "In-memory agent store for the peerkit framework",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [
@@ -33,7 +33,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "@peerkit/api": "^0.1.0-alpha.11"
+    "@peerkit/api": "^0.1.0-alpha.12"
   },
   "devDependencies": {}
 }
