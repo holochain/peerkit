@@ -15,7 +15,7 @@ export interface RelayConfig {
   readonly id: string;
   readonly logLevel: string;
   readonly listenAddrs: readonly string[];
-  readonly NetworkAccessBytes: NetworkAccessBytes;
+  readonly networkAccessBytes: NetworkAccessBytes;
   readonly networkAccessHandler: NetworkAccessHandler;
   readonly otel?: OtelConfig;
   readonly publicHost?: string;

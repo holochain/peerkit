@@ -47,7 +47,7 @@ export async function startRelay(
   const relay = await new PeerkitRelayBuilder(config.networkAccessHandler)
     .withId(config.id)
     .withAddresses([...config.listenAddrs])
-    .withNetworkAccessBytes(config.NetworkAccessBytes)
+    .withNetworkAccessBytes(config.networkAccessBytes)
     .withAgentStore(agentStore)
     .withAgentsReceivedObserver((agentIds) => {
       recordAgentsReceived(agentIds.length);
