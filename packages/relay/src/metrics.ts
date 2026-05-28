@@ -18,7 +18,7 @@ import { initMetrics, shutdownMetrics } from "@peerkit/metrics";
 
 /** OpenTelemetry instrumentation scope owned by this package. */
 export const SCOPE_NAME = "@peerkit/relay";
-export const SCOPE_VERSION = "0.1.0-alpha.11";
+export const SCOPE_VERSION = "0.1.0-alpha.12";
 
 /**
  * Attribute set attached to every `peerkit.relay.access.checks` data point.
