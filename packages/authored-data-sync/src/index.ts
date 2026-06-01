@@ -64,3 +64,8 @@
 export { AuthoredDataSync } from "./authored-data-sync.js";
 export { FullReplicationPolicy as FullReplicationStrategy } from "./distribution.js";
 export { MemoryBlobStore } from "./memory-blob-store.js";
+export type {
+  IAuthoredDataSyncStore,
+  IStoredBlob,
+  Blob,
+} from "./types/store.js";

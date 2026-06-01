@@ -1,4 +1,9 @@
-import type { AgentId, AgentInfoSigned, IAgentStore } from "@peerkit/api";
+import type {
+  AgentId,
+  AgentInfoSigned,
+  IAgentStore,
+  INodeModule,
+} from "@peerkit/api";
 import { MemoryAgentStore } from "@peerkit/agent-store";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import { createTextMessageHandler, sendTextMessage } from "./messaging.js";
@@ -11,16 +16,19 @@ export interface NodeEventCallbacks {
   onRelayConnected(address: string): void;
 }
 
+export interface Peer {
+  alias: string;
+  agentId: AgentId;
+  connected: boolean;
+  connectionType: "direct" | "relayed" | null;
+}
+
 export interface NodeSession {
   node: PeerkitNode;
   myAgentId: AgentId;
   sendText(alias: string, text: string): Promise<void>;
-  listPeers(): Array<{
-    alias: string;
-    agentId: AgentId;
-    connected: boolean;
-    connectionType: "direct" | "relayed" | null;
-  }>;
+  listPeers(): Peer[];
+  connect(alias: string): Promise<void>;
   disconnect(alias: string): Promise<void>;
   shutdown(): Promise<void>;
 }
@@ -43,6 +51,8 @@ export async function startNode(options: {
   callbacks: NodeEventCallbacks;
   /** Override libp2p listen addresses. Defaults to the factory defaults when omitted. */
   addresses?: string[];
+  /** Extra node modules to register (e.g. AuthoredDataSync). */
+  modules?: INodeModule[];
 }): Promise<NodeSession> {
   let nextAlias = 1;
   const aliasToAgent = new Map<string, AgentId>();
@@ -109,6 +119,9 @@ export async function startNode(options: {
   if (options.addresses) {
     builder.withAddresses(options.addresses);
   }
+  for (const module of options.modules ?? []) {
+    builder.withModule(module);
+  }
   const node = await builder.build();
 
   // assignAlias is declared here so myAgentId can be const. Function
@@ -156,6 +169,22 @@ export async function startNode(options: {
             : null;
           return { alias, agentId, connected, connectionType };
         });
+    },
+
+    async connect(alias: string): Promise<void> {
+      const agentId = aliasToAgent.get(alias);
+      if (agentId === undefined) {
+        throw new Error(`Unknown alias: ${alias}`);
+      }
+      if (node.isConnected(agentId)) {
+        throw new Error(`Already connected to ${alias}`);
+      }
+      const info = agentStore.get(agentId);
+      const address = info?.addresses[0];
+      if (!address) {
+        throw new Error(`No address known for ${alias}`);
+      }
+      await node.transport.connect(address);
     },
 
     async disconnect(alias: string): Promise<void> {
