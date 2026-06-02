@@ -20,10 +20,11 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // infos have been received.
   const peersConnectedToRelay: NodeId[] = [];
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const relayListenAddr = `127.0.0.1:${relayPort}`;
   const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await createRelay({
     id: "relay",
-    addrs: [relayAddress],
+    addrs: [relayListenAddr],
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);
@@ -154,10 +155,11 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   // infos have been received.
   const peersConnectedToRelay: NodeId[] = [];
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const relayListenAddr = `127.0.0.1:${relayPort}`;
   const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await createRelay({
     id: "relay",
-    addrs: [relayAddress],
+    addrs: [relayListenAddr],
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);

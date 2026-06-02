@@ -4,43 +4,58 @@ import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
 import { webSockets } from "@libp2p/websockets";
-import type { ITransport, RelayAddress } from "@peerkit/api";
+import type {
+  ITransport,
+  RelayDialAddress,
+  RelayListenAddress,
+} from "@peerkit/api";
 import {
   TransportLibp2p,
   type RelayOptions,
 } from "@peerkit/transport-libp2p-core";
 import { createLibp2p } from "libp2p";
 import { isIP } from "node:net";
+import { hostPortToMultiaddr } from "./address.js";
 
 /**
- * Default libp2p listen addresses for a peerkit relay.
+ * Default listen addresses for a peerkit relay.
+ *
+ * Binds to all IPv4 and IPv6 interfaces on an OS-assigned ephemeral port.
+ * Suitable for tests and development environments where any free port works.
  */
-export const defaultRelayListenAddrs: RelayAddress[] = [
-  "/ip4/0.0.0.0/tcp/0/ws",
-  "/ip6/::/tcp/0/ws",
+export const defaultRelayListenAddrs: RelayListenAddress[] = [
+  "0.0.0.0:0",
+  "[::]:0",
 ];
 
 /**
  * Default listen address for a peerkit relay, suitable for local development.
- * Binds to all interfaces on port 9000.
+ * Binds to all IPv4 interfaces on port 9000.
  *
  * Use this as the default in local-development tools.
  * Do not use in production.
  */
-export const localDevRelayListenAddr: RelayAddress = "/ip4/0.0.0.0/tcp/9000/ws";
+export const localDevRelayListenAddr: RelayListenAddress = "0.0.0.0:9000";
 
 /**
  * Build the public announce address for a relay sitting behind NAT.
  * Peers use this address to dial the relay. The relay itself still binds
  * to `listenAddr`.
  *
- * @param listenAddr  The relay's local listen address.
+ * @param listenAddr  The relay's local listen address in `"host:port"` format.
  * @param publicIp    The relay's externally-reachable IP address.
  */
 export function buildRelayAnnounceAddr(
-  listenAddr: string,
+  listenAddr: RelayListenAddress,
   publicIp: string,
-): RelayAddress {
+): RelayDialAddress {
+  const url = new URL(`ws://${listenAddr}`);
+  const port = url.port;
+  if (!port || port === "0") {
+    throw new Error(
+      `buildRelayAnnounceAddr: "${listenAddr}" uses port 0 or has no port, which is not dialable`,
+    );
+  }
   const version = isIP(publicIp);
   if (version === 0) {
     throw new Error(
@@ -48,12 +63,6 @@ export function buildRelayAnnounceAddr(
     );
   }
   const prefix = version === 6 ? "/ip6" : "/ip4";
-  const port = /\/tcp\/(\d+)/.exec(listenAddr)?.[1] ?? "9000";
-  if (port === "0") {
-    throw new Error(
-      `buildRelayAnnounceAddr: listenAddr "${listenAddr}" uses port 0, which is not dialable`,
-    );
-  }
   return `${prefix}/${publicIp}/tcp/${port}/ws`;
 }
 
@@ -63,11 +72,21 @@ export function buildRelayAnnounceAddr(
  */
 export interface CreateRelayOptions extends RelayOptions {
   /**
-   * Listening addresses
+   * Listening addresses in `"host:port"` format (e.g. `"0.0.0.0:4001"`).
    *
-   * Defaults to {@link defaultRelayListenAddrs}
+   * IPv6 addresses must use bracket notation: `"[::]:4001"`.
+   *
+   * Defaults to {@link defaultRelayListenAddrs}.
    */
-  addrs?: string[];
+  addrs?: RelayListenAddress[];
+  /**
+   * Public IP to announce when the relay is behind NAT.
+   *
+   * The transport computes `/ip4/<ip>/tcp/<port>/ws` (or `/ip6/…`) for each
+   * listen address and configures libp2p to advertise it. Peers dial the
+   * public address; the relay still binds locally to `addrs`.
+   */
+  publicIp?: string;
   /**
    * Opt into the libp2p ping protocol (`/ipfs/ping/1.0.0`). Defaults to
    * `false`.
@@ -98,6 +117,18 @@ export interface CreateRelayOptions extends RelayOptions {
 export async function createRelay(
   options: CreateRelayOptions,
 ): Promise<ITransport> {
+  const addrs = options?.addrs ?? defaultRelayListenAddrs;
+  const listenMultiaddrs = addrs.map(hostPortToMultiaddr);
+
+  // If a public IP has been configured, the relay should use it to announce
+  // its dialable addresses.
+  const announce: string[] = [];
+  if (options.publicIp) {
+    for (const addr of addrs) {
+      announce.push(buildRelayAnnounceAddr(addr, options.publicIp));
+    }
+  }
+
   const libp2pNode = await createLibp2p({
     // Defer listening so TransportLibp2p can register protocol handlers
     // (including /peerkit/access/v1) before any inbound connection arrives.
@@ -117,7 +148,8 @@ export async function createRelay(
       ...(options.enablePing ? { ping: ping() } : {}),
     },
     addresses: {
-      listen: options?.addrs ?? defaultRelayListenAddrs,
+      listen: listenMultiaddrs,
+      ...(announce.length > 0 ? { announce } : {}),
     },
   });
   const transport = new TransportLibp2p(libp2pNode, options);

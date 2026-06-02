@@ -31,7 +31,7 @@ export async function run(config: RelayConfig): Promise<void> {
   logger.info("starting relay", {
     logLevel: config.logLevel,
     listenAddrs: config.listenAddrs,
-    publicHost: config.publicHost,
+    publicIp: config.publicIp,
     otelEnabled: config.otel !== undefined,
   });
 
@@ -69,20 +69,9 @@ export async function run(config: RelayConfig): Promise<void> {
     const startedAt = new Date().toISOString();
     const startedRelay = relay;
 
-    const buildMultiaddrs = (): readonly string[] => {
-      const base = config.listenAddrs.map(
-        (addr) => `${addr}/p2p/${startedRelay.nodeId}`,
-      );
-      if (!config.publicHost) return base;
-      return [
-        `/dns4/${config.publicHost}/tcp/${derivePort(config.listenAddrs)}/p2p/${startedRelay.nodeId}`,
-        ...base,
-      ];
-    };
-
     logger.info("relay ready", {
       nodeId: startedRelay.nodeId,
-      multiaddrs: buildMultiaddrs(),
+      multiaddrs: startedRelay.transport.getListenAddresses(),
       startedAt,
     });
   } catch (error: unknown) {
@@ -196,12 +185,4 @@ async function rollback(args: RollbackArgs): Promise<void> {
       });
     }
   }
-}
-
-function derivePort(listenAddrs: readonly string[]): number {
-  for (const addr of listenAddrs) {
-    const m = /\/tcp\/(\d+)/.exec(addr);
-    if (m && m[1]) return Number.parseInt(m[1], 10);
-  }
-  return 4001;
 }

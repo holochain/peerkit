@@ -1,4 +1,10 @@
-import type { AgentId, AgentInfoSigned, IAgentStore } from "@peerkit/api";
+import type {
+  AgentId,
+  AgentInfoSigned,
+  IAgentStore,
+  NodeAddress,
+  RelayDialAddress,
+} from "@peerkit/api";
 import { MemoryAgentStore } from "@peerkit/agent-store";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import { createTextMessageHandler, sendTextMessage } from "./messaging.js";
@@ -8,7 +14,7 @@ export interface NodeEventCallbacks {
   onPeerDisconnected(alias: string): void;
   onAgentsReceived(agentIds: AgentId[]): void;
   onMessageReceived(alias: string, text: string): void;
-  onRelayConnected(address: string): void;
+  onRelayConnected(address: NodeAddress): void;
 }
 
 export interface NodeSession {
@@ -39,10 +45,10 @@ class ObservableAgentStore extends MemoryAgentStore {
 }
 
 export async function startNode(options: {
-  bootstrapRelays: string[];
+  bootstrapRelays: RelayDialAddress[];
   callbacks: NodeEventCallbacks;
-  /** Override libp2p listen addresses. Defaults to the factory defaults when omitted. */
-  addresses?: string[];
+  /** Override transport listen addresses. Set to the transport's defaults when omitted. */
+  addresses?: NodeAddress[];
 }): Promise<NodeSession> {
   let nextAlias = 1;
   const aliasToAgent = new Map<string, AgentId>();

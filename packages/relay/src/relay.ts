@@ -44,11 +44,17 @@ export async function startRelay(
   const agents = logger.getChild("agents");
   const lifecycle = logger.getChild("lifecycle");
 
-  const relay = await new PeerkitRelayBuilder(config.networkAccessHandler)
+  const builder = new PeerkitRelayBuilder(config.networkAccessHandler)
     .withId(config.id)
     .withAddresses([...config.listenAddrs])
     .withNetworkAccessBytes(config.networkAccessBytes)
-    .withAgentStore(agentStore)
+    .withAgentStore(agentStore);
+
+  if (config.publicIp) {
+    builder.withPublicIp(config.publicIp);
+  }
+
+  const relay = await builder
     .withAgentsReceivedObserver((agentIds) => {
       recordAgentsReceived(agentIds.length);
       agents.info("agents received", {

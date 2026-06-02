@@ -1,5 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-import type { AgentId, NodeId } from "@peerkit/api";
+import type { AgentId, NodeId, RelayListenAddress } from "@peerkit/api";
 import {
   PeerkitRelayBuilder,
   serializeAgentInfoList,
@@ -10,28 +10,30 @@ const logger = getLogger(["peerkit", "peer-session"]);
 
 export interface RelaySession {
   relay: PeerkitRelay;
-  /** Full dial address peers can use to connect: `<listenAddr>/p2p/<peerId>` */
+  /** Full dial address peers can use to connect to this relay. */
   dialAddr: string;
   /** Stop the broadcast timer and shut down the relay transport. */
   shutdown(): Promise<void>;
 }
 
 export async function startRelay(options: {
-  listenAddr: string;
+  listenAddr: RelayListenAddress;
   /**
-   * The address under which the relay is publically dialable.
-   * Required when the relay is behind NAT: listen on
-   * `0.0.0.0`, but announce the public IP so peers can actually reach it.
-   *
-   * The format of the address depends on the transport implementation.
+   * The public IP of the relay when it is behind NAT.
+   * The transport announces this IP so peers can reach the relay.
+   * The relay still binds locally to `listenAddr`.
    */
-  announceAddr?: string;
+  publicIp?: string;
   onPeerConnected?: (nodeId: NodeId) => void;
   onAgentsReceived?: (agentIds: AgentId[]) => void;
 }): Promise<RelaySession> {
   const builder = new PeerkitRelayBuilder(async () => true).withAddresses([
     options.listenAddr,
   ]);
+
+  if (options.publicIp) {
+    builder.withPublicIp(options.publicIp);
+  }
 
   if (options.onPeerConnected) {
     builder.withPeerConnectedObserver(options.onPeerConnected);
@@ -50,8 +52,12 @@ export async function startRelay(options: {
   });
 
   relay = await builder.build();
-  const baseAddr = options.announceAddr ?? options.listenAddr;
-  const dialAddr = `${baseAddr}/p2p/${relay.transport.getNodeId()}`;
+  // The transport exposes its actual listen addresses after startup.
+  // Use the first one as the dial address peers use to bootstrap.
+  const dialAddr = relay.transport.getListenAddresses()[0];
+  if (!dialAddr) {
+    throw new Error("Relay transport reported no listen addresses after start");
+  }
 
   // Broadcast all stored agents periodically so peers that joined after a
   // node's last publish still receive fresh info well before TTL expiry.

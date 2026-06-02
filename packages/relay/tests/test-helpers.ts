@@ -77,10 +77,8 @@ export async function startTestRelay(
         {
           id: "test-relay",
           logLevel: "warn",
-          // The Node.js relay transport speaks WebSockets, so the listen
-          // address must carry the `/ws` suffix to be dialable.
-          listenAddrs: [`/ip4/127.0.0.1/tcp/${port}/ws`],
-          NetworkAccessBytes: accessBytes,
+          listenAddrs: [`127.0.0.1:${port}`],
+          networkAccessBytes: accessBytes,
           networkAccessHandler: async (_nodeId, bytes) =>
             bytesEqual(bytes, accessBytes),
         },
