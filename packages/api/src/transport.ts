@@ -1,5 +1,5 @@
-import type { NodeId, NodeAddress, RelayAddress } from "./primitives.js";
-export type { NodeId, NodeAddress, RelayAddress };
+import type { NodeId, NodeAddress, RelayDialAddress } from "./primitives.js";
+export type { NodeId, NodeAddress, RelayDialAddress };
 
 /**
  * Byte sequence to prove access to a network has been granted
@@ -31,13 +31,14 @@ export type MessageHandler = (
  * Called when a connection to the relay is complete, including the network
  * access handshake, and the node can be contacted through the relay.
  *
- * Provides the relay's address and node ID for full address construction.
+ * Provides the node's own dial address, fully qualified to be shared with
+ * peers so they can reach this node via the relay.
  *
  * Fire-and-forget notification. The transport does not await this, but logs
  * errors.
  */
 export type ConnectedToRelayCallback = (
-  relayAddress: RelayAddress,
+  nodeAddress: NodeAddress,
   relayNodeId: NodeId,
   transport: ITransport,
 ) => Promise<void>;
@@ -232,6 +233,17 @@ export interface ITransport {
    * @param nodeId The node ID to disconnect from
    */
   disconnect(nodeId: NodeId): Promise<void>;
+
+  /**
+   * Return the transport's actual dial addresses after startup.
+   *
+   * Each string is a fully-qualified address that peers can use to connect,
+   * including the node's identity suffix where the transport requires it.
+   *
+   * Use this to obtain the relay's dial address rather than constructing it
+   * from config.
+   */
+  getListenAddresses(): string[];
 
   /**
    * Shut down the transport and all underlying connections.

@@ -5,7 +5,7 @@ import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
-import type { ITransport, NodeAddress, RelayAddress } from "@peerkit/api";
+import type { ITransport, NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
   type NodeOptions,
@@ -16,7 +16,7 @@ import { createLibp2p } from "libp2p";
  * Default libp2p listen addresses for a peerkit node.
  *
  * `/p2p-circuit` enables inbound relayed connections.
- * WebSocket enables direct outbound connections to the relay.
+ * WebRTC enables inbound direct connections.
  */
 export const defaultNodeListenAddrs: NodeAddress[] = [
   "/p2p-circuit",
@@ -29,17 +29,20 @@ export const defaultNodeListenAddrs: NodeAddress[] = [
  */
 export interface CreateNodeOptions extends NodeOptions {
   /**
-   * Listening addresses
+   * Raw libp2p multiaddr listen addresses, e.g. `"/p2p-circuit"`, `"/webrtc"`.
    *
-   * Defaults to {@link defaultNodeListenAddrs}
+   * **For testing only.** In production leave this unset and let the transport
+   * use {@link defaultNodeListenAddrs}.
+   *
+   * Defaults to {@link defaultNodeListenAddrs}.
    */
-  addrs?: string[];
+  addrs?: NodeAddress[];
   /**
    * Relay multiaddrs to dial at startup. The transport invokes
    * {@link NodeOptions.connectedToRelayCallback} once the dialable circuit
    * address has been received.
    */
-  bootstrapRelays?: RelayAddress[];
+  bootstrapRelays?: RelayDialAddress[];
   /**
    * List of ICE server URLs needed for establishing direct connections.
    */

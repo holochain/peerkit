@@ -9,7 +9,6 @@ import {
 } from "@logtape/logtape";
 import { startNode, startRelay } from "@peerkit/peer-session";
 import {
-  buildRelayAnnounceAddr,
   localDevRelayListenAddr,
   defaultNodeListenAddrs,
 } from "@peerkit/transport-libp2p-nodejs";
@@ -55,13 +54,9 @@ program
     });
 
     const listenAddr = addr ?? localDevRelayListenAddr;
-    let announceAddr: string | undefined;
-    if (opts.publicIp) {
-      announceAddr = buildRelayAnnounceAddr(listenAddr, opts.publicIp);
-    }
     const relaySession = await startRelay({
       listenAddr,
-      announceAddr,
+      publicIp: opts.publicIp,
       onPeerConnected: (nodeId) => {
         console.log(`[Peer connected]: ${nodeId}`);
       },

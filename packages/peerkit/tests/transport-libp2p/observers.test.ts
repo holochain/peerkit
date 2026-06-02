@@ -1,5 +1,9 @@
 import { reset } from "@logtape/logtape";
-import type { RelayAddress } from "@peerkit/api";
+import type {
+  NodeAddress,
+  RelayDialAddress,
+  RelayListenAddress,
+} from "@peerkit/api";
 import { createNode } from "@peerkit/transport-libp2p";
 import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -15,14 +19,14 @@ afterEach(reset);
 test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive", async () => {
   // Node 1 listens on a known port.
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([address])
+    .withAddresses([node1DialAddr])
     .build();
 
   // Pre-populate node 1's agent store so it has something to send when node 2
@@ -31,7 +35,7 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
     signAgentInfo(
       {
         agentId: node1.keyPair.agentId(),
-        addresses: [address],
+        addresses: [node1DialAddr],
         expiresAt: Date.now() + 60_000,
       },
       node1.keyPair,
@@ -49,7 +53,7 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
     })
     .build();
 
-  await node2.transport.connect(address);
+  await node2.transport.connect(node1DialAddr);
 
   // Observer must fire with node 1's agent ID as the advertised agent.
   await vi.waitFor(
@@ -65,11 +69,12 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
 
 test("withRelayConnectedObserver on node fires with the relay address", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
+  const relayListenAddr: RelayListenAddress = `0.0.0.0:${relayPort}`;
+  const relayDialAddress: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
 
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayAddress])
+    .withAddresses([relayListenAddr])
     .build();
 
   const relayAddresses: string[] = [];
@@ -78,7 +83,7 @@ test("withRelayConnectedObserver on node fires with the relay address", async ()
     messageHandler: async () => {},
   })
     .withId("node")
-    .withBootstrapRelays([relayAddress])
+    .withBootstrapRelays([relayDialAddress])
     .withRelayConnectedObserver((address) => {
       relayAddresses.push(address);
     })
@@ -95,12 +100,13 @@ test("withRelayConnectedObserver on node fires with the relay address", async ()
 
 test("withAgentsReceivedObserver on relay fires when a node sends agent info", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
+  const relayListenAddr = `0.0.0.0:${relayPort}`;
+  const relayBootstrapAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
 
   const receivedAgentIds: string[] = [];
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayAddress])
+    .withAddresses([relayListenAddr])
     .withAgentsReceivedObserver((agentIds) => {
       receivedAgentIds.push(...agentIds);
     })
@@ -113,7 +119,7 @@ test("withAgentsReceivedObserver on relay fires when a node sends agent info", a
     messageHandler: async () => {},
   })
     .withId("node")
-    .withBootstrapRelays([relayAddress])
+    .withBootstrapRelays([relayBootstrapAddr])
     .build();
 
   await vi.waitFor(
@@ -127,7 +133,7 @@ test("withAgentsReceivedObserver on relay fires when a node sends agent info", a
 
 test("message handler has the sender's AgentId", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const receivedMessages: Array<{ fromAgent: string; text: string }> = [];
 
@@ -142,7 +148,7 @@ test("message handler has the sender's AgentId", async () => {
     },
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
@@ -152,7 +158,7 @@ test("message handler has the sender's AgentId", async () => {
     .withId("node2")
     .build();
 
-  await node2.transport.connect(node1Address);
+  await node2.transport.connect(node1DialAddr);
 
   // The AgentId↔NodeId mapping is established during the access handshake,
   // so the message handler receives the correct AgentId without any delay.
@@ -176,7 +182,7 @@ test("message handler has the sender's AgentId", async () => {
 
 test("message is dropped when peer does not send an AgentId prefix and access is granted", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   // Track when the transport-level message handler fires on node1 so we know
   // the message arrived and was processed and dropped by the internal handler
@@ -188,7 +194,7 @@ test("message is dropped when peer does not send an AgentId prefix and access is
     messageHandler: appMessageHandler,
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .withTransportFactory(async (options) => {
       const original = options.messageHandler;
       return createNode({
@@ -216,7 +222,7 @@ test("message is dropped when peer does not send an AgentId prefix and access is
     })
     .build();
 
-  await node2.transport.connect(node1Address);
+  await node2.transport.connect(node1DialAddr);
   await node2.transport.send(
     node1.transport.getNodeId(),
     new TextEncoder().encode("hello"),
@@ -235,7 +241,7 @@ test("message is dropped when peer does not send an AgentId prefix and access is
 
 test("withPeerDisconnectedObserver on node fires with AgentId when peer disconnects", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   // node1 records connected and disconnected agent IDs so it can be asserted
   // the disconnect observer fires with the correct AgentId and cleans up
@@ -248,7 +254,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .withPeerConnectedObserver((fromAgent) => {
       connectedAgents.push(fromAgent);
     })
@@ -264,7 +270,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
     .withId("node2")
     .build();
 
-  await node2.transport.connect(node1Address);
+  await node2.transport.connect(node1DialAddr);
 
   // Wait for the access handshake to complete, so node1 has the AgentId mapping.
   await vi.waitFor(() => expect(connectedAgents).toHaveLength(1), {
@@ -288,7 +294,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
 test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts down abruptly", async () => {
   // Peer shuts down rather than a graceful disconnect().
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const connectedAgents: string[] = [];
   const disconnectedAgents: string[] = [];
@@ -298,7 +304,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .withPeerConnectedObserver((fromAgent) => {
       connectedAgents.push(fromAgent);
     })
@@ -314,7 +320,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
     .withId("node2")
     .build();
 
-  await node2.transport.connect(node1Address);
+  await node2.transport.connect(node1DialAddr);
 
   // Wait for the handshake so node1 has node2's AgentId in its maps.
   await vi.waitFor(() => expect(connectedAgents).toHaveLength(1), {
@@ -335,14 +341,14 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
 
 test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .build();
 
   const disconnectedAgents: string[] = [];
@@ -356,7 +362,7 @@ test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect"
     })
     .build();
 
-  await node2.transport.connect(node1Address);
+  await node2.transport.connect(node1DialAddr);
 
   // After disconnect, send() via the AgentId should throw because the mapping
   // has been pruned — a stale NodeId would otherwise silently fail later.
@@ -377,11 +383,12 @@ test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect"
 
 test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
+  const relayListenAddr = `0.0.0.0:${relayPort}`;
+  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
 
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayAddress])
+    .withAddresses([relayListenAddr])
     .build();
 
   const nodePort = await getPort({ port: portNumbers(30_000, 40_000) });
@@ -393,7 +400,7 @@ test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections",
     .withAddresses([`/ip4/127.0.0.1/tcp/${nodePort}/ws`])
     .build();
 
-  await node.transport.connect(relayAddress);
+  await node.transport.connect(relayDialAddr);
 
   // The relay should record the node as connected after the handshake.
   await vi.waitFor(() => expect(relay.connectedPeers.size).toBe(1), {
@@ -413,11 +420,12 @@ test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections",
 
 test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
+  const relayListenAddr = `0.0.0.0:${relayPort}`;
+  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
 
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayAddress])
+    .withAddresses([relayListenAddr])
     .build();
 
   const node = await new PeerkitNodeBuilder({
@@ -425,7 +433,7 @@ test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store
     messageHandler: async () => {},
   })
     .withId("node")
-    .withBootstrapRelays([relayAddress])
+    .withBootstrapRelays([relayDialAddr])
     .build();
 
   const agentId = node.keyPair.agentId();
@@ -458,7 +466,7 @@ test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store
 
 test("access is denied when network access bytes are wrong even though AgentId is valid", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const VALID_NAB = 0xab;
   const INVALID_NAB = 0xcd;
@@ -473,7 +481,7 @@ test("access is denied when network access bytes are wrong even though AgentId i
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .build();
 
   // node2 sends wrong app bytes. PeerkitNodeBuilder still prepends the
@@ -486,7 +494,7 @@ test("access is denied when network access bytes are wrong even though AgentId i
     .withNetworkAccessBytes(new Uint8Array([INVALID_NAB]))
     .build();
 
-  await expect(node2.transport.connect(node1Address)).rejects.toThrow();
+  await expect(node2.transport.connect(node1DialAddr)).rejects.toThrow();
 
   // node1's handler received the stripped app bytes, not the 32-byte AgentId
   // prefix, confirming that byte extraction and delegation work correctly.
@@ -500,14 +508,14 @@ test("access is denied when network access bytes are wrong even though AgentId i
 
 test("PeerkitNode.isConnected reflects live connection state by AgentId", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
@@ -521,7 +529,7 @@ test("PeerkitNode.isConnected reflects live connection state by AgentId", async 
   expect(node1.isConnected(node2.keyPair.agentId())).toBe(false);
   expect(node2.isConnected(node1.keyPair.agentId())).toBe(false);
 
-  await node2.transport.connect(node1Address);
+  await node2.transport.connect(node1DialAddr);
 
   // The AgentId↔NodeId mapping is established during the access handshake, so
   // node2 can check by AgentId immediately after connect() resolves.
@@ -551,14 +559,14 @@ test("PeerkitNode.isConnected reflects live connection state by AgentId", async 
 
 test("PeerkitNode.getConnectedAgents lists AgentIds of connected peers", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([node1Address])
+    .withAddresses([node1DialAddr])
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
@@ -572,7 +580,7 @@ test("PeerkitNode.getConnectedAgents lists AgentIds of connected peers", async (
   expect(node1.getConnectedAgents()).toHaveLength(0);
   expect(node2.getConnectedAgents()).toHaveLength(0);
 
-  await node2.transport.connect(node1Address);
+  await node2.transport.connect(node1DialAddr);
 
   // node2 knows node1's AgentId immediately after connect().
   expect(node2.getConnectedAgents()).toContain(node1.keyPair.agentId());

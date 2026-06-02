@@ -16,7 +16,7 @@ import type {
   NodeId,
   PeerConnectedCallback,
   PeerDisconnectedCallback,
-  RelayAddress,
+  RelayDialAddress,
 } from "@peerkit/api";
 import { createNode, type CreateNodeOptions } from "@peerkit/transport-libp2p";
 import { bytesToHex } from "@noble/hashes/utils.js";
@@ -65,7 +65,7 @@ export type PeerkitNodeTransportFactory = (
  * ```
  */
 export class PeerkitNodeBuilder {
-  bootstrapRelays: RelayAddress[] = [];
+  bootstrapRelays: RelayDialAddress[] = [];
   id?: string;
   addresses?: NodeAddress[];
   iceServerUrls?: string[];
@@ -75,7 +75,7 @@ export class PeerkitNodeBuilder {
   agentsReceivedObserver?: (agentIds: AgentId[]) => void;
   peerConnectedObserver?: (fromAgent: AgentId) => void;
   peerDisconnectedObserver?: (fromAgent: AgentId) => void;
-  connectedToRelayObserver?: (address: RelayAddress) => void;
+  connectedToRelayObserver?: (address: NodeAddress) => void;
   private readonly modules: INodeModule[] = [];
 
   readonly networkAccessHandler: NetworkAccessHandler;
@@ -92,7 +92,7 @@ export class PeerkitNodeBuilder {
     this.messageHandler = messageHandler;
   }
 
-  withBootstrapRelays(relays: RelayAddress[]): this {
+  withBootstrapRelays(relays: RelayDialAddress[]): this {
     this.bootstrapRelays = relays;
     return this;
   }

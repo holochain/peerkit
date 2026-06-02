@@ -10,6 +10,7 @@ import type {
   NodeId,
   PeerConnectedCallback,
   PeerDisconnectedCallback,
+  RelayListenAddress,
 } from "@peerkit/api";
 import {
   createRelay,
@@ -35,14 +36,15 @@ export type PeerkitRelayTransportFactory = (
  * ```ts
  * const relay = await new PeerkitRelayBuilder(async () => true)
  *   .withId("relay")
- *   .withAddresses(["/ip4/0.0.0.0/tcp/9000/ws"])
+ *   .withAddresses(["0.0.0.0:4001"])
  *   .build();
  * ```
  */
 export class PeerkitRelayBuilder {
   networkAccessHandler: NetworkAccessHandler;
   id?: string;
-  addresses?: string[];
+  addresses?: RelayListenAddress[];
+  publicIp?: string;
   networkAccessBytes?: NetworkAccessBytes;
   agentStore?: IAgentStore;
   relayTransportFactory?: PeerkitRelayTransportFactory;
@@ -59,8 +61,13 @@ export class PeerkitRelayBuilder {
     return this;
   }
 
-  withAddresses(addresses: string[]): this {
+  withAddresses(addresses: RelayListenAddress[]): this {
     this.addresses = addresses;
+    return this;
+  }
+
+  withPublicIp(ip: string): this {
+    this.publicIp = ip;
     return this;
   }
 
@@ -147,12 +154,14 @@ export class PeerkitRelayBuilder {
           peerDisconnectedCallback,
           networkAccessHandler: this.networkAccessHandler,
           addrs: this.addresses,
+          publicIp: this.publicIp,
           id: this.id,
           networkAccessBytes: this.networkAccessBytes,
         })
       : await createRelay({
           id: this.id,
           addrs: this.addresses,
+          publicIp: this.publicIp,
           networkAccessBytes: this.networkAccessBytes,
           agentsReceivedCallback,
           peerConnectedCallback,

@@ -1,5 +1,5 @@
 import { reset } from "@logtape/logtape";
-import type { RelayAddress } from "@peerkit/api";
+import type { RelayDialAddress } from "@peerkit/api";
 import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { buildOwnAgentInfo } from "../../src/agent-info.js";
@@ -13,12 +13,13 @@ beforeEach(setupTestLogger);
 afterEach(reset);
 
 test("Relay sends known agents to connecting peer", async () => {
-  // Create the relay
+  // Create the relay listening on a known port.
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
+  const relayListenAddr = `127.0.0.1:${relayPort}`;
+  const relayBootstrapAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayAddress])
+    .withAddresses([relayListenAddr])
     .build();
 
   // Create node 1 with the relay address. Access handler allows everyone.
@@ -27,7 +28,7 @@ test("Relay sends known agents to connecting peer", async () => {
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withBootstrapRelays([relayAddress])
+    .withBootstrapRelays([relayBootstrapAddr])
     .build();
 
   // Wait for node 1 to connect to relay and add its own address to
@@ -51,7 +52,7 @@ test("Relay sends known agents to connecting peer", async () => {
     messageHandler: async () => {},
   })
     .withId("node2")
-    .withBootstrapRelays([relayAddress])
+    .withBootstrapRelays([relayBootstrapAddr])
     .build();
 
   // Wait for node 2 to add its own agent info to its agent store.
@@ -80,12 +81,13 @@ test("Relay sends known agents to connecting peer", async () => {
 });
 
 test("Node connects to another node using address learned from relay", async () => {
-  // Create the relay
+  // Create the relay listening on a known port.
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
+  const relayListenAddr = `127.0.0.1:${relayPort}`;
+  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayAddress])
+    .withAddresses([relayListenAddr])
     .build();
 
   // Create node 1 and wait until it has registered its own agent info via the
@@ -95,7 +97,7 @@ test("Node connects to another node using address learned from relay", async () 
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withBootstrapRelays([relayAddress])
+    .withBootstrapRelays([relayDialAddr])
     .build();
   await vi.waitUntil(() => node1.agentStore.get(node1.keyPair.agentId()), {
     timeout: 5_000,
@@ -118,7 +120,7 @@ test("Node connects to another node using address learned from relay", async () 
     messageHandler: async () => {},
   })
     .withId("node2")
-    .withBootstrapRelays([relayAddress])
+    .withBootstrapRelays([relayDialAddr])
     .build();
   // Wait for node 2 to register its own agent info, to send to node 1 later.
   const node2AgentInfo = await vi.waitUntil(

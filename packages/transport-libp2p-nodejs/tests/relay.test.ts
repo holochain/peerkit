@@ -140,36 +140,35 @@ test("Relay knows node's agent infos after agent exchange", async () => {
   await relay.shutDown();
 });
 
-test("buildRelayAnnounceAddr: IPv4 WebSocket listen address", () => {
-  // Standard case: extract port from a WebSocket listen address
+test("buildRelayAnnounceAddr: IPv4 host:port listen address", () => {
+  // Standard case: extract port from a host:port listen address
   // and substitute the public IP.
   assert.equal(
-    buildRelayAnnounceAddr("/ip4/0.0.0.0/tcp/9000/ws", "1.2.3.4"),
+    buildRelayAnnounceAddr("0.0.0.0:9000", "1.2.3.4"),
     "/ip4/1.2.3.4/tcp/9000/ws",
   );
 });
 
-test("buildRelayAnnounceAddr: IPv6 WebSocket listen address", () => {
+test("buildRelayAnnounceAddr: IPv6 host:port listen address", () => {
   // IPv6 public IP should produce an /ip6 announce address.
   assert.equal(
-    buildRelayAnnounceAddr("/ip6/::/tcp/9000/ws", "::1"),
+    buildRelayAnnounceAddr("[::]:9000", "::1"),
     "/ip6/::1/tcp/9000/ws",
   );
 });
 
-test("buildRelayAnnounceAddr: falls back to port 9000 when listen address has no TCP port", () => {
-  // Ephemeral / malformed listen addresses that lack a port should
-  // default to 9000.
-  assert.equal(
-    buildRelayAnnounceAddr("/memory/test", "1.2.3.4"),
-    "/ip4/1.2.3.4/tcp/9000/ws",
+test("buildRelayAnnounceAddr: throws when port is 0", () => {
+  // Port 0 is ephemeral and not dialable, so an error must be thrown.
+  assert.throws(
+    () => buildRelayAnnounceAddr("0.0.0.0:0", "1.2.3.4"),
+    /port 0.*not dialable/,
   );
 });
 
 test("buildRelayAnnounceAddr: throws on invalid public IP", () => {
   // Non-IP strings must be rejected immediately.
   assert.throws(
-    () => buildRelayAnnounceAddr("/ip4/0.0.0.0/tcp/9000/ws", "not-an-ip"),
+    () => buildRelayAnnounceAddr("0.0.0.0:9000", "not-an-ip"),
     /not a valid IP address/,
   );
 });

@@ -23,7 +23,7 @@ import type {
   IStream,
   NetworkAccessBytes,
   NodeId,
-  RelayAddress,
+  RelayDialAddress,
   ConnectedToRelayCallback,
   NodeAddress,
   PeerConnectedCallback,
@@ -219,6 +219,10 @@ export class TransportLibp2p implements ITransport {
     return this.libp2p.peerId.toString();
   }
 
+  getListenAddresses(): string[] {
+    return this.libp2p.getMultiaddrs().map((m) => m.toString());
+  }
+
   async connect(nodeAddress: NodeAddress): Promise<void> {
     this.logger.info("Connecting to node {*}", { nodeAddress });
     const connection = await this.libp2p.dial(multiaddr(nodeAddress));
@@ -365,7 +369,7 @@ export class TransportLibp2p implements ITransport {
    *
    * Fire-and-forget. Platform factories typically call this during bootstrap.
    */
-  async connectToRelays(relays: RelayAddress[]): Promise<void> {
+  async connectToRelays(relays: RelayDialAddress[]): Promise<void> {
     const localPeerId = this.libp2p.peerId.toString();
     // Connect to all relays in parallel
     await Promise.allSettled(
@@ -427,7 +431,7 @@ export class TransportLibp2p implements ITransport {
     );
   }
 
-  private async connectToRelay(relay: RelayAddress): Promise<PeerId> {
+  private async connectToRelay(relay: RelayDialAddress): Promise<PeerId> {
     const addr = multiaddr(relay);
     this.logger.info("Connecting to relay {*}", { relay });
     const connection = await this.libp2p.dial(addr);
