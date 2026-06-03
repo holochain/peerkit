@@ -44,7 +44,7 @@
     }
   },
   "scripts": {
-    "test": "echo \"No tests to run\""
+    "test": "vitest --run"
   },
   "dependencies": {
     "@chainsafe/libp2p-noise": "^17.0.0",
