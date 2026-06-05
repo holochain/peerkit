@@ -227,6 +227,11 @@ export class TransportLibp2p implements ITransport {
     this.logger.info("Connecting to node {*}", { nodeAddress });
     const connection = await this.libp2p.dial(multiaddr(nodeAddress));
 
+    this.logger.debug("Node dial complete, starting access handshake {*}", {
+      nodeAddress,
+      peerId: connection.remotePeer.toString(),
+    });
+
     await this.performNetworkAccessHandshake(connection);
 
     // Connection to peer established, run callback.
@@ -445,6 +450,9 @@ export class TransportLibp2p implements ITransport {
   ): Promise<PeerId> {
     // Initiate access handshake
     const stream = await connection.newStream(CURRENT_ACCESS_PROTOCOL);
+    this.logger.debug(`Opened ${CURRENT_ACCESS_PROTOCOL} stream {*}`, {
+      peerId: connection.remotePeer.toString(),
+    });
 
     // Send network access bytes to remote.
     stream.send(this.localNetworkAccessBytes);
@@ -453,6 +461,9 @@ export class TransportLibp2p implements ITransport {
     const responseBytes = await new Promise<Uint8Array>((resolve, reject) => {
       // Close stream and throw error after handshake timed out.
       const timer = setTimeout(async () => {
+        this.logger.debug(`Access handshake response timed out {*}`, {
+          peerId: connection.remotePeer.toString(),
+        });
         stream
           .close()
           .catch((error) =>
@@ -469,6 +480,10 @@ export class TransportLibp2p implements ITransport {
         "close",
         () => {
           clearTimeout(timer);
+          this.logger.debug(
+            `${CURRENT_ACCESS_PROTOCOL} stream closed before response {*}`,
+            { peerId: connection.remotePeer.toString() },
+          );
           stream
             .close()
             .catch((error) =>
@@ -487,6 +502,13 @@ export class TransportLibp2p implements ITransport {
         "message",
         (message) => {
           clearTimeout(timer);
+          this.logger.debug(
+            `Received access response on ${CURRENT_ACCESS_PROTOCOL} {*}`,
+            {
+              peerId: connection.remotePeer.toString(),
+              byteLength: message.data.byteLength,
+            },
+          );
           resolve(message.data.subarray());
         },
         { once: true },

@@ -18,6 +18,12 @@
  *     `RTCPeerConnection`, `RTCSessionDescription`, etc. used by
  *     `@libp2p/webrtc`.
  *
+ * It also installs the WHATWG `Event` / `EventTarget` / `CustomEvent` globals
+ * that Hermes lacks but libp2p extends at module-evaluation time (see
+ * `event-target-polyfill`), plus the `TextEncoder` / `TextDecoder` globals that
+ * `uint8arrays` constructs at module-evaluation time (see `text-codec-polyfill`).
+ * Those steps are order-independent relative to the three above.
+ *
  * Consumers must also configure Metro to map bare Node imports (`crypto`,
  * `stream`, `buffer`, `events`) to their React Native equivalents and enable
  * `@babel/plugin-transform-private-methods` (loose) so libp2p's ES2022
@@ -30,6 +36,9 @@ import { Buffer } from "buffer";
 import process from "process";
 import { install as installQuickCrypto } from "react-native-quick-crypto";
 import { registerGlobals as registerWebRtcGlobals } from "react-native-webrtc";
+import { installEventTargetPolyfill } from "./event-target-polyfill.js";
+import { installTextCodecPolyfill } from "./text-codec-polyfill.js";
+import { installWebSocketBufferedAmountPolyfill } from "./websocket-buffered-amount-polyfill.js";
 
 // Buffer + process must live on globalThis: some libp2p dependencies reach for these as globals
 // rather than as ES module imports. Metro's `extraNodeModules` only rewrites
@@ -42,5 +51,8 @@ const globalScope = globalThis as {
 globalScope.Buffer ??= Buffer;
 globalScope.process ??= process;
 
+installEventTargetPolyfill();
+installTextCodecPolyfill();
+installWebSocketBufferedAmountPolyfill();
 installQuickCrypto();
 registerWebRtcGlobals();

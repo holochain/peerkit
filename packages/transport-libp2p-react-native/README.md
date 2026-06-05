@@ -4,11 +4,6 @@ React Native implementation of the peerkit transport layer. Wires
 `@peerkit/transport-libp2p-core` to a libp2p stack configured for mobile:
 WebSockets (outbound), WebRTC, and circuit-relay-v2 client.
 
-Mobile peers cannot accept inbound direct connections (CGNAT, no listen socket
-survives backgrounding on iOS or Android). Reachability is therefore always
-mediated by a relay; direct peer-to-peer is achieved with WebRTC over a
-circuit-relay-v2 reservation, using ICE/STUN for hole-punching.
-
 ## Install
 
 ```sh
@@ -24,7 +19,8 @@ Android: Gradle sync).
 
 libp2p depends on Node built-ins (`crypto`, `stream`, `buffer`, `events`,
 `process`) and on the Web Crypto / WebRTC globals. Hermes provides none of
-those out of the box. The package ships a single side-effect entry that
+those out of the box (Hermes is Meta's JavaScript engine for React
+Native). The package ships a single side-effect entry that
 installs everything in the right order.
 
 Add **as the very first import** of the app entry (typically `index.js` or
@@ -46,10 +42,15 @@ The polyfill module:
 4. Assigns `globalThis.Buffer` and `globalThis.process` from the `buffer` and
    `process` shims so libp2p code that touches these as globals (rather than
    ES module imports) works.
+5. Installs the WHATWG `Event` / `EventTarget` / `CustomEvent` globals that
+   Hermes lacks but `@libp2p/interface` extends at module init.
+6. Installs UTF-8 `TextEncoder` / `TextDecoder` globals that Hermes lacks but
+   `uint8arrays` constructs at module init.
 
 ## Metro config
 
-Metro must rewrite Node-style bare imports to their React Native shims. Add
+Metro (React Native's JavaScript bundler) must rewrite Node-style bare
+imports to their React Native shims. Add
 the following to `metro.config.js`:
 
 ```js
@@ -78,16 +79,32 @@ module.exports = config;
 
 ## Babel config
 
-libp2p uses ES2022 private class fields (`#field`). Hermes parses these
-correctly on recent React Native versions, but stale Babel caches can still
-trip up. Ensure the private-methods transform is enabled:
+Compile public class fields with spec `[[Define]]` semantics by setting the
+`setPublicClassFields: false` assumption:
 
 ```js
 module.exports = {
-  presets: ["module:@react-native/babel-preset"],
-  plugins: [["@babel/plugin-transform-private-methods", { loose: true }]],
+  presets: ["babel-preset-expo"], // or "module:@react-native/babel-preset"
+  assumptions: {
+    setPublicClassFields: false,
+  },
 };
 ```
+
+This is **required**, not optional. `babel-preset-expo` defaults to loose
+(`[[Set]]`) class fields, which compile an uninitialized field declaration to
+`this.field = void 0`. React Native's webapis define read-only prototype
+constants — notably `Event.prototype.NONE` (and `CAPTURING_PHASE` /
+`AT_TARGET` / `BUBBLING_PHASE`) via `Object.defineProperty` without
+`writable: true`. The matching `this.NONE = void 0` walks the prototype chain
+and throws `Cannot assign to read-only property 'NONE'` the moment libp2p or
+WebRTC construct an `Event`. The `[[Define]]` assumption drops the bare
+declaration, so the read-only constant is never assigned.
+
+Do **not** add `["@babel/plugin-transform-private-methods", { loose: true }]`:
+its loose option sets the opposite assumption (`setPublicClassFields: true`)
+and reintroduces the crash. libp2p's private fields (`#field`) are transformed
+by the preset without it.
 
 ## Usage
 
@@ -133,13 +150,6 @@ Native bundles — do not import it from Node test code. Type-only imports
 
 ## Known limitations
 
-- No hole-punching via DCUtR (see
-  <https://github.com/libp2p/js-libp2p/discussions/2388>). All direct
-  peer-to-peer connections go over WebRTC; if WebRTC ICE fails, traffic
-  remains relayed.
 - No background operation. iOS suspends the JS runtime when the app is
   backgrounded; Android Doze mode throttles. Foreground-only without
   additional OS-specific work.
-- No local discovery (no mDNS).
-- Mobile peer cannot listen for inbound direct connections. The transport
-  advertises `/p2p-circuit` and `/webrtc` listen addresses only.

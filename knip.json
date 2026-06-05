@@ -6,6 +6,7 @@
     },
     "packages/transport-libp2p-react-native": {
       "ignoreDependencies": [
+        "react-native",
         "react-native-get-random-values",
         "react-native-quick-crypto",
         "react-native-webrtc"
