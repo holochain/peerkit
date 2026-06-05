@@ -25,6 +25,15 @@ vi.mock("react-native-webrtc", () => ({
   registerGlobals: vi.fn(() => calls.push("register-webrtc-globals")),
 }));
 
+// `react-native`'s real entry is a Flow source the test bundler cannot parse, and
+// its native modules do not exist under Node. The datachannel polyfill only reads
+// `NativeModules.WebRTCModule` (absent here, so it no-ops); an empty `NativeModules`
+// is enough to keep that guard from throwing.
+vi.mock("react-native", () => ({
+  NativeModules: {},
+  NativeEventEmitter: class {},
+}));
+
 describe("polyfills entry", () => {
   test("installs RNG, quick-crypto, and WebRTC globals in order", async () => {
     // Importing the module triggers all side effects exactly once.

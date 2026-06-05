@@ -4,7 +4,8 @@ import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
-import type { ITransport, NodeAddress, RelayAddress } from "@peerkit/api";
+import type { ConnectionGater } from "@libp2p/interface";
+import type { ITransport, NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
   type NodeOptions,
@@ -43,11 +44,23 @@ export interface CreateNodeOptions extends NodeOptions {
    * {@link NodeOptions.connectedToRelayCallback} once the dialable circuit
    * address has been received.
    */
-  bootstrapRelays?: RelayAddress[];
+  bootstrapRelays?: RelayDialAddress[];
   /**
    * List of ICE server URLs needed for establishing direct connections.
    */
   iceServerUrls?: string[];
+  /**
+   * Overrides libp2p's connection gater.
+   *
+   * On React Native libp2p applies its browser gater, which refuses to dial
+   * insecure WebSocket (`/ws`) relays and private/LAN addresses. A production
+   * deployment behind a secure `wss` relay never hits this, but development and
+   * demo setups that target a cleartext relay or LAN peers must supply a gater
+   * that permits those dials (e.g. `{ denyDialMultiaddr: async () => false }`).
+   *
+   * Left undefined, libp2p keeps its secure-by-default browser gater.
+   */
+  connectionGater?: ConnectionGater;
 }
 
 /**
@@ -90,6 +103,7 @@ export async function createNode(
     connectionEncrypters: [noise({ crypto: quickCryptoNoise })],
     streamMuxers: [yamux()],
     services: { identify: identify() },
+    connectionGater: options.connectionGater,
     addresses: {
       listen: options.addrs ?? defaultNodeListenAddrs,
     },

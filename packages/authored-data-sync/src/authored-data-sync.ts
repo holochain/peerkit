@@ -109,7 +109,7 @@ export class AuthoredDataSync implements INodeModule {
   }
 
   /**
-   * Run one ppull round with every currently connected peer, in sequence.
+   * Run one pull round with every currently connected peer, in sequence.
    */
   async pullFromAllPeers(): Promise<void> {
     // Peers are visited most-stale-first, so attention is spread evenly.
