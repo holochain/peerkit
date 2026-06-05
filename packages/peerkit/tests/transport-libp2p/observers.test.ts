@@ -411,6 +411,51 @@ test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections",
   await relay.shutDown();
 });
 
+test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store", async () => {
+  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const relayAddress: RelayAddress = `/ip4/0.0.0.0/tcp/${relayPort}/ws`;
+
+  const relay = await new PeerkitRelayBuilder(async () => true)
+    .withId("relay")
+    .withAddresses([relayAddress])
+    .build();
+
+  const node = await new PeerkitNodeBuilder({
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node")
+    .withBootstrapRelays([relayAddress])
+    .build();
+
+  const agentId = node.keyPair.agentId();
+
+  // The node advertises its own agent info to the relay on connect, so the
+  // relay's store must contain it.
+  await vi.waitFor(
+    () =>
+      expect(relay.agentStore.getAll().map((info) => info.agentId)).toContain(
+        agentId,
+      ),
+    { timeout: 5_000 },
+  );
+  // When the node disconnects its circuit reservation is dropped, so the relay
+  // must drop the now-undialable agent info instead of replaying it to new
+  // peers — replaying it makes their dial fail with NO_RESERVATION.
+  await node.transport.disconnect(relay.transport.getNodeId());
+
+  await vi.waitFor(
+    () =>
+      expect(
+        relay.agentStore.getAll().map((info) => info.agentId),
+      ).not.toContain(agentId),
+    { timeout: 5_000 },
+  );
+
+  await node.shutDown();
+  await relay.shutDown();
+});
+
 test("access is denied when network access bytes are wrong even though AgentId is valid", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
   const node1Address = `/ip4/127.0.0.1/tcp/${port}/ws`;
