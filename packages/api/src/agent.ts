@@ -72,4 +72,9 @@ export interface IAgentStore {
    * Stores agents, overwriting any existing record with the same agentId.
    */
   store(agents: AgentInfoSigned[]): void;
+
+  /**
+   * Removes the record for the given id, if present. No-op when absent.
+   */
+  delete(agentId: AgentId): void;
 }

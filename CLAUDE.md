@@ -117,6 +117,10 @@ Root `tsconfig.json` sets strict-plus flags worth knowing before editing:
 
 ESLint flat config (`eslint.config.mjs`) ignores `**/dist/**` and `docs/**`.
 
+### Code comments
+
+Comments explain intent — the "why" a reader cannot infer from the code — not implementation play-by-play. Keep them short. Avoid long narrative blocks that re-describe what the code does, recount the failure that motivated the code, or embed protocol/wire-format trivia (e.g. address shapes, error codes, libp2p internals). If a behavior needs that much explanation, prefer a one-line pointer to the spec or a concise rationale over a paragraph.
+
 ## Plans
 
 Always write implementation plans to `.claude/plans/` (create the directory if missing). One markdown file per plan, kebab-case name. Do not place plans elsewhere in the repo.

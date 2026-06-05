@@ -43,6 +43,10 @@ export class MemoryAgentStore implements IAgentStore {
     }
   }
 
+  delete(agentId: AgentId): void {
+    this.agents.delete(agentId);
+  }
+
   prune(): void {
     const now = Date.now();
     for (const [agentId, info] of this.agents) {
