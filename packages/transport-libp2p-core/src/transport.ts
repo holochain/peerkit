@@ -82,21 +82,6 @@ export interface NodeOptions extends TransportOptionsBase {
    */
   messageHandler: MessageHandler;
   /**
-   * Callbacks for custom protocol streams.
-   *
-   * The connection to peers is multi-plexed. Data streams can be opened
-   * and closed at runtime. Any kind of data can be sent over a stream,
-   * defined by a protocol.
-   *
-   * Callbacks must be registered when constructing the transport and cannot
-   * be added or removed dynamically.
-   *
-   * Call {@link TransportLibp2p.createStream} to create a stream for a
-   * specific protocol and peer. On the remote side, the corresponding
-   * callback will be executed.
-   */
-  customStreamCreatedCallbacks?: Record<string, CustomStreamCreatedCallback>;
-  /**
    * Called when the bootstrap connection to a relay is complete.
    */
   connectedToRelayCallback?: ConnectedToRelayCallback;
@@ -203,28 +188,6 @@ export class TransportLibp2p implements ITransport {
       // Regular node that will handle messages. Relay nodes don't handle messages.
       libp2p.handle(CURRENT_MESSAGE_PROTOCOL, this.onMessageConnect);
       this.messageHandler = options.messageHandler;
-    }
-
-    // Register custom stream callbacks
-    if (
-      "customStreamCreatedCallbacks" in options &&
-      options.customStreamCreatedCallbacks
-    ) {
-      for (const [protocol, customStreamCreatedCallback] of Object.entries(
-        options.customStreamCreatedCallbacks,
-      )) {
-        libp2p.handle(protocol, async (stream, connection) => {
-          this.logger.info(`Incoming custom stream {*}`, {
-            remoteId: connection.remotePeer,
-            protocol,
-          });
-          // Make sure that access has been granted before. If not,
-          // `accessCheck` will throw and not call the callback.
-          await this.accessCheck(protocol, connection);
-          const customStream = new CustomStream(stream);
-          customStreamCreatedCallback(customStream);
-        });
-      }
     }
 
     if ("connectedToRelayCallback" in options) {
@@ -376,6 +339,19 @@ export class TransportLibp2p implements ITransport {
     const stream = await connection.newStream(protocol);
     const customStream = new CustomStream(stream);
     return customStream;
+  }
+
+  registerStreamHandler(
+    protocol: string,
+    handler: CustomStreamCreatedCallback,
+  ): void {
+    this.libp2p.handle(protocol, async (stream, connection) => {
+      // Make sure that access has been granted before. If not,
+      // `accessCheck` will throw and not call the handler.
+      await this.accessCheck(protocol, connection);
+      const customStream = new CustomStream(stream);
+      handler(connection.remotePeer.toString(), customStream);
+    });
   }
 
   async shutDown(): Promise<void> {

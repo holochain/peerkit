@@ -5,6 +5,9 @@ import type {
   AgentsReceivedCallback,
   IAgentStore,
   IKeyPair,
+  INodeModule,
+  IPeerkitNode,
+  IStream,
   ITransport,
   MessageHandler,
   NetworkAccessBytes,
@@ -73,6 +76,7 @@ export class PeerkitNodeBuilder {
   peerConnectedObserver?: (fromAgent: AgentId) => void;
   peerDisconnectedObserver?: (fromAgent: AgentId) => void;
   connectedToRelayObserver?: (address: RelayAddress) => void;
+  private readonly modules: INodeModule[] = [];
 
   readonly networkAccessHandler: NetworkAccessHandler;
   readonly messageHandler: AppMessageHandler;
@@ -140,6 +144,11 @@ export class PeerkitNodeBuilder {
 
   withRelayConnectedObserver(fn: (address: NodeAddress) => void): this {
     this.connectedToRelayObserver = fn;
+    return this;
+  }
+
+  withModule(module: INodeModule): this {
+    this.modules.push(module);
     return this;
   }
 
@@ -385,7 +394,7 @@ export class PeerkitNodeBuilder {
       renewalTimer as ReturnType<typeof setInterval> & { unref?: () => void }
     ).unref?.();
 
-    return new PeerkitNode(
+    const node = new PeerkitNode(
       keyPair,
       transport,
       agentStore,
@@ -393,13 +402,24 @@ export class PeerkitNodeBuilder {
       nodeByAgentId,
       renewalTimer,
     );
+
+    try {
+      for (const module of this.modules) {
+        await node.register(module);
+      }
+      return node;
+    } catch (error) {
+      await node.shutDown().catch(() => undefined);
+      throw error;
+    }
   }
 }
 
-export class PeerkitNode {
+export class PeerkitNode implements IPeerkitNode {
   readonly transport: ITransport;
   readonly agentStore: IAgentStore;
   readonly keyPair: IKeyPair;
+  private readonly modules: INodeModule[] = [];
   private readonly agentByNodeId: Map<NodeId, AgentId>;
   private readonly nodeByAgentId: Map<AgentId, NodeId>;
   private readonly renewalTimer: ReturnType<typeof setInterval>;
@@ -418,6 +438,38 @@ export class PeerkitNode {
     this.agentByNodeId = agentByNodeId;
     this.nodeByAgentId = nodeByAgentId;
     this.renewalTimer = renewalTimer;
+  }
+
+  async register(module: INodeModule) {
+    this.modules.push(module);
+    module.init(this);
+    await module.start?.();
+  }
+
+  get ownAgentId(): AgentId {
+    return this.keyPair.agentId();
+  }
+
+  async createStream(agentId: AgentId, protocol: string): Promise<IStream> {
+    const nodeId = this.nodeByAgentId.get(agentId);
+    if (nodeId === undefined) {
+      throw new Error(`No connection to agent ${agentId}`);
+    }
+    return this.transport.createStream(nodeId, protocol);
+  }
+
+  registerStreamHandler(
+    protocol: string,
+    handler: (fromAgent: AgentId, stream: IStream) => void,
+  ): void {
+    this.transport.registerStreamHandler(protocol, (nodeId, stream) => {
+      const agentId = this.agentByNodeId.get(nodeId);
+      if (agentId === undefined) {
+        stream.close();
+        return;
+      }
+      handler(agentId, stream);
+    });
   }
 
   isConnected(toAgent: AgentId): boolean {
@@ -467,6 +519,20 @@ export class PeerkitNode {
 
   async shutDown(): Promise<void> {
     clearInterval(this.renewalTimer);
+    const stopErrors: unknown[] = [];
+    for (const module of this.modules) {
+      try {
+        module.stop?.();
+      } catch (error) {
+        stopErrors.push(error);
+      }
+    }
     await this.transport.shutDown();
+    if (stopErrors.length > 0) {
+      throw new AggregateError(
+        stopErrors,
+        "One or more modules failed to stop",
+      );
+    }
   }
 }

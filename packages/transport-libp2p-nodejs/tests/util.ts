@@ -167,6 +167,10 @@ export interface TestNodeOptions {
    */
   customStreamCreatedCallbacks?: Record<string, CustomStreamCreatedCallback>;
   /**
+   * Optional relay addresses to connect to at startup
+   */
+  bootstrapRelays?: string[];
+  /**
    * Optional timeout for the outbound access handshake response
    */
   handshakeTimeoutMs?: number;
@@ -177,7 +181,7 @@ export interface TestNodeOptions {
  */
 export const createNode = async (options: TestNodeOptions) => {
   const address = `/memory/${uniqueTxAddress()}`;
-  const { id, handshakeTimeoutMs } = options;
+  const { id, bootstrapRelays, handshakeTimeoutMs } = options;
   const connectedToRelayCallback = options.connectedToRelayCallback;
   const agentsReceivedCallback =
     options.agentsReceivedCallback ?? (async (_fromPeer, _bytes) => {});
@@ -189,7 +193,6 @@ export const createNode = async (options: TestNodeOptions) => {
   const networkAccessBytes = options.networkAccessBytes ?? new Uint8Array([0]);
   const messageHandler =
     options.messageHandler ?? (async (_fromPeer, _message, _transport) => {});
-  const customStreamCreatedCallbacks = options.customStreamCreatedCallbacks;
   // This is mostly what the production node is like, with the exception that
   // an in-memory transport is used.
   const libp2p = await createLibp2p({
@@ -218,11 +221,15 @@ export const createNode = async (options: TestNodeOptions) => {
     networkAccessHandler,
     networkAccessBytes,
     messageHandler,
-    customStreamCreatedCallbacks: customStreamCreatedCallbacks,
     handshakeTimeoutMs,
   });
   await libp2p.start();
   // Connect to all provided relays.
+  if (bootstrapRelays) {
+    for (const relayAddress of bootstrapRelays) {
+      await node.connect(relayAddress);
+    }
+  }
 
   return { node, address };
 };

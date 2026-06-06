@@ -135,8 +135,13 @@ export interface IStream {
 /**
  * A callback for when a stream described by a custom protocol was created
  * by a peer.
+ *
+ * Receives the NodeId of the initiating peer.
  */
-export type CustomStreamCreatedCallback = (stream: IStream) => void;
+export type CustomStreamCreatedCallback = (
+  nodeId: NodeId,
+  stream: IStream,
+) => void;
 
 /**
  * Interface that defines the methods a peerkit transport needs to implement
@@ -206,6 +211,20 @@ export interface ITransport {
    * @param protocol The name and version of the stream protocol
    */
   createStream(nodeId: NodeId, protocol: string): Promise<IStream>;
+
+  /**
+   * Register a handler for incoming streams on the given protocol.
+   *
+   * The handler is called once per incoming stream, after the access check
+   * has passed. Can be called after transport construction.
+   *
+   * @param protocol The protocol identifier to handle
+   * @param handler Called with the initiating peer's NodeId and the stream
+   */
+  registerStreamHandler(
+    protocol: string,
+    handler: CustomStreamCreatedCallback,
+  ): void;
 
   /**
    * Disconnect from the peer.

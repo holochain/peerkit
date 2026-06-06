@@ -3,6 +3,7 @@
   "entryPoints": [
     "packages/agent-store",
     "packages/api",
+    "packages/authored-data-sync",
     "packages/peerkit",
     "packages/transport-libp2p",
     "packages/transport-libp2p-core",

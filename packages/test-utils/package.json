@@ -1,0 +1,40 @@
+{
+  "name": "@peerkit/test-utils",
+  "version": "0.1.0-alpha.12",
+  "description": "Test utilities for peerkit module development",
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "keywords": [
+    "peerkit",
+    "p2p",
+    "test",
+    "utils"
+  ],
+  "license": "CAL-1.0",
+  "files": [
+    "dist"
+  ],
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"No tests to run\""
+  },
+  "dependencies": {
+    "@peerkit/api": "^0.1.0-alpha.12"
+  }
+}
