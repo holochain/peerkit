@@ -132,13 +132,6 @@ export class PeerkitRelayBuilder {
       nodeId,
     ) => {
       connectedPeers.delete(nodeId);
-      // The peer's circuit reservation drops the instant it disconnects, so its
-      // advertised circuit address is no longer dialable. Drop the agent info
-      // now rather than letting it linger until its own expiry — otherwise the
-      // relay replays a stale address to newly connected peers and their dial
-      // fails with NO_RESERVATION. A node's dialable address embeds its own
-      // libp2p peer id (".../p2p-circuit/webrtc/p2p/<nodeId>"), which uniquely
-      // identifies the records to remove.
       const owned = `/p2p/${nodeId}`;
       for (const info of agentStore.getAll()) {
         if (info.addresses.some((address) => address.includes(owned))) {
