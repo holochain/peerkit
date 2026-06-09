@@ -56,6 +56,16 @@ export class AuthoredDataSync implements INodeModule {
     this.pullTimeoutMs = pullTimeoutMs ?? PULL_TIMEOUT;
   }
 
+  /**
+   * The epoch in milliseconds
+   *
+   * Blobs authored between now and the epoch threshold are recent.
+   * Blobs authored before the epoch threshold are historical.
+   */
+  get epochDuration(): number {
+    return this.epochDurationMs;
+  }
+
   init(core: IPeerkitNode): void {
     this.core = core;
     this.logger = getLogger(["peerkit", "authored-data-sync"]).with({
