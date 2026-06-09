@@ -1,6 +1,6 @@
 import { reset } from "@logtape/logtape";
 import type { RelayDialAddress } from "@peerkit/api";
-import { setupTestLogger } from "@peerkit/test-utils";
+import { MemoryAgentKeyStore, setupTestLogger } from "@peerkit/test-utils";
 import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { buildOwnAgentInfo } from "../../src/agent-info.js";
@@ -24,6 +24,7 @@ test("Relay sends known agents to connecting peer", async () => {
 
   // Create node 1 with the relay address. Access handler allows everyone.
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -48,6 +49,7 @@ test("Relay sends known agents to connecting peer", async () => {
 
   // Create node 2
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -93,6 +95,7 @@ test("Node connects to another node using address learned from relay", async () 
   // Create node 1 and wait until it has registered its own agent info via the
   // relay.
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -106,7 +109,9 @@ test("Node connects to another node using address learned from relay", async () 
   // Add a third agent info to node 1's store, one that the relay will never
   // forward. When node 2 later connects directly to node 1, receiving this
   // info proves node 1 sent its full store, not just its own entry.
-  const thirdKeyPair = new AgentKeyPair();
+  const thirdKeyPair = await AgentKeyPair.load_or_create(
+    new MemoryAgentKeyStore(),
+  );
   const thirdAgentInfo = buildOwnAgentInfo(
     thirdKeyPair,
     [],
@@ -116,6 +121,7 @@ test("Node connects to another node using address learned from relay", async () 
 
   // Create node 2
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })

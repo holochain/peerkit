@@ -3,6 +3,7 @@ import { MemoryAgentStore } from "@peerkit/agent-store";
 import type {
   AgentId,
   AgentsReceivedCallback,
+  IAgentKeyStore,
   IAgentStore,
   IKeyPair,
   INodeModule,
@@ -56,6 +57,7 @@ export type PeerkitNodeTransportFactory = (
  * @example
  * ```ts
  * const node = await new PeerkitNodeBuilder({
+ *   agentKeyStore,
  *   networkAccessHandler: async () => true,
  *   messageHandler: async (fromAgent, data) => { ... },
  * })
@@ -80,14 +82,18 @@ export class PeerkitNodeBuilder {
 
   readonly networkAccessHandler: NetworkAccessHandler;
   readonly messageHandler: AppMessageHandler;
+  readonly agentKeyStore: IAgentKeyStore;
 
   constructor({
+    agentKeyStore,
     networkAccessHandler,
     messageHandler,
   }: {
+    agentKeyStore: IAgentKeyStore;
     networkAccessHandler: NetworkAccessHandler;
     messageHandler: AppMessageHandler;
   }) {
+    this.agentKeyStore = agentKeyStore;
     this.networkAccessHandler = networkAccessHandler;
     this.messageHandler = messageHandler;
   }
@@ -244,7 +250,7 @@ export class PeerkitNodeBuilder {
   }
 
   async build(): Promise<PeerkitNode> {
-    const keyPair = new AgentKeyPair();
+    const keyPair = await AgentKeyPair.load_or_create(this.agentKeyStore);
     const agentStore = this.agentStore ?? new MemoryAgentStore();
     const logger = getLogger(["peerkit", "node"]).with({
       id: this.id,

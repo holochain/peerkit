@@ -17,6 +17,7 @@ import {
   serializeAgentInfoList,
 } from "@peerkit/peerkit";
 import { MemoryAgentStore } from "@peerkit/agent-store";
+import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 import type {
   AgentInfoSigned,
   IAgentStore,
@@ -125,10 +126,10 @@ export async function startTestRelay(
  * records. Mirrors peerkit's own `buildOwnAgentInfo`, reconstructed from the
  * package's public exports.
  */
-export function makeSignedAgentInfo(
+export async function makeSignedAgentInfo(
   opts: { expiresAt?: number; addresses?: string[] } = {},
-): { readonly info: AgentInfoSigned; readonly bytes: Uint8Array } {
-  const keyPair = new AgentKeyPair();
+): Promise<{ readonly info: AgentInfoSigned; readonly bytes: Uint8Array }> {
+  const keyPair = await AgentKeyPair.load_or_create(new MemoryAgentKeyStore());
   const agentInfo = {
     agentId: keyPair.agentId(),
     addresses: opts.addresses ?? [],

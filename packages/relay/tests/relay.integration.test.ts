@@ -76,7 +76,7 @@ describe("relay integration", () => {
         () => expect(relay.relay.peerCount()).toBe(1),
         WAIT_OPTS,
       );
-      const { info, bytes } = makeSignedAgentInfo();
+      const { info, bytes } = await makeSignedAgentInfo();
       await n.node.sendAgents(relay.relay.nodeId, bytes);
       await vi.waitFor(
         () => expect(relay.store.get(info.agentId)).toBeTruthy(),
@@ -96,7 +96,7 @@ describe("relay integration", () => {
         () => expect(relay.relay.peerCount()).toBe(1),
         WAIT_OPTS,
       );
-      const { bytes } = makeSignedAgentInfo();
+      const { bytes } = await makeSignedAgentInfo();
       // Corrupt the cbor payload so the signature can no longer verify.
       bytes[bytes.length - 1] ^= 0xff;
       await n.node.sendAgents(relay.relay.nodeId, bytes);
@@ -111,7 +111,7 @@ describe("relay integration", () => {
     "replays stored agents to a newly connected peer",
     async () => {
       const first = await spawn();
-      const { info, bytes } = makeSignedAgentInfo();
+      const { info, bytes } = await makeSignedAgentInfo();
       await first.node.connect(relay.multiaddr);
       await vi.waitFor(
         () => expect(relay.relay.peerCount()).toBe(1),
@@ -192,7 +192,7 @@ describe("relay integration", () => {
     "decrements peerCount on disconnect but retains the agent record",
     async () => {
       const n = await spawn();
-      const { info, bytes } = makeSignedAgentInfo();
+      const { info, bytes } = await makeSignedAgentInfo();
       await n.node.connect(relay.multiaddr);
       await vi.waitFor(
         () => expect(relay.relay.peerCount()).toBe(1),

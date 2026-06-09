@@ -1,7 +1,7 @@
 import * as ed25519 from "@noble/ed25519";
 import { sha512 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import type { AgentId, IKeyPair } from "@peerkit/api";
+import type { AgentId, IAgentKeyStore, IKeyPair } from "@peerkit/api";
 
 // Set hashing function to enable synchronous crypto functions.
 // See https://github.com/paulmillr/noble-ed25519#enabling-synchronous-methods
@@ -28,16 +28,44 @@ export function decodeAgentId(agentId: AgentId): Uint8Array {
 }
 
 /**
- * Concrete Ed25519 key pair for an agent. Generates a new random key pair on
- * construction.
+ * Concrete Ed25519 key pair for an agent.
+ *
+ * Construct via {@link AgentKeyPair.load_or_create}: it reads the private key from the
+ * given {@link IAgentKeyStore}, or generates and persists a new one when the
+ * store is empty.
  */
 export class AgentKeyPair implements IKeyPair {
   private readonly privateKey: Uint8Array;
   private readonly publicKey: Uint8Array;
 
-  constructor() {
-    this.privateKey = ed25519.utils.randomSecretKey();
-    this.publicKey = ed25519.getPublicKey(this.privateKey);
+  private constructor(privateKey: Uint8Array) {
+    this.privateKey = privateKey;
+    this.publicKey = ed25519.getPublicKey(privateKey);
+  }
+
+  /**
+   * Loads the agent's key pair from the store, generating and persisting a new
+   * one when the store holds no key.
+   * If the store doesn't contain a key yet, a new random Ed25519 private key is generated and stored.
+   * If the store contains an invalid key, an error is thrown.
+   *
+   * @param agentKeyStore - Storage for the agent's private key.
+   * @returns The loaded or newly created key pair.
+   * @throws Error if the store contains an invalid key.
+   */
+  static async load_or_create(
+    agentKeyStore: IAgentKeyStore,
+  ): Promise<AgentKeyPair> {
+    let privateKey = await agentKeyStore.loadKey();
+
+    if (privateKey === undefined) {
+      privateKey = ed25519.utils.randomSecretKey();
+      await agentKeyStore.storeKey(privateKey);
+    } else if (privateKey.length !== 32) {
+      throw new Error("Invalid Ed25519 private key length");
+    }
+
+    return new AgentKeyPair(privateKey);
   }
 
   /**

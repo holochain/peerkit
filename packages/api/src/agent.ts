@@ -78,3 +78,18 @@ export interface IAgentStore {
    */
   delete(agentId: AgentId): void;
 }
+
+/**
+ * Storage for the agent's own private key, which is never shared with other peers.
+ */
+export interface IAgentKeyStore {
+  /**
+   * Loads the agent's private key, or returns undefined if not found. The key is expected to be in raw binary format.
+   */
+  loadKey(): Promise<Uint8Array | undefined>;
+
+  /**
+   * Stores the agent's private key. The key is expected to be in raw binary format.
+   */
+  storeKey(privateKey: Uint8Array): Promise<void>;
+}

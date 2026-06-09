@@ -6,6 +6,7 @@ import {
   type NodeEventCallbacks,
   type NodeSession,
 } from "../../src/index.js";
+import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 
 export async function startTestRelay() {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
@@ -23,6 +24,7 @@ export async function startTestNode(
   let relayConnected = false;
   const session = await startNode({
     bootstrapRelays: [dialAddr],
+    agentKeyStore: new MemoryAgentKeyStore(),
     callbacks: {
       onPeerConnected: callbacks?.onPeerConnected ?? (() => {}),
       onPeerDisconnected: callbacks?.onPeerDisconnected ?? (() => {}),

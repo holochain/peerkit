@@ -49,9 +49,9 @@ Run from repo root unless noted.
 - Lint: `npm run lint`
 - Format: `npm run fmt`
 - Test all workspaces: `npm test`
-- Test a single workspace: `npm test -w @peerkit/transport-libp2p-nodejs`
-- Single test file: `npm test -w @peerkit/transport-libp2p-nodejs -- tests/access.test.ts`
-- Single test by name: `npm test -w @peerkit/transport-libp2p-nodejs -- -t "Invalid network access bytes"`
+- Test a single package: `npm t -- --project @peerkit/transport-libp2p-nodejs` (the `--project` value is the package's `name` from its `package.json`)
+- Single test file: `npm t -- --project @peerkit/transport-libp2p-nodejs tests/access.test.ts`
+- Single test by name: `npm t -- --project @peerkit/transport-libp2p-nodejs -t "Invalid network access bytes"`
 
 Vitest runs with `--run` by default (CI-style, no watch).
 

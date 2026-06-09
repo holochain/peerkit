@@ -4,7 +4,7 @@ import type {
   RelayDialAddress,
   RelayListenAddress,
 } from "@peerkit/api";
-import { setupTestLogger } from "@peerkit/test-utils";
+import { MemoryAgentKeyStore, setupTestLogger } from "@peerkit/test-utils";
 import { createNode } from "@peerkit/transport-libp2p";
 import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -22,6 +22,7 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
   const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -44,6 +45,7 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
 
   const receivedAgentIds: string[] = [];
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -79,6 +81,7 @@ test("withRelayConnectedObserver on node fires with the relay address", async ()
 
   const relayAddresses: string[] = [];
   const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -115,6 +118,7 @@ test("withAgentsReceivedObserver on relay fires when a node sends agent info", a
   // The node sends its own agent info to the relay on connection,
   // so the relay's observer must fire.
   const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -139,6 +143,7 @@ test("message handler has the sender's AgentId", async () => {
 
   // Node 1 records every incoming message together with the reported AgentId.
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async (fromAgent, data) => {
       receivedMessages.push({
@@ -152,6 +157,7 @@ test("message handler has the sender's AgentId", async () => {
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -190,6 +196,7 @@ test("message is dropped when peer does not send an AgentId prefix and access is
   let transportMessageHandlerCalled = false;
   const appMessageHandler = vi.fn().mockResolvedValue(undefined);
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: appMessageHandler,
   })
@@ -210,6 +217,7 @@ test("message is dropped when peer does not send an AgentId prefix and access is
   // node2 overrides networkAccessBytes to fewer than 32 bytes, so node1
   // cannot extract an AgentId from the access handshake.
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -250,6 +258,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
   const disconnectedAgents: string[] = [];
 
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -264,6 +273,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -300,6 +310,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
   const disconnectedAgents: string[] = [];
 
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -314,6 +325,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -344,6 +356,7 @@ test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect"
   const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -353,6 +366,7 @@ test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect"
 
   const disconnectedAgents: string[] = [];
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -393,6 +407,7 @@ test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections",
 
   const nodePort = await getPort({ port: portNumbers(30_000, 40_000) });
   const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -429,6 +444,7 @@ test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store
     .build();
 
   const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -474,6 +490,7 @@ test("access is denied when network access bytes are wrong even though AgentId i
 
   // node1 expects a specific token in the app-level access bytes.
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async (_nodeId, bytes) => {
       receivedAppBytes.push(bytes);
       return bytes[0] === VALID_NAB;
@@ -487,6 +504,7 @@ test("access is denied when network access bytes are wrong even though AgentId i
   // node2 sends wrong app bytes. PeerkitNodeBuilder still prepends the
   // 32-byte AgentId prefix, so the AgentId is valid — only the app bytes fail.
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -511,6 +529,7 @@ test("PeerkitNode.isConnected reflects live connection state by AgentId", async 
   const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -519,6 +538,7 @@ test("PeerkitNode.isConnected reflects live connection state by AgentId", async 
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -562,6 +582,7 @@ test("PeerkitNode.getConnectedAgents lists AgentIds of connected peers", async (
   const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
 
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -570,6 +591,7 @@ test("PeerkitNode.getConnectedAgents lists AgentIds of connected peers", async (
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })

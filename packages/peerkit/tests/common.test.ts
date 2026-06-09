@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { getAgentsReceivedCallback } from "../src/common.js";
 import { MemoryAgentStore } from "@peerkit/agent-store";
 import { AgentKeyPair } from "../src/agent.js";
+import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 import { signAgentInfo } from "../src/agent-info.js";
 import { serializeAgentInfoList } from "../src/serialize.js";
 import { hexToBytes } from "@noble/hashes/utils.js";
@@ -9,7 +10,7 @@ import { hexToBytes } from "@noble/hashes/utils.js";
 test("Valid agent info is stored", async () => {
   const agentStore = new MemoryAgentStore();
   const callback = getAgentsReceivedCallback(agentStore);
-  const keyPair = new AgentKeyPair();
+  const keyPair = await AgentKeyPair.load_or_create(new MemoryAgentKeyStore());
   const agentInfo = signAgentInfo(
     {
       agentId: keyPair.agentId(),
@@ -72,7 +73,7 @@ test("Agent info with wrong-size signature is discarded", async () => {
 test("Only valid agent infos are stored from a mixed list", async () => {
   const agentStore = new MemoryAgentStore();
   const callback = getAgentsReceivedCallback(agentStore);
-  const keyPair = new AgentKeyPair();
+  const keyPair = await AgentKeyPair.load_or_create(new MemoryAgentKeyStore());
   const valid = signAgentInfo(
     {
       agentId: keyPair.agentId(),
