@@ -1,6 +1,6 @@
 import { reset } from "@logtape/logtape";
 import type { NodeAddress } from "@peerkit/api";
-import { setupTestLogger } from "@peerkit/test-utils";
+import { MemoryAgentKeyStore, setupTestLogger } from "@peerkit/test-utils";
 import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { signAgentInfo } from "../../src/agent-info.js";
@@ -15,6 +15,7 @@ test("Two nodes exchange agents bidirectionally", async () => {
   const node1Port = await getPort({ port: portNumbers(30_000, 40_000) });
   const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${node1Port}/ws`;
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -37,6 +38,7 @@ test("Two nodes exchange agents bidirectionally", async () => {
   const node2Port = await getPort({ port: portNumbers(30_000, 40_000) });
   const node2DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${node2Port}/ws`;
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -82,6 +84,7 @@ test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
 
   // Node 1 records incoming messages with the sender's AgentId.
   const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async (fromAgent, data) => {
       receivedMessages.push({
@@ -95,6 +98,7 @@ test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
@@ -123,6 +127,7 @@ test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
 
 test("PeerkitNode.send throws when there is no connection to the agent", async () => {
   const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })

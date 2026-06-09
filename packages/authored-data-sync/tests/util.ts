@@ -1,6 +1,7 @@
 import type { NodeAddress } from "@peerkit/api";
 import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
+import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 import getPort, { portNumbers } from "get-port";
 import {
   AuthoredDataSync,
@@ -36,6 +37,7 @@ export async function createTestNode(opts: {
   const address = `/ip4/0.0.0.0/tcp/${port}/ws`;
 
   const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })

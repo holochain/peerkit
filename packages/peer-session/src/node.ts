@@ -2,6 +2,7 @@ import type {
   AgentId,
   AgentInfoSigned,
   IAgentStore,
+  IAgentKeyStore,
   NodeAddress,
   RelayDialAddress,
 } from "@peerkit/api";
@@ -49,6 +50,8 @@ export async function startNode(options: {
   callbacks: NodeEventCallbacks;
   /** Override transport listen addresses. Set to the transport's defaults when omitted. */
   addresses?: NodeAddress[];
+  /** Storage for the node's own private key. The caller owns persistence. */
+  agentKeyStore: IAgentKeyStore;
 }): Promise<NodeSession> {
   let nextAlias = 1;
   const aliasToAgent = new Map<string, AgentId>();
@@ -62,6 +65,7 @@ export async function startNode(options: {
   });
 
   const builder = new PeerkitNodeBuilder({
+    agentKeyStore: options.agentKeyStore,
     networkAccessHandler: async () => true,
     messageHandler: createTextMessageHandler((fromAgent, text) => {
       // assignAlias here covers a timing race: peerConnectedCallback is
