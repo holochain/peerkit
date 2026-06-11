@@ -3,6 +3,7 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
+import { setupTestLogger } from "@peerkit/test-utils";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import {
@@ -11,12 +12,7 @@ import {
   CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
 } from "../src/index.js";
-import {
-  createNode,
-  createRelay,
-  setupTestLogger,
-  uniqueTxAddress,
-} from "./util.js";
+import { createNode, createRelay, uniqueTxAddress } from "./util.js";
 
 beforeEach(setupTestLogger);
 

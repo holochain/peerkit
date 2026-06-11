@@ -1,6 +1,6 @@
 import { reset } from "@logtape/logtape";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { setupTestLogger } from "../util.js";
+import { setupTestLogger } from "../../../test-utils/dist/test-logger.js";
 import { startTestNode, startTestRelay } from "./util.js";
 
 beforeEach(setupTestLogger);

@@ -1,6 +1,7 @@
 import { reset } from "@logtape/logtape";
+import { setupTestLogger } from "@peerkit/test-utils";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { createTestNode, setupTestLogger } from "./util.js";
+import { createTestNode } from "./util.js";
 
 beforeEach(setupTestLogger);
 afterEach(reset);

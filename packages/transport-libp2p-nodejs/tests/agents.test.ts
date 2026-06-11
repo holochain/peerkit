@@ -4,11 +4,12 @@ import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import type { NetworkAccessHandler } from "@peerkit/api";
+import { setupTestLogger } from "@peerkit/test-utils";
 import { createLibp2p } from "libp2p";
 import { isDeepStrictEqual } from "node:util";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_AGENTS_PROTOCOL } from "../src/index.js";
-import { createNode, setupTestLogger, uniqueTxAddress } from "./util.js";
+import { createNode, uniqueTxAddress } from "./util.js";
 
 beforeEach(setupTestLogger);
 

@@ -3,9 +3,10 @@ import {
   getAnsiColorFormatter,
   getConsoleSink,
 } from "@logtape/logtape";
-import type {} from "@peerkit/api";
 
-// Setup logger to output ID with every log.
+/**
+ * Set up a test logger that outputs logs to the console
+ */
 export const setupTestLogger = async () => {
   await configure({
     sinks: {
@@ -13,8 +14,8 @@ export const setupTestLogger = async () => {
         formatter: getAnsiColorFormatter({
           format({ timestamp, level, category, message, record }) {
             let output = `${timestamp} ${level} ${category}`;
-            if (typeof record.properties.id === "string") {
-              output = output + ` ${record.properties.id}`;
+            if (typeof record.properties["id"] === "string") {
+              output = output + ` ${record.properties["id"]}`;
             }
             output = output + `: ${message}`;
             return output;

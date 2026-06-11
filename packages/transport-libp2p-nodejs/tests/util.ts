@@ -4,11 +4,6 @@ import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { memory } from "@libp2p/memory";
 import { ping } from "@libp2p/ping";
-import {
-  configure,
-  getAnsiColorFormatter,
-  getConsoleSink,
-} from "@logtape/logtape";
 import type {
   AgentsReceivedCallback,
   ConnectedToRelayCallback,
@@ -24,32 +19,6 @@ import { randomUUID } from "node:crypto";
 import { TransportLibp2p } from "../src/index.js";
 
 export const uniqueTxAddress = () => randomUUID();
-
-export const setupTestLogger = async () => {
-  await configure({
-    sinks: {
-      console: getConsoleSink({
-        formatter: getAnsiColorFormatter({
-          format({ timestamp, level, category, message, record }) {
-            let output = `${timestamp} ${level} ${category}`;
-            if (typeof record.properties.id === "string") {
-              output = output + ` ${record.properties.id}`;
-            }
-            output = output + `: ${message}`;
-            return output;
-          },
-        }),
-      }),
-    },
-    loggers: [
-      {
-        category: "peerkit",
-        lowestLevel: "info",
-        sinks: ["console"],
-      },
-    ],
-  });
-};
 
 export interface TestRelayOptions {
   /**

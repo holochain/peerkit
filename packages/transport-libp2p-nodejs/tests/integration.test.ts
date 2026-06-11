@@ -1,9 +1,9 @@
 import { reset } from "@logtape/logtape";
+import { NodeId } from "@peerkit/api";
+import { setupTestLogger } from "@peerkit/test-utils";
+import getPort, { portNumbers } from "get-port";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { createNode, createRelay } from "../src/index.js";
-import { setupTestLogger } from "./util.js";
-import { NodeId } from "@peerkit/api";
-import getPort, { portNumbers } from "get-port";
 
 // These tests exercise peer connections over WebRTC.
 // Connections to the relay use WebSockets.

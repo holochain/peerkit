@@ -1,12 +1,12 @@
 import { reset } from "@logtape/logtape";
 import type { RelayDialAddress } from "@peerkit/api";
+import { setupTestLogger } from "@peerkit/test-utils";
 import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { buildOwnAgentInfo } from "../../src/agent-info.js";
 import { AgentKeyPair } from "../../src/agent.js";
 import { PeerkitNodeBuilder } from "../../src/node.js";
 import { PeerkitRelayBuilder } from "../../src/relay.js";
-import { setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 

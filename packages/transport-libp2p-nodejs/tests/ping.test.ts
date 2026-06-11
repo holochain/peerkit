@@ -4,9 +4,10 @@ import { memory } from "@libp2p/memory";
 import { ping, type Ping } from "@libp2p/ping";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
+import { setupTestLogger } from "@peerkit/test-utils";
 import { createLibp2p, type Libp2p } from "libp2p";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { createRelay, setupTestLogger } from "./util.js";
+import { createRelay } from "./util.js";
 
 beforeEach(setupTestLogger);
 

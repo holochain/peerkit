@@ -11,8 +11,9 @@ import {
   encodeFrame,
 } from "@peerkit/transport-libp2p-core";
 import type { MessageHandler, NetworkAccessHandler } from "@peerkit/api";
-import { createNode, setupTestLogger, uniqueTxAddress } from "./util.js";
+import { createNode, uniqueTxAddress } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
+import { setupTestLogger } from "@peerkit/test-utils";
 
 beforeEach(setupTestLogger);
 

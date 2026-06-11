@@ -47,6 +47,7 @@
   "devDependencies": {
     "@logtape/logtape": "^2.0.5",
     "@peerkit/metrics": "^0.1.0-alpha.12",
+    "@peerkit/test-utils": "^0.1.0-alpha.12",
     "get-port": "^7.2.0"
   }
 }
