@@ -39,19 +39,13 @@ export async function startRelay(options: {
     builder.withPeerConnectedObserver(options.onPeerConnected);
   }
 
-  // Late-binding ref: relay is assigned immediately after build() returns.
-  // The observer only fires after the transport is running, which is after
-  // build() completes, so relay is always defined when the observer executes.
-  // eslint-disable-next-line prefer-const
-  let relay: PeerkitRelay;
-  // When a new agent connects and sends its agent info, broadcast it to all
-  // connected peers.
-  builder.withAgentsReceivedObserver((agentIds) => {
-    options.onAgentsReceived?.(agentIds);
-    broadcastAllAgentInfos(relay);
-  });
+  // The core relay forwards a node's freshly published info to other connected
+  // peers, so peer-session only needs to surface the event to the caller.
+  if (options.onAgentsReceived) {
+    builder.withAgentsReceivedObserver(options.onAgentsReceived);
+  }
 
-  relay = await builder.build();
+  const relay = await builder.build();
   // The transport exposes its actual listen addresses after startup.
   // Use the first one as the dial address peers use to bootstrap.
   const dialAddr = relay.transport.getListenAddresses()[0];

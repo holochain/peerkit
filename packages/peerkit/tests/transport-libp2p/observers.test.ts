@@ -480,6 +480,58 @@ test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store
   await relay.shutDown();
 });
 
+test("PeerkitRelayBuilder forwards a newly published agent info to already-connected peers", async () => {
+  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const relayListenAddr = `0.0.0.0:${relayPort}`;
+  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
+
+  const relay = await new PeerkitRelayBuilder(async () => true)
+    .withId("relay")
+    .withAddresses([relayListenAddr])
+    .build();
+
+  // node1 joins first and records every agent info the relay pushes to it.
+  const node1ReceivedAgentIds: string[] = [];
+  const node1 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node1")
+    .withBootstrapRelays([relayDialAddr])
+    .withAgentsReceivedObserver((agentIds) => {
+      node1ReceivedAgentIds.push(...agentIds);
+    })
+    .build();
+
+  // Wait until the relay registers node1 as connected, so node1 is an
+  // already-connected peer by the time node2 publishes its info.
+  await vi.waitFor(() => expect(relay.connectedPeers.size).toBe(1), {
+    timeout: 5_000,
+  });
+
+  // node2 joins later and publishes its own agent info to the relay on connect.
+  const node2 = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node2")
+    .withBootstrapRelays([relayDialAddr])
+    .build();
+
+  // The relay must forward node2's freshly published info to node1 without
+  // node1 having to reconnect — node1 and node2 only ever connect to the relay.
+  await vi.waitFor(
+    () => expect(node1ReceivedAgentIds).toContain(node2.keyPair.agentId()),
+    { timeout: 5_000 },
+  );
+
+  await node2.shutDown();
+  await node1.shutDown();
+  await relay.shutDown();
+});
+
 test("access is denied when network access bytes are wrong even though AgentId is valid", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
   const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;

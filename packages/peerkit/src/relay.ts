@@ -107,14 +107,33 @@ export class PeerkitRelayBuilder {
       id: this.id,
     });
     const userAgentsObserver = this.agentsReceivedObserver;
-    const wrappedObserver: AgentsReceivedObserver | undefined =
-      userAgentsObserver
-        ? (_fromNode, agentInfos) =>
-            userAgentsObserver(agentInfos.map((info) => info.agentId))
-        : undefined;
-    const agentsReceivedCallback: AgentsReceivedCallback =
-      getAgentsReceivedCallback(agentStore, wrappedObserver);
     const connectedPeers = new Set<NodeId>();
+    // Late-bound: the transport is constructed after these callbacks, and the
+    // agents-received observer only fires once the transport is running.
+    // eslint-disable-next-line prefer-const -- reassigned after the transport is built
+    let relayTransport: ITransport | undefined;
+    const broadcastObserver: AgentsReceivedObserver = (
+      fromNode,
+      agentInfos,
+    ) => {
+      // Forward the freshly published info to every other connected peer so a
+      // peer that joined before this node learns about it without reconnecting.
+      if (relayTransport) {
+        const payload = serializeAgentInfoList(agentInfos);
+        for (const peer of connectedPeers) {
+          if (peer === fromNode) continue;
+          relayTransport.sendAgents(peer, payload).catch((error) => {
+            logger.error("Failed to forward agents to connected peer {*}", {
+              peer,
+              error,
+            });
+          });
+        }
+      }
+      userAgentsObserver?.(agentInfos.map((info) => info.agentId));
+    };
+    const agentsReceivedCallback: AgentsReceivedCallback =
+      getAgentsReceivedCallback(agentStore, broadcastObserver);
     const peerConnectedObserver = this.peerConnectedObserver;
     const peerConnectedCallback: PeerConnectedCallback = async (
       nodeId,
@@ -168,6 +187,7 @@ export class PeerkitRelayBuilder {
           peerDisconnectedCallback,
           networkAccessHandler: this.networkAccessHandler,
         });
+    relayTransport = transport;
     return new PeerkitRelay(transport, agentStore, connectedPeers);
   }
 }
