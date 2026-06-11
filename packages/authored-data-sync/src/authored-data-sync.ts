@@ -1,3 +1,4 @@
+import { getLogger, type Logger } from "@logtape/logtape";
 import { blake2s } from "@noble/hashes/blake2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type {
@@ -8,16 +9,18 @@ import type {
   IPeerkitNode,
   IStream,
 } from "@peerkit/api";
-import { getLogger, type Logger } from "@logtape/logtape";
+import type {
+  Blob,
+  IAuthoredDataSyncStore,
+} from "@peerkit/api/authored-data-sync";
 import { BufferedStream } from "./buffered-stream.js";
 import { FullReplicationPolicy } from "./distribution.js";
 import {
   decodePullMessage,
   encodePullMessage,
-  uint8ArraysEqual as xorSumHashMatches,
   xorHashes,
+  uint8ArraysEqual as xorSumHashMatches,
 } from "./pull.js";
-import type { IAuthoredDataSyncStore, Blob } from "./types/store.js";
 
 const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-sync/v1";
 const PULL_TIMEOUT = 1000 * 5; // 5 seconds
