@@ -1,7 +1,7 @@
-import type { AgentId, Hash } from "@peerkit/api";
-import { decode, encode } from "cbor-x";
 import { getLogger } from "@logtape/logtape";
-import type { Blob } from "./types/store.js";
+import type { AgentId, Hash } from "@peerkit/api";
+import type { Blob } from "@peerkit/api/authored-data-sync";
+import { decode, encode } from "cbor-x";
 
 const logger = getLogger(["peerkit", "authored-data-sync"]);
 

@@ -4,6 +4,7 @@ import {
   getConsoleSink,
 } from "@logtape/logtape";
 import type { NodeAddress } from "@peerkit/api";
+import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import getPort, { portNumbers } from "get-port";
 import {
@@ -11,7 +12,6 @@ import {
   FullReplicationStrategy,
   MemoryBlobStore,
 } from "../src/index.js";
-import { IAuthoredDataSyncStore } from "../src/types/store.js";
 
 export const setupTestLogger = async () => {
   await configure({

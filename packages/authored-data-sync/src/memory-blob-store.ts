@@ -1,10 +1,10 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { AgentId, Hash } from "@peerkit/api";
 import type {
-  IAuthoredDataSyncStore,
   Blob,
+  IAuthoredDataSyncStore,
   IStoredBlob,
-} from "./types/store.js";
+} from "@peerkit/api/authored-data-sync";
 
 function constructKey(hash: Hash, author: AgentId) {
   return `${author},${bytesToHex(hash)}`;

@@ -1,4 +1,5 @@
-import type { AgentId, Hash } from "@peerkit/api";
+import type { AgentId } from "../agent.js";
+import type { Hash } from "../data-sync.js";
 
 /**
  * Opaque data blob distributed by the transport.

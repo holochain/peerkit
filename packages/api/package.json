@@ -27,6 +27,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./authored-data-sync": {
+      "types": "./dist/authored-data-sync/index.d.ts",
+      "import": "./dist/authored-data-sync/index.js"
     }
   },
   "scripts": {
