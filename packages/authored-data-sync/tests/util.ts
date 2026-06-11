@@ -1,8 +1,3 @@
-import {
-  configure,
-  getAnsiColorFormatter,
-  getConsoleSink,
-} from "@logtape/logtape";
 import type { NodeAddress } from "@peerkit/api";
 import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
@@ -12,32 +7,6 @@ import {
   FullReplicationStrategy,
   MemoryBlobStore,
 } from "../src/index.js";
-
-export const setupTestLogger = async () => {
-  await configure({
-    sinks: {
-      console: getConsoleSink({
-        formatter: getAnsiColorFormatter({
-          format({ timestamp, level, category, message, record }) {
-            let output = `${timestamp} ${level} ${category}`;
-            if (typeof record.properties["id"] === "string") {
-              output = output + ` ${record.properties["id"]}`;
-            }
-            output = output + `: ${message}`;
-            return output;
-          },
-        }),
-      }),
-    },
-    loggers: [
-      {
-        category: "peerkit",
-        lowestLevel: "info",
-        sinks: ["console"],
-      },
-    ],
-  });
-};
 
 export interface TestNode {
   dataSync: AuthoredDataSync;

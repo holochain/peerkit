@@ -1,15 +1,15 @@
 import { reset } from "@logtape/logtape";
 import { blake2s } from "@noble/hashes/blake2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
+import { AgentId, Hash } from "@peerkit/api";
+import { setupTestLogger } from "@peerkit/test-utils";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
   AuthoredDataSync,
   FullReplicationStrategy,
   MemoryBlobStore,
 } from "../src/index.js";
-import { setupTestLogger } from "./util.js";
-import { makeStreamPair, createMockPeer, MockNode } from "./mock-node.js";
-import { AgentId, Hash } from "@peerkit/api";
-import { bytesToHex } from "@noble/hashes/utils.js";
+import { createMockPeer, makeStreamPair, MockNode } from "./mock-node.js";
 
 const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-sync/v1";
 const enc = (s: string) => new TextEncoder().encode(s);

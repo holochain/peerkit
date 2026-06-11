@@ -40,5 +40,8 @@
     "@peerkit/api": "^0.1.0-alpha.12",
     "@peerkit/transport-libp2p": "^0.1.0-alpha.12",
     "cbor-x": "^1.6.4"
+  },
+  "devDependencies": {
+    "@peerkit/test-utils": "^0.1.0-alpha.12"
   }
 }

@@ -4,13 +4,13 @@ import type {
   RelayDialAddress,
   RelayListenAddress,
 } from "@peerkit/api";
+import { setupTestLogger } from "@peerkit/test-utils";
 import { createNode } from "@peerkit/transport-libp2p";
 import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { signAgentInfo } from "../../src/agent-info.js";
 import { PeerkitNodeBuilder } from "../../src/node.js";
 import { PeerkitRelayBuilder } from "../../src/relay.js";
-import { setupTestLogger } from "./util.js";
 
 beforeEach(setupTestLogger);
 

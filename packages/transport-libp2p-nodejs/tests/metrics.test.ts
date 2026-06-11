@@ -9,7 +9,8 @@ import {
 import { initMetrics, shutdownMetrics } from "@peerkit/metrics";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { MessageHandler } from "@peerkit/api";
-import { createNode, setupTestLogger } from "./util.js";
+import { createNode } from "./util.js";
+import { setupTestLogger } from "@peerkit/test-utils";
 
 let exporter: InMemoryMetricExporter;
 let reader: PeriodicExportingMetricReader;

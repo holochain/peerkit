@@ -5,7 +5,7 @@ import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
 import { webRTC } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
-import type { ITransport, NodeAddress, RelayDialAddress } from "@peerkit/api";
+import type { NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
   type NodeOptions,
@@ -60,7 +60,7 @@ export interface CreateNodeOptions extends NodeOptions {
  */
 export async function createNode(
   options: CreateNodeOptions,
-): Promise<ITransport> {
+): Promise<TransportLibp2p> {
   // Build array of ICE servers if provided or leave undefined to use
   // libp2p default.
   const iceServers =

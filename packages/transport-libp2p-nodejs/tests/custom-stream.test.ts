@@ -4,9 +4,10 @@ import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
 import type { IStream } from "@peerkit/api";
+import { setupTestLogger } from "@peerkit/test-utils";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
-import { createNode, setupTestLogger, uniqueTxAddress } from "./util.js";
+import { createNode, uniqueTxAddress } from "./util.js";
 
 const PROTOCOL_A = "/app/custom/v1";
 const PROTOCOL_B = "/app/other/v1";

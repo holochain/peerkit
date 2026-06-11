@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { PeerkitNodeBuilder } from "../../src/node.js";
-import getPort, { portNumbers } from "get-port";
-import { setupTestLogger } from "./util.js";
 import { reset } from "@logtape/logtape";
-import { signAgentInfo } from "../../src/agent-info.js";
 import type { NodeAddress } from "@peerkit/api";
+import { setupTestLogger } from "@peerkit/test-utils";
+import getPort, { portNumbers } from "get-port";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { signAgentInfo } from "../../src/agent-info.js";
+import { PeerkitNodeBuilder } from "../../src/node.js";
 
 beforeEach(setupTestLogger);
 
