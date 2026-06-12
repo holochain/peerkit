@@ -21,7 +21,7 @@ export function createMockPeer(
   agentId: AgentId,
   policy: IDataDistributionPolicy = new FullReplicationPolicy(),
 ): MockPeer {
-  const store = new MemoryBlobStore();
+  const store = new MemoryBlobStore(policy);
   const dataSync = new AuthoredDataSync(store, policy, 5_000);
   const node = new MockNode(agentId);
   dataSync.init(node);
