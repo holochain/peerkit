@@ -1,6 +1,4 @@
 import { getLogger, type Logger } from "@logtape/logtape";
-import { blake2s } from "@noble/hashes/blake2.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
 import type {
   AgentId,
   Hash,
@@ -26,7 +24,6 @@ const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-sync/v1";
 const PULL_TIMEOUT = 1000 * 5; // 5 seconds
 const DEFAULT_PULL_INTERVAL_MS = 3 * 60 * 1_000; // Every 3 minutes
 const DEFAULT_EPOCH_DURATION_MS = 24 * 60 * 60 * 1_000; // 1 day
-const DEFAULT_MAX_BLOB_SIZE = 1024 * 1024 * 20; // 20 MiB
 
 export class AuthoredDataSync implements INodeModule {
   private isRunning: boolean;
@@ -37,9 +34,7 @@ export class AuthoredDataSync implements INodeModule {
   private readonly pullIntervalMs: number;
   private readonly epochDurationMs: number;
   private readonly pullTimeoutMs: number;
-  private readonly maxBlobSize: number;
   private readonly lastPullTime = new Map<AgentId, number>();
-  private lastAuthoredAt = 0;
   private logger: Logger | undefined;
 
   constructor(
@@ -48,14 +43,12 @@ export class AuthoredDataSync implements INodeModule {
     pullIntervalMs: number,
     epochDurationMs?: number,
     pullTimeoutMs?: number,
-    maxBlobSize?: number,
   ) {
     this.isRunning = false;
     this.dataSyncStore = dataSyncStore;
     this.policy = strategy ?? new FullReplicationPolicy();
     this.pullIntervalMs = pullIntervalMs ?? DEFAULT_PULL_INTERVAL_MS;
     this.epochDurationMs = epochDurationMs ?? DEFAULT_EPOCH_DURATION_MS;
-    this.maxBlobSize = maxBlobSize ?? DEFAULT_MAX_BLOB_SIZE;
     this.pullTimeoutMs = pullTimeoutMs ?? PULL_TIMEOUT;
   }
 
@@ -64,10 +57,6 @@ export class AuthoredDataSync implements INodeModule {
     this.logger = getLogger(["peerkit", "authored-data-sync"]).with({
       agentId: core.ownAgentId,
     });
-    // Restore the authoring clock across restarts so newly authored blobs never
-    // land below a last-known timestamp a peer already advanced past.
-    this.lastAuthoredAt =
-      this.dataSyncStore.getLastKnownByAuthor(core.ownAgentId)?.authoredAt ?? 0;
     core.registerStreamHandler(
       AUTHORED_DATA_SYNC_PROTOCOL,
       (_fromAgent, stream) => {
@@ -78,21 +67,13 @@ export class AuthoredDataSync implements INodeModule {
   }
 
   /**
-   * Hash the blob, store it under ownAgentId, and return the hash.
+   * Author a blob: store it under ownAgentId via the store (which owns hashing
+   * and the authoring clock) and return its hash.
    *
    * @param blob The blob to store
    */
-  store(blob: Blob) {
-    if (blob.byteLength > this.maxBlobSize) {
-      throw new Error(
-        `Blob to be stored too large: ${blob.byteLength} > ${this.maxBlobSize}`,
-      );
-    }
-    const hash = blake2s(blob);
-    const authoredAt = this.nextAuthoredAt();
-    this.dataSyncStore.put(hash, blob, this.core!.ownAgentId, authoredAt);
-    this.logger!.trace("Stored blob {*}", { hash: bytesToHex(hash) });
-    return hash;
+  store(blob: Blob): Hash {
+    return this.dataSyncStore.store(blob, this.core!.ownAgentId);
   }
 
   /**
@@ -100,15 +81,6 @@ export class AuthoredDataSync implements INodeModule {
    */
   get(hash: Hash, author: AgentId) {
     return this.dataSyncStore.get(hash, author);
-  }
-
-  /**
-   * Either the current timestamp or the last used authoredAt timestamp,
-   * to guarantee monotonically increasing timestamps.
-   */
-  private nextAuthoredAt(): number {
-    this.lastAuthoredAt = Math.max(Date.now(), this.lastAuthoredAt);
-    return this.lastAuthoredAt;
   }
 
   /**
@@ -251,27 +223,14 @@ export class AuthoredDataSync implements INodeModule {
       }
       const msg = decodePullMessage(result);
       if (msg === null || msg.type !== "blobs") continue;
-      for (const { hash, blob, authoredAt } of msg.entries) {
-        if (blob.byteLength > this.maxBlobSize) {
-          this.logger!.warn("Received blob that exceeds max blob size {*}", {
-            fromAgent: remoteAgentId,
-            blobSize: blob.byteLength,
-          });
-          continue;
+      for (const { blob, authoredAt } of msg.entries) {
+        // Blobs that are oversized or return false for the distribution
+        // policy are skipped.
+        if (
+          this.dataSyncStore.accept(blob, remoteAgentId, authoredAt) !== null
+        ) {
+          blobsReceived++;
         }
-        if (!this.policy.willStore(remoteAgentId, hash)) {
-          continue;
-        }
-        if (!xorSumHashMatches(blake2s(blob), hash)) {
-          this.logger!.warn("Received blob with invalid hash {*}", {
-            agentId: remoteAgentId,
-            hash: bytesToHex(hash),
-          });
-          continue;
-        }
-        // Store the author's authoredAt as-is; never re-stamp locally.
-        this.dataSyncStore.put(hash, blob, remoteAgentId, authoredAt);
-        blobsReceived++;
       }
     }
 
@@ -310,56 +269,67 @@ export class AuthoredDataSync implements INodeModule {
       initiatingAgentId,
     });
 
-    // Recent: delta only. getByAuthorSince already returns ascending by
-    // authoredAt, so a truncated send is a valid prefix. Because recentSince is
-    // >= epochStart, this slice is exactly the recent segment at or above it —
-    // no separate epoch filter needed.
+    // Recent: send all authored blobs since the timestamp the initiator
+    // provided.
     const recentToSend = this.dataSyncStore
       .getByAuthorSince(ownAgentId, request.recentSince)
       .filter((b) => this.policy.willStore(ownAgentId, b.hash));
 
-    // Historical: full segment, for the XOR summary and resend-on-mismatch.
-    // XOR summaries must be computed over the policy-filtered set, because the
-    // initiator won't hold blobs that it won't store. Including them here would
-    // cause a permanent mismatch and trigger redundant sends on every round.
+    // Historical: send all authored historical blobs.
+    // Must consider the distribution policy, otherwise the XOR sum the
+    // initiator sends can never match and all historical data would
+    // be sent on every pull.
     const historicalBlobs = this.dataSyncStore
       .getByAuthorBefore(ownAgentId, epochStart)
       .filter((b) => this.policy.willStore(ownAgentId, b.hash));
 
     if (recentToSend.length > 0) {
-      stream.send(
-        encodePullMessage({
-          type: "blobs",
-          agentId: ownAgentId,
-          segment: "recent",
-          entries: recentToSend.map((e) => ({
-            hash: e.hash,
-            blob: e.blob,
-            authoredAt: e.authoredAt,
-          })),
-        }),
-      );
+      try {
+        stream.send(
+          encodePullMessage({
+            type: "blobs",
+            agentId: ownAgentId,
+            segment: "recent",
+            entries: recentToSend.map((e) => ({
+              hash: e.hash,
+              blob: e.blob,
+              authoredAt: e.authoredAt,
+            })),
+          }),
+        );
+      } catch (error) {
+        this.logger!.warn("Failed to send recent blobs to peer {*}", {
+          agentId: initiatingAgentId,
+          error,
+        });
+      }
     }
 
-    // Historical: unchanged XOR-summary reconciliation (resend whole segment on
-    // mismatch).
+    // Historical: resend all historical blobs when XOR sum mismatches
     const sendHist = !xorSumHashMatches(
       xorHashes(historicalBlobs.map((blob) => blob.hash)),
       request.historicalSummary,
     );
     if (sendHist) {
-      stream.send(
-        encodePullMessage({
-          type: "blobs",
-          agentId: ownAgentId,
-          segment: "historical",
-          entries: historicalBlobs.map((e) => ({
-            hash: e.hash,
-            blob: e.blob,
-            authoredAt: e.authoredAt,
-          })),
-        }),
-      );
+      try {
+        stream.send(
+          encodePullMessage({
+            type: "blobs",
+            agentId: ownAgentId,
+            segment: "historical",
+            entries: historicalBlobs.map((e) => ({
+              hash: e.hash,
+              blob: e.blob,
+              authoredAt: e.authoredAt,
+            })),
+          }),
+        );
+      } catch (error) {
+        this.logger!.warn("Failed to send historical blobs to peer {*}", {
+          agentId: initiatingAgentId,
+          error,
+        });
+      }
     }
 
     this.logger!.debug("Responded to pull request {*}", {

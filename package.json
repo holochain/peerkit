@@ -31,6 +31,7 @@
     "packages/transport-libp2p",
     "packages/peerkit",
     "packages/authored-data-sync",
+    "packages/authored-data-push",
     "packages/peer-session",
     "packages/cli",
     "packages/relay",
