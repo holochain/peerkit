@@ -20,7 +20,7 @@ export class MockStream implements IStream {
   peer: MockStream | undefined;
 
   send(data: Uint8Array): void {
-    if (!this._isOpen || this.peer === undefined) return;
+    if (!this._isOpen || this.peer === undefined || !this.peer._isOpen) return;
     for (const l of this.peer.messageListeners) l(data);
   }
 
