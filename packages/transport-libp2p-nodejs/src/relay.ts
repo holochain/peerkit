@@ -3,12 +3,9 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayServer } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { ping } from "@libp2p/ping";
-import { webSockets } from "@libp2p/websockets";
-import type {
-  ITransport,
-  RelayDialAddress,
-  RelayListenAddress,
-} from "@peerkit/api";
+import { webRTCDirect } from "@libp2p/webrtc";
+import { multiaddr, type Multiaddr } from "@multiformats/multiaddr";
+import type { ITransport, RelayListenAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
   type RelayOptions,
@@ -38,32 +35,62 @@ export const defaultRelayListenAddrs: RelayListenAddress[] = [
 export const localDevRelayListenAddr: RelayListenAddress = "0.0.0.0:9000";
 
 /**
- * Build the public announce address for a relay sitting behind NAT.
- * Peers use this address to dial the relay. The relay itself still binds
- * to `listenAddr`.
+ * Replace the host of a multiaddr with the relay's public IP, preserving the
+ * rest of the address — including the WebRTC Direct certhash, which libp2p
+ * generates at start and is therefore only known at runtime.
  *
- * @param listenAddr  The relay's local listen address in `"host:port"` format.
- * @param publicIp    The relay's externally-reachable IP address.
+ * Used to announce a NAT'd relay's dialable address: the relay binds locally
+ * but advertises its public IP.
+ *
+ * @param addr      A multiaddr string beginning with `/ip4/<host>` or `/ip6/<host>`.
+ * @param publicIp  The relay's externally-reachable IP address.
  */
-export function buildRelayAnnounceAddr(
-  listenAddr: RelayListenAddress,
-  publicIp: string,
-): RelayDialAddress {
-  const url = new URL(`ws://${listenAddr}`);
-  const port = url.port;
-  if (!port || port === "0") {
-    throw new Error(
-      `buildRelayAnnounceAddr: "${listenAddr}" uses port 0 or has no port, which is not dialable`,
-    );
-  }
+export function rewriteHostToPublicIp(addr: string, publicIp: string): string {
   const version = isIP(publicIp);
   if (version === 0) {
     throw new Error(
-      `buildRelayAnnounceAddr: "${publicIp}" is not a valid IP address`,
+      `rewriteHostToPublicIp: "${publicIp}" is not a valid IP address`,
     );
   }
-  const prefix = version === 6 ? "/ip6" : "/ip4";
-  return `${prefix}/${publicIp}/tcp/${port}/ws`;
+  const addrVersion = addr.startsWith("/ip6/") ? 6 : 4;
+  if (addrVersion !== version) {
+    throw new Error(
+      `rewriteHostToPublicIp: cannot rewrite ${addr} to IPv${version} address "${publicIp}"`,
+    );
+  }
+  const prefix = version === 6 ? "ip6" : "ip4";
+  return addr.replace(/^\/(ip4|ip6)\/[^/]+/, `/${prefix}/${publicIp}`);
+}
+
+/**
+ * Build a libp2p `announceFilter` that rewrites every announced address to use
+ * the relay's public IP. Runs at runtime, so the live certhash is retained.
+ */
+function publicIpAnnounceFilter(
+  publicIp: string,
+): (addrs: Multiaddr[]) => Multiaddr[] {
+  const publicIpVersion = isIP(publicIp);
+  if (publicIpVersion === 0) {
+    throw new Error(
+      `publicIpAnnounceFilter: "${publicIp}" is not a valid IP address`,
+    );
+  }
+  return (addrs) => {
+    const seen = new Set<string>();
+    const out: Multiaddr[] = [];
+    for (const addr of addrs) {
+      const addrVersion = addr.toString().startsWith("/ip6/") ? 6 : 4;
+      if (addrVersion !== publicIpVersion) {
+        continue;
+      }
+      const rewritten = rewriteHostToPublicIp(addr.toString(), publicIp);
+      if (!seen.has(rewritten)) {
+        seen.add(rewritten);
+        out.push(multiaddr(rewritten));
+      }
+    }
+    return out;
+  };
 }
 
 /**
@@ -82,9 +109,9 @@ export interface CreateRelayOptions extends RelayOptions {
   /**
    * Public IP to announce when the relay is behind NAT.
    *
-   * The transport computes `/ip4/<ip>/tcp/<port>/ws` (or `/ip6/…`) for each
-   * listen address and configures libp2p to advertise it. Peers dial the
-   * public address; the relay still binds locally to `addrs`.
+   * The transport computes `/ip4/<ip>/udp/<port>/webrtc-direct/certhash/<hash>`
+   * (or `/ip6/…`) for each listen address and configures libp2p to advertise
+   * it. Peers dial the public address; the relay still binds locally to `addrs`.
    */
   publicIp?: string;
   /**
@@ -107,7 +134,7 @@ export interface CreateRelayOptions extends RelayOptions {
 /**
  * Build a Node.js peerkit relay transport
  *
- * Configures libp2p with WebSocket + circuit-relay-v2 server + noise + yamux
+ * Configures libp2p with WebRTC Direct + circuit-relay-v2 server + noise + yamux
  * + identify.
  *
  * Handles access and agents protocols. Does not register the message
@@ -120,20 +147,14 @@ export async function createRelay(
   const addrs = options?.addrs ?? defaultRelayListenAddrs;
   const listenMultiaddrs = addrs.map(hostPortToMultiaddr);
 
-  // If a public IP has been configured, the relay should use it to announce
-  // its dialable addresses.
-  const announce: string[] = [];
-  if (options.publicIp) {
-    for (const addr of addrs) {
-      announce.push(buildRelayAnnounceAddr(addr, options.publicIp));
-    }
-  }
-
   const libp2pNode = await createLibp2p({
     // Defer listening so TransportLibp2p can register protocol handlers
     // (including /peerkit/access/v1) before any inbound connection arrives.
     start: false,
-    transports: [webSockets()],
+    // webRTCDirect generates its own ephemeral certificate at start; the
+    // certhash is appended to the listen multiaddrs and read via
+    // getListenAddresses() once started.
+    transports: [webRTCDirect()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     // Circuit relay server enables relay functionality.
@@ -149,7 +170,11 @@ export async function createRelay(
     },
     addresses: {
       listen: listenMultiaddrs,
-      ...(announce.length > 0 ? { announce } : {}),
+      // Behind NAT, rewrite the announced addresses to the public IP at
+      // runtime so the live certhash is preserved.
+      ...(options.publicIp
+        ? { announceFilter: publicIpAnnounceFilter(options.publicIp) }
+        : {}),
     },
   });
   const transport = new TransportLibp2p(libp2pNode, options);

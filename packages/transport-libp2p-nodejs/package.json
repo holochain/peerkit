@@ -40,6 +40,7 @@
     "@libp2p/ping": "^3.1.5",
     "@libp2p/webrtc": "^6.0.23",
     "@libp2p/websockets": "^10.1.13",
+    "@multiformats/multiaddr": "^13.0.1",
     "@peerkit/api": "^0.1.0-alpha.12",
     "@peerkit/transport-libp2p-core": "^0.1.0-alpha.12",
     "libp2p": "^3.2.0"
@@ -47,7 +48,6 @@
   "devDependencies": {
     "@logtape/logtape": "^2.0.5",
     "@peerkit/metrics": "^0.1.0-alpha.12",
-    "@peerkit/test-utils": "^0.1.0-alpha.12",
-    "get-port": "^7.2.0"
+    "@peerkit/test-utils": "^0.1.0-alpha.12"
   }
 }

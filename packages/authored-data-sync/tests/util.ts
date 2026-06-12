@@ -1,7 +1,6 @@
 import type { NodeAddress } from "@peerkit/api";
 import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
-import getPort, { portNumbers } from "get-port";
 import {
   AuthoredDataSync,
   FullReplicationStrategy,
@@ -32,24 +31,34 @@ export async function createTestNode(opts: {
     opts.pullIntervalMs ?? 5000,
   );
 
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/0.0.0.0/tcp/${port}/ws`;
+  // Listen on WebRTC Direct so the node is directly dialable on loopback.
+  const listenAddr = "/ip4/127.0.0.1/udp/0/webrtc-direct";
 
   const node = await new PeerkitNodeBuilder({
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId(opts.id)
-    .withAddresses([address])
+    .withAddresses([listenAddr])
     .withNetworkAccessBytes(new Uint8Array([0]))
     .withModule(dataSync)
     .build();
+
+  // The dialable address carries the ephemeral certhash, known only after
+  // start, so read it from the running transport.
+  const addresses = node.transport.getListenAddresses();
+  const nodeAddress = addresses.find((a) => a.includes("/webrtc-direct"));
+  if (nodeAddress === undefined) {
+    throw new Error(
+      `createTestNode: node has no webrtc-direct address; got: ${addresses.join(", ")}`,
+    );
+  }
 
   return {
     dataSync,
     store,
     node,
-    nodeAddress: address,
+    nodeAddress,
     shutDown: () => node.shutDown(),
   };
 }

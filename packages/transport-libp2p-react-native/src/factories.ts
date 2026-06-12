@@ -2,8 +2,7 @@ import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
-import { webRTC } from "@libp2p/webrtc";
-import { webSockets } from "@libp2p/websockets";
+import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import type { ConnectionGater } from "@libp2p/interface";
 import type { ITransport, NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
@@ -53,10 +52,10 @@ export interface CreateNodeOptions extends NodeOptions {
    * Overrides libp2p's connection gater.
    *
    * On React Native libp2p applies its browser gater, which refuses to dial
-   * insecure WebSocket (`/ws`) relays and private/LAN addresses. A production
-   * deployment behind a secure `wss` relay never hits this, but development and
-   * demo setups that target a cleartext relay or LAN peers must supply a gater
-   * that permits those dials (e.g. `{ denyDialMultiaddr: async () => false }`).
+   * private/LAN addresses. A production deployment behind a public relay never
+   * hits this, but development and demo setups that target a LAN relay or LAN
+   * peers must supply a gater that permits those dials
+   * (e.g. `{ denyDialMultiaddr: async () => false }`).
    *
    * Left undefined, libp2p keeps its secure-by-default browser gater.
    */
@@ -64,8 +63,8 @@ export interface CreateNodeOptions extends NodeOptions {
 }
 
 /**
- * Build a React Native peerkit transport. Configures libp2p with WebSockets
- * (outbound) + WebRTC + circuit-relay-v2 client + noise + yamux + identify.
+ * Build a React Native peerkit transport. Configures libp2p with WebRTC +
+ * WebRTC Direct + circuit-relay-v2 client + noise + yamux + identify.
  *
  * Noise is wired with `quickCryptoNoise`, the JSI-backed `ICryptoInterface`
  * from `./quick-crypto-noise`, so SHA-256, HKDF, and ChaCha20-Poly1305 are
@@ -96,8 +95,8 @@ export async function createNode(
     // (including /peerkit/access/v1) before any inbound connection arrives.
     start: false,
     transports: [
-      webSockets(),
       webRTC({ rtcConfiguration: { iceServers } }),
+      webRTCDirect(),
       circuitRelayTransport(),
     ],
     connectionEncrypters: [noise({ crypto: quickCryptoNoise })],

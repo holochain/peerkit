@@ -1,13 +1,12 @@
 /**
  * @fileoverview Shared helpers for relay integration tests.
  *
- * Boots a real relay on a free loopback TCP port, builds dialable
- * multiaddrs, and spawns peerkit nodes with captured message/agent
- * buffers and circuit-relay addresses.
+ * Boots a real relay on a free loopback UDP port (WebRTC Direct), reads its
+ * dialable multiaddr at runtime, and spawns peerkit nodes with captured
+ * message/agent buffers and circuit-relay addresses.
  */
 
 import { createHash } from "node:crypto";
-import getPort from "get-port";
 import { vi } from "vitest";
 import { createNode } from "@peerkit/transport-libp2p-nodejs";
 import type { TransportLibp2p } from "@peerkit/transport-libp2p-core";
@@ -52,13 +51,12 @@ function bytesEqual(a: NetworkAccessBytes, b: NetworkAccessBytes): boolean {
 export interface TestRelay {
   readonly relay: RunningRelay;
   readonly store: IAgentStore;
-  readonly port: number;
   readonly multiaddr: string;
   readonly secret: string;
   shutdown(): Promise<void>;
 }
 
-/** Boots a relay bound to a free loopback TCP port. */
+/** Boots a relay bound to an OS-assigned loopback UDP port. */
 export async function startTestRelay(
   opts: { secret?: string } = {},
 ): Promise<TestRelay> {
@@ -67,54 +65,44 @@ export async function startTestRelay(
   // The relay grants access only to peers presenting these exact bytes; it
   // also announces them so the dialing node's own handler can accept.
   const accessBytes = computeNetworkAccessBytes(secret);
-  // Retry on EADDRINUSE: getPort releases the port before startRelay binds
-  // it, so another process can grab the port in between.
-  const maxAttempts = 5;
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const port = await getPort();
-    try {
-      const relay = await startRelay(
-        {
-          id: "test-relay",
-          logLevel: "warn",
-          listenAddrs: [`127.0.0.1:${port}`],
-          networkAccessBytes: accessBytes,
-          networkAccessHandler: async (_nodeId, bytes) =>
-            bytesEqual(bytes, accessBytes),
-        },
-        {
-          logger: createLogger({ level: "warn", id: "test" }),
-          agentStore: store,
-        },
-      );
-      const multiaddr = `/ip4/127.0.0.1/tcp/${port}/ws/p2p/${relay.nodeId}`;
-      return {
-        relay,
-        store,
-        port,
-        multiaddr,
-        secret,
-        shutdown: async () => {
-          try {
-            await relay.shutdown();
-          } finally {
-            store.destroy();
-          }
-        },
-      };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      const inUse =
-        message.includes("EADDRINUSE") ||
-        message.includes("address already in use");
-      if (!inUse || attempt === maxAttempts - 1) {
-        store.destroy();
-        throw error;
-      }
-    }
+  const relay = await startRelay(
+    {
+      id: "test-relay",
+      logLevel: "warn",
+      listenAddrs: ["127.0.0.1:0"],
+      networkAccessBytes: accessBytes,
+      networkAccessHandler: async (_nodeId, bytes) =>
+        bytesEqual(bytes, accessBytes),
+    },
+    {
+      logger: createLogger({ level: "warn", id: "test" }),
+      agentStore: store,
+    },
+  );
+  // The relay listens on WebRTC Direct; its dialable address carries the
+  // ephemeral certhash generated at start, so read it at runtime rather
+  // than constructing it from the port.
+  const addresses = relay.transport.getListenAddresses();
+  const multiaddr = addresses.find((a) => a.includes("/webrtc-direct"));
+  if (multiaddr === undefined) {
+    store.destroy();
+    throw new Error(
+      `startTestRelay: relay has no webrtc-direct address; got: ${addresses.join(", ")}`,
+    );
   }
-  store.destroy();
-  throw new Error("startTestRelay: exhausted port-allocation retries");
+  return {
+    relay,
+    store,
+    multiaddr,
+    secret,
+    shutdown: async () => {
+      try {
+        await relay.shutdown();
+      } finally {
+        store.destroy();
+      }
+    },
+  };
 }
 
 /**
@@ -172,7 +160,7 @@ export async function startTestNode(
   const node = await createNode({
     // `/p2p-circuit` accepts inbound relayed connections; `/webrtc` is the
     // node transport's direct-connection listener. The node dials the relay
-    // outbound over WebSockets, so it needs no TCP listen address of its own.
+    // outbound over WebRTC Direct, so it needs no listen address of its own.
     addrs: ["/p2p-circuit", "/webrtc"],
     networkAccessBytes: opts.accessBytes ?? computeNetworkAccessBytes(secret),
     networkAccessHandler: async () => true,

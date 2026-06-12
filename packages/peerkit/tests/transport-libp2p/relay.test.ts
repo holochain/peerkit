@@ -1,26 +1,24 @@
 import { reset } from "@logtape/logtape";
-import type { RelayDialAddress } from "@peerkit/api";
 import { setupTestLogger } from "@peerkit/test-utils";
-import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { buildOwnAgentInfo } from "../../src/agent-info.js";
 import { AgentKeyPair } from "../../src/agent.js";
 import { PeerkitNodeBuilder } from "../../src/node.js";
 import { PeerkitRelayBuilder } from "../../src/relay.js";
+import { webrtcDirectAddr } from "./webrtc-direct-addr.js";
 
 beforeEach(setupTestLogger);
 
 afterEach(reset);
 
 test("Relay sends known agents to connecting peer", async () => {
-  // Create the relay listening on a known port.
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayBootstrapAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
+  // Create the relay listening on an OS-assigned UDP port.
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayBootstrapAddr = webrtcDirectAddr(relay.transport);
 
   // Create node 1 with the relay address. Access handler allows everyone.
   const node1 = await new PeerkitNodeBuilder({
@@ -81,14 +79,13 @@ test("Relay sends known agents to connecting peer", async () => {
 });
 
 test("Node connects to another node using address learned from relay", async () => {
-  // Create the relay listening on a known port.
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
+  // Create the relay listening on an OS-assigned UDP port.
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayDialAddr = webrtcDirectAddr(relay.transport);
 
   // Create node 1 and wait until it has registered its own agent info via the
   // relay.

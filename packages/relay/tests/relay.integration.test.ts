@@ -1,7 +1,7 @@
 /**
  * @fileoverview Integration tests for the relay.
  *
- * Spins up a real relay bound to a free loopback TCP port, then dials it
+ * Spins up a real relay bound to an OS-assigned loopback UDP port, then dials it
  * with peerkit node transports to exercise the network-access handshake,
  * agent storage, signature verification, replay, circuit-relay forwarding,
  * sticky denial, and disconnect handling.

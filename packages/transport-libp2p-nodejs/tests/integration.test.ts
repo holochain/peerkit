@@ -1,12 +1,11 @@
 import { reset } from "@logtape/logtape";
 import { NodeId } from "@peerkit/api";
 import { setupTestLogger } from "@peerkit/test-utils";
-import getPort, { portNumbers } from "get-port";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { createNode, createRelay } from "../src/index.js";
 
 // These tests exercise peer connections over WebRTC.
-// Connections to the relay use WebSockets.
+// Connections to the relay use WebRTC Direct.
 
 beforeEach(setupTestLogger);
 
@@ -19,12 +18,9 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // Create the relay with a callback that pushes to the agent store when agent
   // infos have been received.
   const peersConnectedToRelay: NodeId[] = [];
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await createRelay({
     id: "relay",
-    addrs: [relayListenAddr],
+    addrs: ["127.0.0.1:0"],
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);
@@ -33,6 +29,15 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
       peersConnectedToRelay.push(nodeId);
     },
   });
+
+  // The relay's WebRTC Direct address carries the ephemeral certhash, which is
+  // only known after the relay has started, so it must be read at runtime.
+  const relayAddresses = relay.getListenAddresses();
+  const relayAddress = relayAddresses.find((a) => a.includes("/webrtc-direct"));
+  assert(
+    relayAddress,
+    `relay has no webrtc-direct address; got: ${relayAddresses.join(", ")}`,
+  );
 
   // Create node 1 that will connect first to the relay and send it its
   // agent info.
@@ -154,12 +159,9 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   // Create the relay with a callback that pushes to the agent store when agent
   // infos have been received.
   const peersConnectedToRelay: NodeId[] = [];
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
   const relay = await createRelay({
     id: "relay",
-    addrs: [relayListenAddr],
+    addrs: ["127.0.0.1:0"],
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       relayAgentStore.push(agentInfos);
@@ -168,6 +170,15 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
       peersConnectedToRelay.push(nodeId);
     },
   });
+
+  // The relay's WebRTC Direct address carries the ephemeral certhash, which is
+  // only known after the relay has started, so it must be read at runtime.
+  const relayAddresses = relay.getListenAddresses();
+  const relayAddress = relayAddresses.find((a) => a.includes("/webrtc-direct"));
+  assert(
+    relayAddress,
+    `relay has no webrtc-direct address; got: ${relayAddresses.join(", ")}`,
+  );
 
   // Create node 1 that will connect first to the relay and send it its
   // agent info.
