@@ -3,8 +3,7 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
-import { webRTC } from "@libp2p/webrtc";
-import { webSockets } from "@libp2p/websockets";
+import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import type { NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
@@ -52,8 +51,8 @@ export interface CreateNodeOptions extends NodeOptions {
 /**
  * Build a Node.js peerkit transport node
  *
- * Configures libp2p with WebSockets + circuit-relay-v2 client + noise +
- * yamux + identify + DCUtR.
+ * Configures libp2p with WebRTC + WebRTC Direct + circuit-relay-v2 client +
+ * noise + yamux + identify + DCUtR.
  *
  * Handles all three protocols (access, agents, messages). The caller invokes
  * {@link TransportLibp2p.sendAgents} explicitly to distribute agent-info.
@@ -74,8 +73,8 @@ export async function createNode(
     start: false,
     // Circuit relay transport enables connecting to peers through connected relays.
     transports: [
-      webSockets(),
       webRTC({ rtcConfiguration: { iceServers } }),
+      webRTCDirect(),
       circuitRelayTransport(),
     ],
     connectionEncrypters: [noise()],

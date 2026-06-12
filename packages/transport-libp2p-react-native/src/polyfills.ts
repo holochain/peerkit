@@ -16,7 +16,14 @@
  *     HMAC, SHA-256) used by `@chainsafe/libp2p-noise`.
  *  3. `react-native-webrtc` `registerGlobals()` — defines the global
  *     `RTCPeerConnection`, `RTCSessionDescription`, etc. used by
- *     `@libp2p/webrtc`.
+ *     `@libp2p/webrtc`, followed by `installWebRtcCertificatePolyfill()` which
+ *     adds the static `RTCPeerConnection.generateCertificate` method the
+ *     webrtc-direct dialer needs but `react-native-webrtc` does not provide
+ *     (see `webrtc-certificate-polyfill`), and
+ *     `installDataChannelEarlyMessagePolyfill()` which recovers the first
+ *     inbound datachannel message `react-native-webrtc` drops during connection
+ *     setup, otherwise mobile-to-mobile stream handshakes hang (see
+ *     `datachannel-early-message-polyfill`).
  *
  * It also installs the WHATWG `Event` / `EventTarget` / `CustomEvent` globals
  * that Hermes lacks but libp2p extends at module-evaluation time (see
@@ -36,8 +43,10 @@ import { Buffer } from "buffer";
 import process from "process";
 import { install as installQuickCrypto } from "react-native-quick-crypto";
 import { registerGlobals as registerWebRtcGlobals } from "react-native-webrtc";
+import { installDataChannelEarlyMessagePolyfill } from "./datachannel-early-message-polyfill.js";
 import { installEventTargetPolyfill } from "./event-target-polyfill.js";
 import { installTextCodecPolyfill } from "./text-codec-polyfill.js";
+import { installWebRtcCertificatePolyfill } from "./webrtc-certificate-polyfill.js";
 import { installWebSocketBufferedAmountPolyfill } from "./websocket-buffered-amount-polyfill.js";
 
 // Buffer + process must live on globalThis: some libp2p dependencies reach for these as globals
@@ -56,3 +65,8 @@ installTextCodecPolyfill();
 installWebSocketBufferedAmountPolyfill();
 installQuickCrypto();
 registerWebRtcGlobals();
+// Must run after `registerWebRtcGlobals()`: both patch the global
+// `RTCPeerConnection` that step installs (the early-message polyfill also probes
+// it for the `RTCDataChannel` prototype).
+installWebRtcCertificatePolyfill();
+installDataChannelEarlyMessagePolyfill();

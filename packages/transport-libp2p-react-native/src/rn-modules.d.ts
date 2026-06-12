@@ -67,6 +67,22 @@ declare module "react-native-webrtc" {
   export function registerGlobals(): void;
 }
 
+declare module "react-native" {
+  export const NativeModules: Record<string, unknown>;
+
+  export interface NativeEventSubscription {
+    remove(): void;
+  }
+
+  export class NativeEventEmitter {
+    constructor(nativeModule?: unknown);
+    addListener(
+      eventType: string,
+      listener: (event: unknown) => void,
+    ): NativeEventSubscription;
+  }
+}
+
 declare module "buffer" {
   export const Buffer: {
     from(...args: readonly unknown[]): unknown;

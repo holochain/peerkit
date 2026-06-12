@@ -7,10 +7,10 @@ import { setupTestLogger } from "@peerkit/test-utils";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import {
-  buildRelayAnnounceAddr,
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_AGENTS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
+  rewriteHostToPublicIp,
 } from "../src/index.js";
 import { createNode, createRelay, uniqueTxAddress } from "./util.js";
 
@@ -136,35 +136,46 @@ test("Relay knows node's agent infos after agent exchange", async () => {
   await relay.shutDown();
 });
 
-test("buildRelayAnnounceAddr: IPv4 host:port listen address", () => {
-  // Standard case: extract port from a host:port listen address
-  // and substitute the public IP.
+test("rewriteHostToPublicIp: swaps the IPv4 host, keeping certhash and peer id", () => {
+  // The relay binds locally but announces its public IP; the live certhash and
+  // the rest of the multiaddr must be preserved.
   assert.equal(
-    buildRelayAnnounceAddr("0.0.0.0:9000", "1.2.3.4"),
-    "/ip4/1.2.3.4/tcp/9000/ws",
+    rewriteHostToPublicIp(
+      "/ip4/0.0.0.0/udp/9000/webrtc-direct/certhash/uHASH/p2p/12D3Koo",
+      "1.2.3.4",
+    ),
+    "/ip4/1.2.3.4/udp/9000/webrtc-direct/certhash/uHASH/p2p/12D3Koo",
   );
 });
 
-test("buildRelayAnnounceAddr: IPv6 host:port listen address", () => {
-  // IPv6 public IP should produce an /ip6 announce address.
+test("rewriteHostToPublicIp: swaps the IPv6 host", () => {
   assert.equal(
-    buildRelayAnnounceAddr("[::]:9000", "::1"),
-    "/ip6/::1/tcp/9000/ws",
+    rewriteHostToPublicIp(
+      "/ip6/::/udp/9000/webrtc-direct/certhash/uHASH",
+      "::1",
+    ),
+    "/ip6/::1/udp/9000/webrtc-direct/certhash/uHASH",
   );
 });
 
-test("buildRelayAnnounceAddr: throws when port is 0", () => {
-  // Port 0 is ephemeral and not dialable, so an error must be thrown.
+test("rewriteHostToPublicIp: rejects cross-family rewrites", () => {
+  // Rewriting an IPv6 listener to an IPv4 address can advertise an unreachable
+  // UDP port, so callers must filter by address family first.
   assert.throws(
-    () => buildRelayAnnounceAddr("0.0.0.0:0", "1.2.3.4"),
-    /port 0.*not dialable/,
+    () =>
+      rewriteHostToPublicIp(
+        "/ip6/::/udp/9000/webrtc-direct/certhash/uHASH",
+        "1.2.3.4",
+      ),
+    /cannot rewrite/,
   );
 });
 
-test("buildRelayAnnounceAddr: throws on invalid public IP", () => {
+test("rewriteHostToPublicIp: throws on invalid public IP", () => {
   // Non-IP strings must be rejected immediately.
   assert.throws(
-    () => buildRelayAnnounceAddr("0.0.0.0:9000", "not-an-ip"),
+    () =>
+      rewriteHostToPublicIp("/ip4/0.0.0.0/udp/9000/webrtc-direct", "not-an-ip"),
     /not a valid IP address/,
   );
 });

@@ -80,6 +80,7 @@ All runtime methods are keyed by `NodeId` (an opaque `string` — the libp2p pee
 - **Incoming message bytes.** libp2p may deliver `message.data` as either `Uint8Array` or `Uint8ArrayList` — normalize with `.subarray()` before use.
 - **Construction.** Use `TransportLibp2p.createNode(...)` or `TransportLibp2p.createRelay(...)` (async static factories) rather than `new TransportLibp2p(...)` directly — the factories own libp2p node creation and `start()`.
 - **Default `networkAccessBytes`.** Defaults to `new Uint8Array([0])`, not an empty array — an empty array causes `.send()` to be a no-op, which breaks the counter-handshake.
+- **Relay address parsing.** `hostPortToMultiaddr` (in `transport-libp2p-nodejs/src/address.ts`) converts a `"host:port"` `RelayListenAddress` to a multiaddr and **must** support all three host forms: DNS names (`/dns`), IPv4 (`/ip4`), and IPv6 (`/ip6`). `node:net`'s `isIP` returns `4`/`6` for IP literals and `0` for DNS names, so a `0` result is a DNS name (the `/dns` prefix), not an error — do not reject it. Only an empty hostname or a missing port is invalid.
 
 ### Two construction modes
 

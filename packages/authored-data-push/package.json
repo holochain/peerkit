@@ -44,7 +44,6 @@
     "@peerkit/authored-data-sync": "^0.1.0-alpha.12",
     "@peerkit/peerkit": "^0.1.0-alpha.12",
     "@peerkit/test-utils": "^0.1.0-alpha.12",
-    "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.12",
-    "get-port": "^7.2.0"
+    "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.12"
   }
 }

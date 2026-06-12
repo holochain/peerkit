@@ -35,7 +35,6 @@
     "@peerkit/peerkit": "^0.1.0-alpha.13"
   },
   "devDependencies": {
-    "@peerkit/test-utils": "^0.1.0-alpha.13",
-    "get-port": "^7.2.0"
+    "@peerkit/test-utils": "^0.1.0-alpha.13"
   }
 }

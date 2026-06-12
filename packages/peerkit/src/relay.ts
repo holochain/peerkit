@@ -10,12 +10,15 @@ import type {
   NodeId,
   PeerConnectedCallback,
   PeerDisconnectedCallback,
+  RelayCertificate,
   RelayListenAddress,
 } from "@peerkit/api";
 import {
   createRelay,
   type CreateRelayOptions,
 } from "@peerkit/transport-libp2p";
+
+export { generateRelayCertificate } from "@peerkit/transport-libp2p";
 import {
   getAgentsReceivedCallback,
   type AgentsReceivedObserver,
@@ -45,6 +48,7 @@ export class PeerkitRelayBuilder {
   id?: string;
   addresses?: RelayListenAddress[];
   publicIp?: string;
+  certificate?: RelayCertificate;
   networkAccessBytes?: NetworkAccessBytes;
   agentStore?: IAgentStore;
   relayTransportFactory?: PeerkitRelayTransportFactory;
@@ -68,6 +72,11 @@ export class PeerkitRelayBuilder {
 
   withPublicIp(ip: string): this {
     this.publicIp = ip;
+    return this;
+  }
+
+  withCertificate(certificate: RelayCertificate): this {
+    this.certificate = certificate;
     return this;
   }
 
@@ -174,6 +183,7 @@ export class PeerkitRelayBuilder {
           networkAccessHandler: this.networkAccessHandler,
           addrs: this.addresses,
           publicIp: this.publicIp,
+          certificate: this.certificate,
           id: this.id,
           networkAccessBytes: this.networkAccessBytes,
         })
@@ -181,6 +191,7 @@ export class PeerkitRelayBuilder {
           id: this.id,
           addrs: this.addresses,
           publicIp: this.publicIp,
+          certificate: this.certificate,
           networkAccessBytes: this.networkAccessBytes,
           agentsReceivedCallback,
           peerConnectedCallback,

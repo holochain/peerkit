@@ -1,14 +1,17 @@
 /**
  * @fileoverview Integration tests for the relay.
  *
- * Spins up a real relay bound to a free loopback TCP port, then dials it
+ * Spins up a real relay bound to an OS-assigned loopback UDP port, then dials it
  * with peerkit node transports to exercise the network-access handshake,
  * agent storage, signature verification, replay, circuit-relay forwarding,
  * sticky denial, and disconnect handling.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deserializeAgentInfoList } from "@peerkit/peerkit";
+import {
+  deserializeAgentInfoList,
+  generateRelayCertificate,
+} from "@peerkit/peerkit";
 import {
   computeNetworkAccessBytes,
   makeSignedAgentInfo,
@@ -199,6 +202,25 @@ describe("relay integration", () => {
       // proven by `peerCount()` staying 0 across both attempts.
       await expect(n.node.connect([relay.multiaddr])).rejects.toThrow();
       expect(relay.relay.peerCount()).toBe(0);
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "advertises the caller-supplied certificate's certhash",
+    async () => {
+      // A persisted certificate keeps the relay's WebRTC Direct certhash stable
+      // across restarts. Boot a relay with one and confirm its dialable address
+      // carries exactly that certhash rather than a freshly generated one.
+      const certificate = await generateRelayCertificate();
+      const certRelay = await startTestRelay({ certificate });
+      try {
+        expect(certRelay.multiaddr).toContain(
+          `/certhash/${certificate.certhash}`,
+        );
+      } finally {
+        await certRelay.shutdown();
+      }
     },
     TEST_TIMEOUT_MS,
   );
