@@ -3,23 +3,21 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
-import { webSockets } from "@libp2p/websockets";
+import { webRTCDirect } from "@libp2p/webrtc";
 import { reset } from "@logtape/logtape";
 import type {
   ITransport,
   NodeAddress,
   NodeId,
   RelayDialAddress,
-  RelayListenAddress,
 } from "@peerkit/api";
 import { setupTestLogger } from "@peerkit/test-utils";
-import getPort, { portNumbers } from "get-port";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import { createNode, createRelay, TransportLibp2p } from "../src/index.js";
 
 // These tests exercise peer connections over WebRTC.
-// Connections to the relay use WebSockets.
+// Connections to the relay use WebRTC Direct.
 
 beforeEach(setupTestLogger);
 
@@ -33,7 +31,7 @@ interface ReceivedMessage {
 
 interface TestRelay {
   relay: ITransport;
-  /** Dialable WebSocket address of the relay. */
+  /** Dialable WebRTC Direct address of the relay. */
   dialAddress: RelayDialAddress;
   /** Agent-info payloads the relay has received, in arrival order. */
   receivedAgents: Uint8Array[];
@@ -41,15 +39,13 @@ interface TestRelay {
   connectedPeers: NodeId[];
 }
 
-/** Start a relay on a free port with the standard tracking callbacks. */
+/** Start a relay on a free loopback UDP port with the standard tracking callbacks. */
 async function startRelay(id = "relay"): Promise<TestRelay> {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const listenAddr: RelayListenAddress = `127.0.0.1:${port}`;
   const receivedAgents: Uint8Array[] = [];
   const connectedPeers: NodeId[] = [];
   const relay = await createRelay({
     id,
-    addrs: [listenAddr],
+    addrs: ["127.0.0.1:0"],
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
       receivedAgents.push(agentInfos);
@@ -58,9 +54,17 @@ async function startRelay(id = "relay"): Promise<TestRelay> {
       connectedPeers.push(nodeId);
     },
   });
+  // The relay's WebRTC Direct address carries the ephemeral certhash, known
+  // only after start, so read it at runtime rather than building it from a port.
+  const listenAddresses = relay.getListenAddresses();
+  const dialAddress = listenAddresses.find((a) => a.includes("/webrtc-direct"));
+  assert(
+    dialAddress,
+    `relay has no webrtc-direct address; got: ${listenAddresses.join(", ")}`,
+  );
   return {
     relay,
-    dialAddress: `/ip4/127.0.0.1/tcp/${port}/ws`,
+    dialAddress,
     receivedAgents,
     connectedPeers,
   };
@@ -315,14 +319,15 @@ test("2 nodes fall back to relayed connection when direct connection fails", asy
     { timeout: 5_000 },
   );
 
-  // Node 2 deliberately omits the WebRTC transport, so node 1's direct dial
-  // fails and the connection must fall back to the relay. It is built by hand
-  // because the factory always wires WebRTC in.
+  // Node 2 omits the peer-to-peer WebRTC transport (keeping WebRTC Direct only
+  // to reach the relay), so node 1's direct dial fails and the connection must
+  // fall back to the relay. It is built by hand because the factory always
+  // wires WebRTC in.
   const libp2pNode2 = await createLibp2p({
     // Defer listening so TransportLibp2p can register protocol handlers
     // (including /peerkit/access/v1) before any inbound connection arrives.
     start: false,
-    transports: [webSockets(), circuitRelayTransport()],
+    transports: [webRTCDirect(), circuitRelayTransport()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: { identify: identify(), dcutr: dcutr() },
@@ -330,8 +335,9 @@ test("2 nodes fall back to relayed connection when direct connection fails", asy
       listen: ["/p2p-circuit", "/webrtc"],
     },
   });
-  // Fake WebRTC address node 1 will try (and fail) to dial directly.
-  const fakeWebrtcAddr = `${dialAddress}/p2p/${relay.getNodeId()}/p2p-circuit/webrtc/p2p/${libp2pNode2.peerId}`;
+  // Fake WebRTC address node 1 will try (and fail) to dial directly. The
+  // relay's dialAddress already carries its `/p2p/<relayId>` suffix.
+  const fakeWebrtcAddr = `${dialAddress}/p2p-circuit/webrtc/p2p/${libp2pNode2.peerId}`;
 
   let node2Addresses: NodeAddress[] = [];
   const node2Peers: NodeId[] = [];
@@ -487,10 +493,10 @@ test("connect tries multiple relayed addresses and connects via a reachable one"
     { timeout: 5_000 },
   );
 
-  // Relayed address routed through a relay that isn't running. Its peer id
-  // differs from the live relay, so libp2p can't reuse the live connection.
-  const deadRelayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const deadRelayedAddr = `/ip4/127.0.0.1/tcp/${deadRelayPort}/ws/p2p/QmDeadReLay/p2p-circuit/p2p/${node1.getNodeId()}`;
+  // Relayed address routed through a relay that isn't running (nothing listens
+  // on port 1). Its peer id differs from the live relay, so libp2p can't reuse
+  // the live connection.
+  const deadRelayedAddr = `/ip4/127.0.0.1/tcp/1/ws/p2p/QmDeadReLay/p2p-circuit/p2p/${node1.getNodeId()}`;
 
   // Dead relayed address first, node 1's real relayed address second.
   await node2.connect([deadRelayedAddr, ...node1Addresses()]);

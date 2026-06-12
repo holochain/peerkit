@@ -1,4 +1,3 @@
-import getPort, { portNumbers } from "get-port";
 import { expect, vi } from "vitest";
 import {
   startNode,
@@ -9,9 +8,9 @@ import {
 import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 
 export async function startTestRelay() {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const listenAddr = `127.0.0.1:${port}`;
-  return startRelay({ listenAddr });
+  // Bind to an OS-assigned loopback UDP port; the relay's dialable WebRTC
+  // Direct address is read at runtime by startRelay.
+  return startRelay({ listenAddr: "127.0.0.1:0" });
 }
 
 // Starts a node connected to dialAddr and resolves only after the node has

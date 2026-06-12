@@ -7,6 +7,23 @@ export type { NodeId, NodeAddress, RelayDialAddress };
 export type NetworkAccessBytes = Uint8Array;
 
 /**
+ * A TLS certificate for a relay's WebRTC Direct listener, supplied by the
+ * caller instead of being auto-generated at start.
+ *
+ * Passing a persisted certificate keeps the relay's certhash — and therefore
+ * its dialable multiaddrs — stable across restarts. Must be ECDSA on the P-256
+ * curve, as required by WebRTC Direct.
+ */
+export interface RelayCertificate {
+  /** Private key in PEM format. */
+  readonly privateKeyPem: string;
+  /** Self-signed certificate in PEM format. */
+  readonly certificatePem: string;
+  /** Multibase-encoded multihash of the certificate (the WebRTC Direct certhash). */
+  readonly certhash: string;
+}
+
+/**
  * Processing hook for incoming access handshakes.
  *
  * The transport awaits this. Return `false` to deny access, `true` to grant it.

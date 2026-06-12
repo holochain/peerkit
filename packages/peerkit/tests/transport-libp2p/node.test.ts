@@ -1,50 +1,48 @@
 import { reset } from "@logtape/logtape";
-import type { NodeAddress } from "@peerkit/api";
 import { MemoryAgentKeyStore, setupTestLogger } from "@peerkit/test-utils";
-import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { signAgentInfo } from "../../src/agent-info.js";
 import { PeerkitNodeBuilder } from "../../src/node.js";
+import { webrtcDirectAddr } from "./webrtc-direct-addr.js";
 
 beforeEach(setupTestLogger);
 
 afterEach(reset);
 
 test("Two nodes exchange agents bidirectionally", async () => {
-  // Create node 1 on a known port so node 2 can dial it directly.
-  const node1Port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1Addresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${node1Port}/ws`];
+  // Create node 1 listening on WebRTC Direct so node 2 can dial it directly.
   const node1 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1Addresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddr = webrtcDirectAddr(node1.transport);
   // Pre-populate node 1's agent store with its own signed agent info, so it
   // has something to send when node 2 connects.
   node1.agentStore.store([
     signAgentInfo(
       {
         agentId: node1.keyPair.agentId(),
-        addresses: node1Addresses,
+        addresses: [node1DialAddr],
         expiresAt: Date.now() + 60_000,
       },
       node1.keyPair,
     ),
   ]);
 
-  const node2Port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node2DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${node2Port}/ws`;
   const node2 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node2")
-    .withAddresses([node2DialAddr])
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  const node2DialAddr = webrtcDirectAddr(node2.transport);
   // Pre-populate node 2's agent store so it also has something to send.
   node2.agentStore.store([
     signAgentInfo(
@@ -59,7 +57,7 @@ test("Two nodes exchange agents bidirectionally", async () => {
 
   // Node 2 dials node 1. Both sides fire peerConnectedCallback, so both
   // send their stored agents to the other.
-  await node2.transport.connect(node1Addresses);
+  await node2.transport.connect([node1DialAddr]);
 
   // Node 2 should receive node 1's agent info.
   await vi.waitFor(
@@ -77,9 +75,6 @@ test("Two nodes exchange agents bidirectionally", async () => {
 });
 
 test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const receivedMessages: Array<{ fromAgent: string; text: string }> = [];
 
   // Node 1 records incoming messages with the sender's AgentId.
@@ -94,8 +89,10 @@ test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
     },
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddr = webrtcDirectAddr(node1.transport);
 
   const node2 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
@@ -105,7 +102,7 @@ test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
     .withId("node2")
     .build();
 
-  await node2.transport.connect(node1DialAddresses);
+  await node2.transport.connect([node1DialAddr]);
 
   // node2.send() resolves node1's AgentId to a NodeId internally — the caller
   // never needs to know the transport-level NodeId.

@@ -54,6 +54,10 @@ export async function startRelay(
     builder.withPublicIp(config.publicIp);
   }
 
+  if (config.certificate) {
+    builder.withCertificate(config.certificate);
+  }
+
   const relay = await builder
     .withAgentsReceivedObserver((agentIds) => {
       recordAgentsReceived(agentIds.length);

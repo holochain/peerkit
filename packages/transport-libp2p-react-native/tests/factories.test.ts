@@ -32,12 +32,12 @@ vi.mock("libp2p", () => ({
   }),
 }));
 
-vi.mock("@libp2p/websockets", () => ({ webSockets: () => ({ tag: "ws" }) }));
 vi.mock("@libp2p/webrtc", () => ({
   webRTC: (arg: { rtcConfiguration?: { iceServers?: unknown } }) => {
     captured.webRtcArg = arg;
     return { tag: "webrtc" };
   },
+  webRTCDirect: () => ({ tag: "webrtc-direct" }),
 }));
 vi.mock("@libp2p/circuit-relay-v2", () => ({
   circuitRelayTransport: () => ({ tag: "relay" }),
@@ -89,13 +89,13 @@ describe("createNode", () => {
   });
 
   test("configures the mobile transport set", async () => {
-    // WebSockets (outbound) + WebRTC + circuit-relay-v2: the three transports a
-    // relay-mediated mobile peer needs. No raw TCP, no listener.
+    // WebRTC (node-to-node) + WebRTC Direct (browser-safe relay dial) +
+    // circuit-relay-v2. No plain websockets, no raw TCP, no listener.
     await createNode({});
 
     expect(captured.libp2pConfig?.transports).toEqual([
-      { tag: "ws" },
       { tag: "webrtc" },
+      { tag: "webrtc-direct" },
       { tag: "relay" },
     ]);
   });

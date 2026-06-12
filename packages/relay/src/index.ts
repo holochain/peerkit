@@ -25,6 +25,11 @@ export {
   type InitRelayMetricsOptions,
 } from "./metrics.js";
 export { createLogger, type Logger, type LoggerOptions } from "./logger.js";
+// Re-exported so callers can persist a stable TLS certificate and
+// feed it back through RelayConfig.certificate without depending on the
+// transport package directly.
+export type { RelayCertificate } from "@peerkit/api";
+export { generateRelayCertificate } from "@peerkit/peerkit";
 
 export async function run(config: RelayConfig): Promise<void> {
   const logger = createLogger({ level: config.logLevel, id: config.id });

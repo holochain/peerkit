@@ -7,5 +7,6 @@ export {
   type RelayOptions,
   type TransportOptionsBase,
 } from "@peerkit/transport-libp2p-core";
+export { generateRelayCertificate } from "./certificate.js";
 export * from "./node.js";
 export * from "./relay.js";

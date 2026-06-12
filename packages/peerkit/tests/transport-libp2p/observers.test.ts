@@ -1,17 +1,12 @@
 import { reset } from "@logtape/logtape";
-import type {
-  NodeAddress,
-  NodeId,
-  RelayDialAddress,
-  RelayListenAddress,
-} from "@peerkit/api";
+import type { NodeAddress, NodeId } from "@peerkit/api";
 import { MemoryAgentKeyStore, setupTestLogger } from "@peerkit/test-utils";
 import { createNode } from "@peerkit/transport-libp2p";
-import getPort, { portNumbers } from "get-port";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { signAgentInfo } from "../../src/agent-info.js";
 import { PeerkitNodeBuilder } from "../../src/node.js";
 import { PeerkitRelayBuilder } from "../../src/relay.js";
+import { webrtcDirectAddr } from "./webrtc-direct-addr.js";
 
 beforeEach(setupTestLogger);
 
@@ -19,17 +14,16 @@ afterEach(reset);
 
 test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive", async () => {
   // Node 1 listens on a known port.
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const node1 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   // Pre-populate node 1's agent store so it has something to send when node 2
   // connects.
@@ -71,14 +65,12 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
 });
 
 test("withConnectedToRelay fires on relay connection", async () => {
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr: RelayListenAddress = `127.0.0.1:${relayPort}`;
-  const relayDialAddress: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayDialAddress = webrtcDirectAddr(relay.transport);
 
   const relayNodeIds: NodeId[] = [];
   const node = await new PeerkitNodeBuilder({
@@ -104,14 +96,12 @@ test("withConnectedToRelay fires on relay connection", async () => {
 });
 
 test("withAddressesChanged on node fires with the node addresses", async () => {
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr: RelayListenAddress = `127.0.0.1:${relayPort}`;
-  const relayDialAddress: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayDialAddress = webrtcDirectAddr(relay.transport);
 
   let nodeAddresses: NodeAddress[] = [];
   const node = await new PeerkitNodeBuilder({
@@ -136,18 +126,16 @@ test("withAddressesChanged on node fires with the node addresses", async () => {
 });
 
 test("withAgentsReceivedObserver on relay fires when a node sends agent info", async () => {
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayBootstrapAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-
   const receivedAgentIds: string[] = [];
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .withAgentsReceivedObserver((agentIds) => {
       receivedAgentIds.push(...agentIds);
     })
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayBootstrapAddr = webrtcDirectAddr(relay.transport);
 
   // The node sends its own agent info to the relay on connection,
   // so the relay's observer must fire.
@@ -170,9 +158,6 @@ test("withAgentsReceivedObserver on relay fires when a node sends agent info", a
 });
 
 test("message handler has the sender's AgentId", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const receivedMessages: Array<{ fromAgent: string; text: string }> = [];
 
   // Node 1 records every incoming message together with the reported AgentId.
@@ -187,8 +172,10 @@ test("message handler has the sender's AgentId", async () => {
     },
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   const node2 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
@@ -221,9 +208,6 @@ test("message handler has the sender's AgentId", async () => {
 });
 
 test("message is dropped when peer does not send an AgentId prefix and access is granted", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   // Track when the transport-level message handler fires on node1 so we know
   // the message arrived and was processed and dropped by the internal handler
   // before asserting the app handler was not called.
@@ -235,7 +219,7 @@ test("message is dropped when peer does not send an AgentId prefix and access is
     messageHandler: appMessageHandler,
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .withTransportFactory(async (options) => {
       const original = options.messageHandler;
       return createNode({
@@ -247,6 +231,8 @@ test("message is dropped when peer does not send an AgentId prefix and access is
       });
     })
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   // node2 overrides networkAccessBytes to fewer than 32 bytes, so node1
   // cannot extract an AgentId from the access handshake.
@@ -282,9 +268,6 @@ test("message is dropped when peer does not send an AgentId prefix and access is
 });
 
 test("withPeerDisconnectedObserver on node fires with AgentId when peer disconnects", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   // node1 records connected and disconnected agent IDs so it can be asserted
   // the disconnect observer fires with the correct AgentId and cleans up
   // mappings.
@@ -297,7 +280,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .withPeerConnectedObserver((fromAgent) => {
       connectedAgents.push(fromAgent);
     })
@@ -305,6 +288,8 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
       disconnectedAgents.push(fromAgent);
     })
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   const node2 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
@@ -337,9 +322,6 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer disconne
 
 test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts down abruptly", async () => {
   // Peer shuts down rather than a graceful disconnect().
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const connectedAgents: string[] = [];
   const disconnectedAgents: string[] = [];
 
@@ -349,7 +331,7 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .withPeerConnectedObserver((fromAgent) => {
       connectedAgents.push(fromAgent);
     })
@@ -357,6 +339,8 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
       disconnectedAgents.push(fromAgent);
     })
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   const node2 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
@@ -386,17 +370,16 @@ test("withPeerDisconnectedObserver on node fires with AgentId when peer shuts do
 });
 
 test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const node1 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   const disconnectedAgents: string[] = [];
   const node2 = await new PeerkitNodeBuilder({
@@ -430,23 +413,20 @@ test("withPeerDisconnectedObserver on node cleans up AgentId maps on disconnect"
 });
 
 test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections", async () => {
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayDialAddr = webrtcDirectAddr(relay.transport);
 
-  const nodePort = await getPort({ port: portNumbers(30_000, 40_000) });
   const node = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node")
-    .withAddresses([`/ip4/127.0.0.1/tcp/${nodePort}/ws`])
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
 
   await node.transport.connect([relayDialAddr]);
@@ -468,14 +448,12 @@ test("PeerkitRelayBuilder connectedPeers tracks connections and disconnections",
 });
 
 test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store", async () => {
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `0.0.0.0:${relayPort}`;
-  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayDialAddr = webrtcDirectAddr(relay.transport);
 
   const node = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
@@ -515,14 +493,12 @@ test("PeerkitRelayBuilder prunes a disconnected peer's agent info from the store
 });
 
 test("PeerkitRelayBuilder forwards a newly published agent info to already-connected peers", async () => {
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `0.0.0.0:${relayPort}`;
-  const relayDialAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-
   const relay = await new PeerkitRelayBuilder(async () => true)
     .withId("relay")
-    .withAddresses([relayListenAddr])
+    .withAddresses(["127.0.0.1:0"])
     .build();
+  // The relay's dialable WebRTC Direct address carries its runtime certhash.
+  const relayDialAddr = webrtcDirectAddr(relay.transport);
 
   // node1 joins first and records every agent info the relay pushes to it.
   const node1ReceivedAgentIds: string[] = [];
@@ -567,9 +543,6 @@ test("PeerkitRelayBuilder forwards a newly published agent info to already-conne
 });
 
 test("access is denied when network access bytes are wrong even though AgentId is valid", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const VALID_NAB = 0xab;
   const INVALID_NAB = 0xcd;
   const receivedAppBytes: Uint8Array[] = [];
@@ -584,8 +557,10 @@ test("access is denied when network access bytes are wrong even though AgentId i
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   // node2 sends wrong app bytes. PeerkitNodeBuilder still prepends the
   // 32-byte AgentId prefix, so the AgentId is valid — only the app bytes fail.
@@ -611,17 +586,16 @@ test("access is denied when network access bytes are wrong even though AgentId i
 });
 
 test("PeerkitNode.isConnected reflects live connection state by AgentId", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const node1 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   const node2 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
@@ -664,17 +638,16 @@ test("PeerkitNode.isConnected reflects live connection state by AgentId", async 
 });
 
 test("PeerkitNode.getConnectedAgents lists AgentIds of connected peers", async () => {
-  const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
-
   const node1 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses(node1DialAddresses)
+    .withAddresses(["/ip4/127.0.0.1/udp/0/webrtc-direct"])
     .build();
+  // The dialable address carries the runtime certhash; read it after start.
+  const node1DialAddresses = [webrtcDirectAddr(node1.transport)];
 
   const node2 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
