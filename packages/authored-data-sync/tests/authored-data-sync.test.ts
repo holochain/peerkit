@@ -68,13 +68,13 @@ test("Pull responses return blobs since recent timestamp", async () => {
     await syncA.pullFromAllPeers();
     expect(storeA.getByAuthorSince("agent-b", 0)).toHaveLength(2);
 
-    const putSpy = vi.spyOn(storeA, "put");
+    const acceptSpy = vi.spyOn(storeA, "accept");
     // A should only receive the most recent blob again, since that's the
     // last authoredAt timestamp.
     await syncA.pullFromAllPeers();
 
-    expect(putSpy).to.toHaveBeenCalledOnce();
-    expect(putSpy.mock.calls[0][3]).toEqual(2_000);
+    expect(acceptSpy).to.toHaveBeenCalledOnce();
+    expect(acceptSpy.mock.calls[0][2]).toEqual(2_000);
     expect(storeA.getByAuthorSince("agent-b", 0)).toHaveLength(2);
   } finally {
     vi.useRealTimers();
@@ -155,19 +155,20 @@ test("Only the recent segment is transferred when historical is already in sync"
     syncB.init(nodeB);
 
     vi.setSystemTime(500);
-    const hashHist = syncB.store(enc("historical blob"));
-    storeA.put(hashHist, enc("historical blob"), "agent-b", 500); // pre-synced
+    syncB.store(enc("historical blob"));
+    // A already holds this historical blob from an earlier sync.
+    storeA.accept(enc("historical blob"), "agent-b", 500);
 
     vi.setSystemTime(1_500);
     const hashRecent = syncB.store(enc("recent blob")); // only B has this
 
     vi.setSystemTime(1_800);
-    const putSpy = vi.spyOn(storeA, "put");
+    const acceptSpy = vi.spyOn(storeA, "accept");
     await syncA.pullFromAllPeers();
 
     // A held only the historical blob, so its recent last-known timestamp clamps
     // to epochStart and exactly one blob transfers — the recent one.
-    expect(putSpy).toHaveBeenCalledTimes(1);
+    expect(acceptSpy).toHaveBeenCalledTimes(1);
     expect(syncA.get(hashRecent, nodeB.ownAgentId)).toBeDefined();
   } finally {
     vi.useRealTimers();
@@ -221,12 +222,11 @@ test("Responder only sends blobs it authored, not blobs attributed to others", a
   const blobB = enc("blob from B");
   const hashB = b.dataSync.store(blobB); // attributed to "agent-b"
 
-  // Directly inject a blob into B's store attributed to a third agent, bypassing
-  // dataSync.store() so it is not registered as B's own authored data.
+  // B received a blob attributed to a third agent. accept stores it without
+  // registering it as B's own authored data (no onAuthored fires).
   const blobC = enc("blob supposedly from C");
-  const hashC = blake2s(blobC);
   const agentIdC = "agent-c";
-  b.store.put(hashC, blobC, agentIdC, Date.now());
+  const hashC = b.store.accept(blobC, agentIdC, Date.now())!;
 
   await a.dataSync.pullFromAllPeers();
 
@@ -353,7 +353,7 @@ test("Responder uses initiator's epoch boundary when clocks differ", async () =>
   //
   // The spy's fallback value (900) is the regression guard: if the fix were removed
   // and B called Date.now(), it would receive 900, compute the wrong epochStart,
-  // and putSpy would be called — failing the assertion.
+  // and acceptSpy would be called — failing the assertion.
   vi.useFakeTimers();
   try {
     const storeA = new MemoryBlobStore();
@@ -381,18 +381,19 @@ test("Responder uses initiator's epoch boundary when clocks differ", async () =>
     // Store the blob in both nodes at t = 500 (historical relative to epoch 1000).
     vi.setSystemTime(500);
     const blob = enc("pre-synced blob");
-    const hash = syncB.store(blob);
-    storeA.put(hash, blob, "agent-b", 500);
+    syncB.store(blob);
+    // A already holds this blob from an earlier sync.
+    storeA.accept(blob, "agent-b", 500);
 
     // First call returns A's clock (t = 1500 → epochStart = 1000).
     // Subsequent calls return B's lagging clock (t = 900 → epochStart = 0 if used).
     vi.spyOn(Date, "now").mockReturnValueOnce(1_500).mockReturnValue(900);
 
-    const putSpy = vi.spyOn(storeA, "put");
+    const acceptSpy = vi.spyOn(storeA, "accept");
     await syncA.pullFromAllPeers();
 
     // Both sides used epochStart = 1000; summaries match; no blobs transferred.
-    expect(putSpy).not.toHaveBeenCalled();
+    expect(acceptSpy).not.toHaveBeenCalled();
   } finally {
     vi.useRealTimers();
   }
@@ -454,7 +455,7 @@ test("pull loop exits after pullTimeoutMs with no blob activity", async () => {
     // B's handler holds the stream open without sending anything.
     nodeB.registerStreamHandler(AUTHORED_DATA_SYNC_PROTOCOL, () => {});
 
-    const putSpy = vi.spyOn(storeA, "put");
+    const acceptSpy = vi.spyOn(storeA, "accept");
     const pullPromise = syncA.pullFromAllPeers();
 
     // Fire the setTimeout inside Promise.race; advanceTimersByTimeAsync also
@@ -462,7 +463,7 @@ test("pull loop exits after pullTimeoutMs with no blob activity", async () => {
     await vi.advanceTimersByTimeAsync(TIMEOUT + 1);
 
     await pullPromise;
-    expect(putSpy).not.toHaveBeenCalled();
+    expect(acceptSpy).not.toHaveBeenCalled();
   } finally {
     vi.useRealTimers();
   }
@@ -471,8 +472,6 @@ test("pull loop exits after pullTimeoutMs with no blob activity", async () => {
 test("Hash summary considers data distribution policy", async () => {
   vi.useFakeTimers();
   try {
-    const storeA = new MemoryBlobStore();
-    const storeB = new MemoryBlobStore();
     const nodeA = new MockNode("agent-a");
     const nodeB = new MockNode("agent-b");
     nodeA.addPeer(nodeB);
@@ -484,6 +483,9 @@ test("Hash summary considers data distribution policy", async () => {
       willStore: (_peerId: AgentId, hash: Hash) =>
         bytesToHex(hash) !== bytesToHex(willNotStoreHash),
     };
+
+    const storeA = new MemoryBlobStore(policy);
+    const storeB = new MemoryBlobStore(policy);
 
     // 10 s epoch
     const syncA = new AuthoredDataSync(storeA, policy, 5_000, 10_000);
@@ -494,10 +496,12 @@ test("Hash summary considers data distribution policy", async () => {
     // B authors a storable historical blob within the epoch
     vi.setSystemTime(1_000);
     const storableHash = syncB.store(enc("storable"));
-    // B stores the blob that A will not store.
-    storeB.put(willNotStoreHash, willNotStoreBlob, nodeB.ownAgentId, 2_000);
+    // B authors the blob A will not store. Authoring bypasses willStore, so B
+    // holds its own blob even though the gossip policy excludes it.
+    vi.setSystemTime(2_000);
+    syncB.store(willNotStoreBlob);
 
-    const putSpy = vi.spyOn(storeA, "put");
+    const acceptSpy = vi.spyOn(storeA, "accept");
 
     vi.setSystemTime(15_000);
     await syncA.pullFromAllPeers();
@@ -506,16 +510,16 @@ test("Hash summary considers data distribution policy", async () => {
     // Hash summary filtered the blob that A will not store
     expect(syncA.get(willNotStoreHash, nodeB.ownAgentId)).toBeUndefined();
     // 1 blob put into the store
-    expect(putSpy).toHaveBeenCalledTimes(1);
+    expect(acceptSpy).toHaveBeenCalledTimes(1);
 
-    putSpy.mockReset();
+    acceptSpy.mockReset();
 
     // Calling pull again should result in matching hash summaries
     // and not to transfer any blob.
     vi.setSystemTime(20_000);
     await syncA.pullFromAllPeers();
 
-    expect(putSpy).not.toHaveBeenCalled();
+    expect(acceptSpy).not.toHaveBeenCalled();
   } finally {
     vi.useRealTimers();
   }
@@ -524,8 +528,6 @@ test("Hash summary considers data distribution policy", async () => {
 test("Recent blobs considers data distribution policy", async () => {
   vi.useFakeTimers();
   try {
-    const storeA = new MemoryBlobStore();
-    const storeB = new MemoryBlobStore();
     const nodeA = new MockNode("agent-a");
     const nodeB = new MockNode("agent-b");
     nodeA.addPeer(nodeB);
@@ -538,6 +540,9 @@ test("Recent blobs considers data distribution policy", async () => {
         bytesToHex(hash) !== bytesToHex(willNotStoreHash),
     };
 
+    const storeA = new MemoryBlobStore(policy);
+    const storeB = new MemoryBlobStore(policy);
+
     // 10 s epoch so both blobs are recent
     const syncA = new AuthoredDataSync(storeA, policy, 5_000, 10_000);
     const syncB = new AuthoredDataSync(storeB, policy, 5_000, 10_000);
@@ -547,8 +552,10 @@ test("Recent blobs considers data distribution policy", async () => {
     // B authors a storable recent blob (authoredAt 1000) that A is missing.
     vi.setSystemTime(1_000);
     const storableHash = syncB.store(enc("storable"));
-    // B stores the blob that A will not store.
-    storeB.put(willNotStoreHash, willNotStoreBlob, nodeB.ownAgentId, 2_000);
+    // B authors the blob A will not store. Authoring bypasses willStore, so B
+    // holds its own blob even though the gossip policy excludes it.
+    vi.setSystemTime(2_000);
+    syncB.store(willNotStoreBlob);
 
     vi.setSystemTime(3_000);
     await syncA.pullFromAllPeers();
@@ -590,23 +597,25 @@ test("nextAuthoredAt stays non-decreasing when the wall clock moves backward", a
   }
 });
 
-test("init restores the authoring clock to the max authoredAt held", () => {
+test("authoring clock resumes above the max authoredAt held", () => {
   // A store populated by a previous run already holds own data at authoredAt =
-  // 5000. After re-init the authoring clock must resume above that mark even if
-  // the wall clock now reads far below it.
+  // 5000. The store's authoring clock must resume above that mark even if the
+  // wall clock now reads far below it.
   vi.useFakeTimers();
   try {
     const store = new MemoryBlobStore();
     const node = new MockNode("agent-a");
-    store.put(new Uint8Array([42]), enc("old"), "agent-a", 5_000);
+    // Simulate persisted data from a previous run: accept seeds the store
+    // without warming the in-memory authoring clock.
+    store.accept(enc("old"), "agent-a", 5_000);
 
-    vi.setSystemTime(100); // wall clock far below the restored mark
+    vi.setSystemTime(100); // wall clock far below the held mark
     const sync = new AuthoredDataSync(
       store,
       new FullReplicationStrategy(),
       5_000,
     );
-    sync.init(node); // reads lastAuthoredAt = 5000 from the store
+    sync.init(node); // the store derives lastAuthoredAt = 5000 lazily on store()
 
     const hash = sync.store(enc("new")); // authoredAt must be >= 5000, not 100
     const stored = store
@@ -619,17 +628,14 @@ test("init restores the authoring clock to the max authoredAt held", () => {
 });
 
 test("Storing blobs exceeding the max blob size throws", () => {
-  const store = new MemoryBlobStore();
+  const maxBlobSize = 10;
+  const store = new MemoryBlobStore(new FullReplicationStrategy(), maxBlobSize);
   const node = new MockNode("agent-a");
 
-  const maxBlobSize = 10;
   const sync = new AuthoredDataSync(
     store,
     new FullReplicationStrategy(),
     5_000,
-    undefined,
-    undefined,
-    maxBlobSize,
   );
   sync.init(node);
 
@@ -639,12 +645,16 @@ test("Storing blobs exceeding the max blob size throws", () => {
 });
 
 test("Received blobs exceeding the max blob size are dropped", async () => {
+  // A's store doesn't set a max blob size, so it can store larger blobs.
   const storeA = new MemoryBlobStore();
-  const storeB = new MemoryBlobStore();
+  const maxBlobSize = 10;
+  const storeB = new MemoryBlobStore(
+    new FullReplicationStrategy(),
+    maxBlobSize,
+  );
   const nodeA = new MockNode("agent-a");
   const nodeB = new MockNode("agent-b");
 
-  // A doesn't set a max blob size, so it can store larger blobs.
   const syncA = new AuthoredDataSync(
     storeA,
     new FullReplicationStrategy(),
@@ -652,14 +662,10 @@ test("Received blobs exceeding the max blob size are dropped", async () => {
   );
   syncA.init(nodeA);
 
-  const maxBlobSize = 10;
   const syncB = new AuthoredDataSync(
     storeB,
     new FullReplicationStrategy(),
     5_000,
-    undefined,
-    undefined,
-    maxBlobSize,
   );
   syncB.init(nodeB);
 
@@ -673,11 +679,10 @@ test("Received blobs exceeding the max blob size are dropped", async () => {
 });
 
 test("Received blobs which do not pass willStore are dropped", async () => {
-  const storeA = new MemoryBlobStore();
-  const storeB = new MemoryBlobStore();
   const nodeA = new MockNode("agent-a");
   const nodeB = new MockNode("agent-b");
 
+  const storeA = new MemoryBlobStore();
   const syncA = new AuthoredDataSync(
     storeA,
     new FullReplicationStrategy(),
@@ -688,50 +693,16 @@ test("Received blobs which do not pass willStore are dropped", async () => {
   // Create a blob that A will store but B won't
   const blob = new Uint8Array(1);
   const hash = blake2s(blob);
-  const syncB = new AuthoredDataSync(
-    storeB,
-    {
-      willStore: (_peerId, blobHash) =>
-        bytesToHex(blobHash) !== bytesToHex(hash),
-    },
-    5_000,
-  );
+  const bPolicy = {
+    willStore: (_peerId: AgentId, blobHash: Hash) =>
+      bytesToHex(blobHash) !== bytesToHex(hash),
+  };
+  const storeB = new MemoryBlobStore(bPolicy);
+  const syncB = new AuthoredDataSync(storeB, bPolicy, 5_000);
   syncB.init(nodeB);
 
   // A stores blob B won't store
   syncA.store(blob);
-
-  nodeB.addPeer(nodeA);
-  await syncB.pullFromAllPeers();
-
-  expect(storeB.getLastKnownByAuthor(nodeA.ownAgentId)).toBeUndefined();
-});
-
-test("Received blobs with hash mismatch are dropped", async () => {
-  const storeA = new MemoryBlobStore();
-  const storeB = new MemoryBlobStore();
-  const nodeA = new MockNode("agent-a");
-  const nodeB = new MockNode("agent-b");
-
-  const syncA = new AuthoredDataSync(
-    storeA,
-    new FullReplicationStrategy(),
-    5_000,
-  );
-  syncA.init(nodeA);
-
-  const syncB = new AuthoredDataSync(
-    storeB,
-    new FullReplicationStrategy(),
-    5_000,
-  );
-  syncB.init(nodeB);
-
-  // A stores a blob
-  const blob = new Uint8Array(1);
-  const _hash = blake2s(blob);
-  // Store under invalid hash
-  storeA.put(new Uint8Array(100), blob, nodeA.ownAgentId, Date.now());
 
   nodeB.addPeer(nodeA);
   await syncB.pullFromAllPeers();
