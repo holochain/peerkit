@@ -30,4 +30,3 @@
  * `/peerkit/authored-data-push/v1` is the sole version signal.
  */
 export { AuthoredDataPush } from "./authored-data-push.js";
-export { FullReplicationPolicy } from "./distribution.js";

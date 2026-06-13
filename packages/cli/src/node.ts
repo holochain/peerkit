@@ -2,8 +2,7 @@ import { getFileSink } from "@logtape/file";
 import { configure } from "@logtape/logtape";
 import {
   AuthoredDataSync,
-  FullReplicationStrategy,
-  MemoryBlobStore,
+  FullReplicationPolicy,
 } from "@peerkit/authored-data-pull";
 import { startNode } from "@peerkit/peer-session";
 import { defaultNodeListenAddrs } from "@peerkit/transport-libp2p-nodejs";
@@ -15,6 +14,7 @@ import * as readline from "node:readline";
 import { runNodeCommands } from "./commands.js";
 import { logLevel } from "./logging.js";
 import { FileAgentKeyStore } from "@peerkit/peerkit/node";
+import { MemoryBlobStore } from "@peerkit/data-store";
 
 export function addNodeCommand(program: Command): void {
   program
@@ -124,7 +124,7 @@ export function addNodeCommand(program: Command): void {
         const blobStore = new MemoryBlobStore();
         const dataSync = new AuthoredDataSync(
           blobStore,
-          new FullReplicationStrategy(),
+          new FullReplicationPolicy(),
           pullIntervalMs,
           epochDurationMs, // undefined falls back to the module default (1 day)
         );

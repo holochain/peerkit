@@ -4,12 +4,10 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import type { AgentId, Hash } from "@peerkit/api";
 import { setupTestLogger, makeStreamPair, MockNode } from "@peerkit/test-utils";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import {
-  AuthoredDataSync,
-  FullReplicationStrategy,
-  MemoryBlobStore,
-} from "../src/index.js";
+import { AuthoredDataSync } from "../src/index.js";
+import { FullReplicationPolicy } from "./util.js";
 import { createMockPeer } from "./mock-node.js";
+import { MemoryBlobStore } from "@peerkit/data-store";
 
 const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-pull/v1";
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -45,13 +43,13 @@ test("Pull responses return blobs since recent timestamp", async () => {
     // 10 s epoch so all blobs stay in the recent segment.
     const syncA = new AuthoredDataSync(
       storeA,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       10_000,
     );
     const syncB = new AuthoredDataSync(
       storeB,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       10_000,
     );
@@ -95,13 +93,13 @@ test("Blobs from before and after the epoch boundary are pulled", async () => {
 
     const syncA = new AuthoredDataSync(
       storeA,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       1_000,
     );
     const syncB = new AuthoredDataSync(
       storeB,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       1_000,
     );
@@ -141,13 +139,13 @@ test("Only the recent segment is transferred when historical is already in sync"
 
     const syncA = new AuthoredDataSync(
       storeA,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       1_000,
     );
     const syncB = new AuthoredDataSync(
       storeB,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       1_000,
     );
@@ -302,12 +300,12 @@ test("start() pulls on the configured interval, stop() halts it", async () => {
     const INTERVAL = 50;
     const syncA = new AuthoredDataSync(
       storeA,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       INTERVAL,
     );
     const syncB = new AuthoredDataSync(
       storeB,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       INTERVAL,
     );
     syncA.init(nodeA);
@@ -365,13 +363,13 @@ test("Responder uses initiator's epoch boundary when clocks differ", async () =>
     const EPOCH = 1_000;
     const syncA = new AuthoredDataSync(
       storeA,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       EPOCH,
     );
     const syncB = new AuthoredDataSync(
       storeB,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       EPOCH,
     );
@@ -445,7 +443,7 @@ test("pull loop exits after pullTimeoutMs with no blob activity", async () => {
     const TIMEOUT = 50;
     const syncA = new AuthoredDataSync(
       storeA,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       60_000,
       undefined,
       TIMEOUT,
@@ -578,7 +576,7 @@ test("nextAuthoredAt stays non-decreasing when the wall clock moves backward", a
     const node = new MockNode("agent-a");
     const sync = new AuthoredDataSync(
       store,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
     );
     sync.init(node);
@@ -612,7 +610,7 @@ test("authoring clock resumes above the max authoredAt held", () => {
     vi.setSystemTime(100); // wall clock far below the held mark
     const sync = new AuthoredDataSync(
       store,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
     );
     sync.init(node); // the store derives lastAuthoredAt = 5000 lazily on store()
@@ -629,14 +627,10 @@ test("authoring clock resumes above the max authoredAt held", () => {
 
 test("Storing blobs exceeding the max blob size throws", () => {
   const maxBlobSize = 10;
-  const store = new MemoryBlobStore(new FullReplicationStrategy(), maxBlobSize);
+  const store = new MemoryBlobStore(new FullReplicationPolicy(), maxBlobSize);
   const node = new MockNode("agent-a");
 
-  const sync = new AuthoredDataSync(
-    store,
-    new FullReplicationStrategy(),
-    5_000,
-  );
+  const sync = new AuthoredDataSync(store, new FullReplicationPolicy(), 5_000);
   sync.init(node);
 
   expect(() => sync.store(new Uint8Array(maxBlobSize + 1))).toThrow(
@@ -648,23 +642,20 @@ test("Received blobs exceeding the max blob size are dropped", async () => {
   // A's store doesn't set a max blob size, so it can store larger blobs.
   const storeA = new MemoryBlobStore();
   const maxBlobSize = 10;
-  const storeB = new MemoryBlobStore(
-    new FullReplicationStrategy(),
-    maxBlobSize,
-  );
+  const storeB = new MemoryBlobStore(new FullReplicationPolicy(), maxBlobSize);
   const nodeA = new MockNode("agent-a");
   const nodeB = new MockNode("agent-b");
 
   const syncA = new AuthoredDataSync(
     storeA,
-    new FullReplicationStrategy(),
+    new FullReplicationPolicy(),
     5_000,
   );
   syncA.init(nodeA);
 
   const syncB = new AuthoredDataSync(
     storeB,
-    new FullReplicationStrategy(),
+    new FullReplicationPolicy(),
     5_000,
   );
   syncB.init(nodeB);
@@ -685,7 +676,7 @@ test("Received blobs which do not pass willStore are dropped", async () => {
   const storeA = new MemoryBlobStore();
   const syncA = new AuthoredDataSync(
     storeA,
-    new FullReplicationStrategy(),
+    new FullReplicationPolicy(),
     5_000,
   );
   syncA.init(nodeA);
@@ -723,13 +714,13 @@ test("Empty recent holding pulls the entire recent segment", async () => {
 
     const syncA = new AuthoredDataSync(
       storeA,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       1_000,
     );
     const syncB = new AuthoredDataSync(
       storeB,
-      new FullReplicationStrategy(),
+      new FullReplicationPolicy(),
       5_000,
       1_000,
     );
