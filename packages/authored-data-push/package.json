@@ -38,6 +38,7 @@
   "dependencies": {
     "@logtape/logtape": "^2.0.5",
     "@peerkit/api": "^0.1.0-alpha.12",
+    "@peerkit/data-store": "^0.1.0-alpha.12",
     "cbor-x": "^1.6.4"
   },
   "devDependencies": {

@@ -1,15 +1,14 @@
 {
-  "name": "@peerkit/authored-data-sync",
+  "name": "@peerkit/data-store",
   "version": "0.1.0-alpha.12",
-  "description": "Peerkit module for syncing authored data",
+  "description": "Data store implementations for the peerkit framework",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [
     "peerkit",
     "p2p",
     "data",
     "sync",
-    "gossip",
-    "pull"
+    "data store"
   ],
   "license": "CAL-1.0",
   "files": [
@@ -23,9 +22,6 @@
     "type": "git",
     "url": "git+https://github.com/holochain/peerkit.git"
   },
-  "engines": {
-    "node": ">=22"
-  },
   "type": "module",
   "exports": {
     ".": {
@@ -37,16 +33,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "@logtape/logtape": "^2.0.5",
-    "@noble/hashes": "^2.2.0",
-    "@peerkit/api": "^0.1.0-alpha.12",
-    "@peerkit/data-store": "^0.1.0-alpha.12",
-    "cbor-x": "^1.6.4"
+    "@peerkit/api": "^0.1.0-alpha.12"
   },
-  "devDependencies": {
-    "@peerkit/peerkit": "^0.1.0-alpha.12",
-    "@peerkit/test-utils": "^0.1.0-alpha.12",
-    "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.12",
-    "get-port": "^7.2.0"
-  }
+  "devDependencies": {}
 }

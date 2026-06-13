@@ -62,5 +62,4 @@
  * appears in the payload.
  */
 export { AuthoredDataSync } from "./authored-data-sync.js";
-export { FullReplicationPolicy as FullReplicationStrategy } from "./distribution.js";
-export { MemoryBlobStore } from "./memory-blob-store.js";
+export { FullReplicationPolicy } from "./distribution.js";

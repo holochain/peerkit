@@ -6,12 +6,17 @@ import type {
   IAuthoredDataSyncStore,
   StoredBlob,
 } from "@peerkit/api/authored-data-sync";
-import { FullReplicationPolicy } from "./distribution.js";
 
 const DEFAULT_MAX_BLOB_SIZE = 1024 * 1024 * 20; // 20 MiB
 
 function constructKey(hash: Hash, author: AgentId) {
   return `${author},${bytesToHex(hash)}`;
+}
+
+class FullReplicationPolicy implements IDataDistributionPolicy {
+  willStore(_peerId: AgentId, _blobHash: Hash): boolean {
+    return true;
+  }
 }
 
 export class MemoryBlobStore implements IAuthoredDataSyncStore {

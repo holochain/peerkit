@@ -1,13 +1,21 @@
-import type { NodeAddress } from "@peerkit/api";
+import type {
+  AgentId,
+  Hash,
+  IDataDistributionPolicy,
+  NodeAddress,
+} from "@peerkit/api";
 import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
+import { MemoryBlobStore } from "@peerkit/data-store";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 import getPort, { portNumbers } from "get-port";
-import {
-  AuthoredDataSync,
-  FullReplicationStrategy,
-  MemoryBlobStore,
-} from "../src/index.js";
+import { AuthoredDataSync } from "../src/index.js";
+
+export class FullReplicationPolicy implements IDataDistributionPolicy {
+  willStore(_peerId: AgentId, _blobHash: Hash): boolean {
+    return true;
+  }
+}
 
 export interface TestNode {
   dataSync: AuthoredDataSync;
@@ -29,7 +37,7 @@ export async function createTestNode(opts: {
   const store = new MemoryBlobStore();
   const dataSync = new AuthoredDataSync(
     store,
-    new FullReplicationStrategy(),
+    new FullReplicationPolicy(),
     opts.pullIntervalMs ?? 5000,
   );
 

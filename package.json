@@ -24,6 +24,7 @@
   "workspaces": [
     "packages/api",
     "packages/agent-store",
+    "packages/data-store",
     "packages/metrics",
     "packages/transport-libp2p-core",
     "packages/transport-libp2p-nodejs",

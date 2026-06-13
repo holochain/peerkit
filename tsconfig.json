@@ -30,6 +30,7 @@
   "references": [
     { "path": "packages/api" },
     { "path": "packages/agent-store" },
+    { "path": "packages/data-store" },
     { "path": "packages/metrics" },
     { "path": "packages/transport-libp2p-core" },
     { "path": "packages/transport-libp2p-nodejs" },

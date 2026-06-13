@@ -1,11 +1,9 @@
 import type { AgentId, IDataDistributionPolicy } from "@peerkit/api";
 import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
 import { MockNode } from "@peerkit/test-utils";
-import {
-  AuthoredDataSync,
-  FullReplicationStrategy as FullReplicationPolicy,
-  MemoryBlobStore,
-} from "../src/index.js";
+import { AuthoredDataSync } from "../src/index.js";
+import { FullReplicationPolicy } from "./util.js";
+import { MemoryBlobStore } from "@peerkit/data-store";
 
 // Re-export test utils
 export { makeStreamPair, MockNode, MockStream } from "@peerkit/test-utils";
