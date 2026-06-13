@@ -1,9 +1,8 @@
 import type { AgentId, IDataDistributionPolicy } from "@peerkit/api";
 import type { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
-import { MemoryBlobStore } from "@peerkit/authored-data-pull";
 import { MockNode } from "@peerkit/test-utils";
-import { FullReplicationPolicy } from "../src/distribution.js";
 import { AuthoredDataPush } from "../src/index.js";
+import { MemoryBlobStore } from "@peerkit/data-store";
 
 export interface MockPeer {
   node: MockNode;
@@ -20,10 +19,7 @@ export function createMockPeer(
     pushTimeoutMs?: number;
   } = {},
 ): MockPeer {
-  const store = new MemoryBlobStore(
-    opts.policy ?? new FullReplicationPolicy(),
-    opts.maxBlobSize,
-  );
+  const store = new MemoryBlobStore(opts.policy, opts.maxBlobSize);
   const push = new AuthoredDataPush(store, opts.pushTimeoutMs);
   const node = new MockNode(agentId);
   push.init(node);

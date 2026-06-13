@@ -40,6 +40,7 @@
     "@logtape/logtape": "^2.0.5",
     "@noble/hashes": "^2.2.0",
     "@peerkit/api": "^0.1.0-alpha.13",
+    "@peerkit/data-store": "^0.1.0-alpha.13",
     "cbor-x": "^1.6.4"
   },
   "devDependencies": {
