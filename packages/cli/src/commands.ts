@@ -1,7 +1,7 @@
 import type {
   AuthoredDataSync,
   MemoryBlobStore,
-} from "@peerkit/authored-data-sync";
+} from "@peerkit/authored-data-pull";
 import type { AgentId } from "@peerkit/api";
 import type { NodeSession } from "@peerkit/peer-session";
 import type * as readline from "node:readline";

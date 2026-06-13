@@ -4,7 +4,7 @@
  * Authored-data sync for Peerkit.
  *
  * This package synchronizes content-addressed blobs across peers using a
- * pull-based protocol on `/peerkit/authored-data-sync/v1`. Each blob is
+ * pull-based protocol on `/peerkit/authored-data-pull/v1`. Each blob is
  * attributed to an `AgentId` and persisted in a store that's described
  * by an `IAuthoredDataSyncStore`.
  *
@@ -58,9 +58,9 @@
  *
  * All messages are CBOR-encoded `PullMessage` values. Framing is provided by
  * the underlying `IStream` abstraction. The protocol identifier
- * `/peerkit/authored-data-sync/v1` is the sole version signal, no versioning header
+ * `/peerkit/authored-data-pull/v1` is the sole version signal, no versioning header
  * appears in the payload.
  */
-export { AuthoredDataSync } from "./authored-data-sync.js";
+export { AuthoredDataSync } from "./authored-data-pull.js";
 export { FullReplicationPolicy as FullReplicationStrategy } from "./distribution.js";
 export { MemoryBlobStore } from "./memory-blob-store.js";

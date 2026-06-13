@@ -1,6 +1,6 @@
 import type { NodeAddress } from "@peerkit/api";
-import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
-import { MemoryBlobStore } from "@peerkit/authored-data-sync";
+import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
+import { MemoryBlobStore } from "@peerkit/authored-data-pull";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import { AuthoredDataPush, FullReplicationPolicy } from "../src/index.js";
 import { MemoryAgentKeyStore } from "@peerkit/test-utils";

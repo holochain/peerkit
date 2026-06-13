@@ -52,12 +52,9 @@
     "@libp2p/circuit-relay-v2": "^4.2.3",
     "@libp2p/identify": "^4.1.0",
     "@libp2p/webrtc": "^6.0.23",
-    "@libp2p/websockets": "^10.1.13",
     "@peerkit/api": "^0.1.0-alpha.13",
     "@peerkit/transport-libp2p-core": "^0.1.0-alpha.13",
-    "buffer": "^6.0.3",
-    "libp2p": "^3.2.0",
-    "process": "^0.11.10"
+    "libp2p": "^3.2.0"
   },
   "peerDependencies": {
     "react-native": ">=0.81.0",

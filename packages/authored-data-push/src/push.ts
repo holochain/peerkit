@@ -1,5 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-import type { Blob } from "@peerkit/api/authored-data-sync";
+import type { Blob } from "@peerkit/api/authored-data-pull";
 import { decode, encode } from "cbor-x";
 
 const logger = getLogger(["peerkit", "authored-data-push"]);

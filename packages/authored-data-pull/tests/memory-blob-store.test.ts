@@ -1,5 +1,5 @@
 import { blake2s } from "@noble/hashes/blake2.js";
-import type { StoredBlob } from "@peerkit/api/authored-data-sync";
+import type { StoredBlob } from "@peerkit/api/authored-data-pull";
 import { expect, test, vi } from "vitest";
 import { MemoryBlobStore } from "../src/memory-blob-store.js";
 

@@ -28,9 +28,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./authored-data-sync": {
-      "types": "./dist/authored-data-sync/index.d.ts",
-      "import": "./dist/authored-data-sync/index.js"
+    "./authored-data-pull": {
+      "types": "./dist/authored-data-pull/index.d.ts",
+      "import": "./dist/authored-data-pull/index.js"
     }
   },
   "scripts": {

@@ -36,7 +36,7 @@
     { "path": "packages/transport-libp2p-react-native" },
     { "path": "packages/transport-libp2p" },
     { "path": "packages/peerkit" },
-    { "path": "packages/authored-data-sync" },
+    { "path": "packages/authored-data-pull" },
     { "path": "packages/authored-data-push" },
     { "path": "packages/peer-session" },
     { "path": "packages/cli" },

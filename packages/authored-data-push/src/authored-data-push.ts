@@ -3,7 +3,7 @@ import type { AgentId, INodeModule, IPeerkitNode, IStream } from "@peerkit/api";
 import type {
   Blob,
   IAuthoredDataSyncStore,
-} from "@peerkit/api/authored-data-sync";
+} from "@peerkit/api/authored-data-pull";
 import { BufferedStream } from "./buffered-stream.js";
 import { decodePushMessage, encodePushMessage } from "./push.js";
 
