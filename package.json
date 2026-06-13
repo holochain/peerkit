@@ -30,7 +30,7 @@
     "packages/transport-libp2p-react-native",
     "packages/transport-libp2p",
     "packages/peerkit",
-    "packages/authored-data-sync",
+    "packages/authored-data-pull",
     "packages/authored-data-push",
     "packages/peer-session",
     "packages/cli",

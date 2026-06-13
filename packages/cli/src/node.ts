@@ -4,7 +4,7 @@ import {
   AuthoredDataSync,
   FullReplicationStrategy,
   MemoryBlobStore,
-} from "@peerkit/authored-data-sync";
+} from "@peerkit/authored-data-pull";
 import { startNode } from "@peerkit/peer-session";
 import { defaultNodeListenAddrs } from "@peerkit/transport-libp2p-nodejs";
 import type { Command } from "commander";

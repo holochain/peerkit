@@ -11,7 +11,7 @@ import {
 } from "../src/index.js";
 import { createMockPeer, makeStreamPair, MockNode } from "./mock-node.js";
 
-const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-sync/v1";
+const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-pull/v1";
 const enc = (s: string) => new TextEncoder().encode(s);
 
 beforeEach(setupTestLogger);
