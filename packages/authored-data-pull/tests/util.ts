@@ -1,5 +1,5 @@
 import type { NodeAddress } from "@peerkit/api";
-import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
+import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 import getPort, { portNumbers } from "get-port";

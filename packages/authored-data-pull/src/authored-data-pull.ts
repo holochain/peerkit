@@ -10,7 +10,7 @@ import type {
 import type {
   Blob,
   IAuthoredDataSyncStore,
-} from "@peerkit/api/authored-data-sync";
+} from "@peerkit/api/authored-data-pull";
 import { BufferedStream } from "./buffered-stream.js";
 import { FullReplicationPolicy } from "./distribution.js";
 import {
@@ -20,7 +20,7 @@ import {
   uint8ArraysEqual as xorSumHashMatches,
 } from "./pull.js";
 
-const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-sync/v1";
+const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-pull/v1";
 const PULL_TIMEOUT = 1000 * 5; // 5 seconds
 const DEFAULT_PULL_INTERVAL_MS = 3 * 60 * 1_000; // Every 3 minutes
 const DEFAULT_EPOCH_DURATION_MS = 24 * 60 * 60 * 1_000; // 1 day
@@ -54,7 +54,7 @@ export class AuthoredDataSync implements INodeModule {
 
   init(core: IPeerkitNode): void {
     this.core = core;
-    this.logger = getLogger(["peerkit", "authored-data-sync"]).with({
+    this.logger = getLogger(["peerkit", "authored-data-pull"]).with({
       agentId: core.ownAgentId,
     });
     core.registerStreamHandler(

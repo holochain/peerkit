@@ -5,7 +5,7 @@ import type {
   Blob,
   IAuthoredDataSyncStore,
   StoredBlob,
-} from "@peerkit/api/authored-data-sync";
+} from "@peerkit/api/authored-data-pull";
 import { FullReplicationPolicy } from "./distribution.js";
 
 const DEFAULT_MAX_BLOB_SIZE = 1024 * 1024 * 20; // 20 MiB

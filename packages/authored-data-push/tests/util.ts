@@ -1,9 +1,10 @@
 import type { NodeAddress } from "@peerkit/api";
-import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
-import { MemoryBlobStore } from "@peerkit/authored-data-sync";
+import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
+import { MemoryBlobStore } from "@peerkit/authored-data-pull";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import getPort, { portNumbers } from "get-port";
 import { AuthoredDataPush, FullReplicationPolicy } from "../src/index.js";
+import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 
 export interface TestNode {
   push: AuthoredDataPush;
@@ -25,6 +26,7 @@ export async function createTestNode(opts: { id: string }): Promise<TestNode> {
   const address = `/ip4/0.0.0.0/tcp/${port}/ws`;
 
   const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })

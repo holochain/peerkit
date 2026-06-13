@@ -1,5 +1,5 @@
 import type { AgentId, IDataDistributionPolicy } from "@peerkit/api";
-import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-sync";
+import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
 import { MockNode } from "@peerkit/test-utils";
 import {
   AuthoredDataSync,

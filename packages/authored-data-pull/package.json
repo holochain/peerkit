@@ -1,5 +1,5 @@
 {
-  "name": "@peerkit/authored-data-sync",
+  "name": "@peerkit/authored-data-pull",
   "version": "0.1.0-alpha.12",
   "description": "Peerkit module for syncing authored data",
   "author": "Holochain Dev Team <devcore@holochain.org>",
