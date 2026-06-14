@@ -63,7 +63,7 @@ test("Agents channel round-trip after access handshake", async () => {
     networkAccessBytes: VALID_ACCESS_BYTES,
   });
 
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   await node2.sendAgents(
     node1.getNodeId(),
@@ -96,7 +96,7 @@ test("Large agents payload can be received", async () => {
 
   // Both nodes allow access to all
 
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   // Send a 300 KiB message. Yamux frames support up to 256 KiB by default.
   const largeAgentsMessage = new Uint8Array(1024 * 300).fill(12);
@@ -130,7 +130,7 @@ test("Two nodes can exchange agent infos", async () => {
     },
   });
 
-  await initiator.connect(responderAddress);
+  await initiator.connect([responderAddress]);
 
   // After bootstrap, both sides should know each other — verify via sendAgents
   await initiator.sendAgents(

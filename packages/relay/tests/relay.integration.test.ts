@@ -45,7 +45,7 @@ describe("relay integration", () => {
     async () => {
       const wrong = computeNetworkAccessBytes("not-the-secret");
       const n = await spawn({ accessBytes: wrong });
-      await expect(n.node.connect(relay.multiaddr)).rejects.toThrow(
+      await expect(n.node.connect([relay.multiaddr])).rejects.toThrow(
         /Access denied/,
       );
       expect(relay.relay.peerCount()).toBe(0);
@@ -57,7 +57,7 @@ describe("relay integration", () => {
     "accepts nodes that present the correct access bytes",
     async () => {
       const n = await spawn();
-      await n.node.connect(relay.multiaddr);
+      await n.node.connect([relay.multiaddr]);
       await vi.waitFor(
         () => expect(relay.relay.peerCount()).toBe(1),
         WAIT_OPTS,
@@ -71,7 +71,7 @@ describe("relay integration", () => {
     "stores verified agent info received from a connected node",
     async () => {
       const n = await spawn();
-      await n.node.connect(relay.multiaddr);
+      await n.node.connect([relay.multiaddr]);
       await vi.waitFor(
         () => expect(relay.relay.peerCount()).toBe(1),
         WAIT_OPTS,
@@ -91,7 +91,7 @@ describe("relay integration", () => {
     "drops an agent info whose signature does not verify",
     async () => {
       const n = await spawn();
-      await n.node.connect(relay.multiaddr);
+      await n.node.connect([relay.multiaddr]);
       await vi.waitFor(
         () => expect(relay.relay.peerCount()).toBe(1),
         WAIT_OPTS,
@@ -112,7 +112,7 @@ describe("relay integration", () => {
     async () => {
       const first = await spawn();
       const { info, bytes } = await makeSignedAgentInfo();
-      await first.node.connect(relay.multiaddr);
+      await first.node.connect([relay.multiaddr]);
       await vi.waitFor(
         () => expect(relay.relay.peerCount()).toBe(1),
         WAIT_OPTS,
@@ -124,7 +124,7 @@ describe("relay integration", () => {
       );
 
       const second = await spawn();
-      await second.node.connect(relay.multiaddr);
+      await second.node.connect([relay.multiaddr]);
       await vi.waitFor(
         () => expect(second.receivedAgents.length).toBeGreaterThan(0),
         WAIT_OPTS,
@@ -145,15 +145,18 @@ describe("relay integration", () => {
     async () => {
       const a = await spawn({ bootstrapRelays: [relay.multiaddr] });
       const b = await spawn({ bootstrapRelays: [relay.multiaddr] });
-      const aCircuit = await a.waitForCircuitAddr(relay.relay.nodeId);
-      const bCircuit = await b.waitForCircuitAddr(relay.relay.nodeId);
-      // The node transport upgrades relayed connections to WebRTC, so the
-      // dialable circuit address carries a `/webrtc` segment between the
-      // relay hop and the target peer id.
-      expect(aCircuit).toContain("/p2p-circuit/webrtc/p2p/");
-      expect(bCircuit).toContain("/p2p-circuit/webrtc/p2p/");
+      const aNodeAddresses = await a.waitForCircuitAddr(relay.relay.nodeId);
+      const bNodeAddresses = await b.waitForCircuitAddr(relay.relay.nodeId);
+      expect(
+        aNodeAddresses.every((a) => a.includes("/p2p-circuit")),
+      ).toBeTruthy();
+      expect(
+        bNodeAddresses.every((a) => a.includes("/p2p-circuit")),
+      ).toBeTruthy();
+      expect(aNodeAddresses.some((a) => a.includes("/webrtc"))).toBeTruthy();
+      expect(bNodeAddresses.some((a) => a.includes("/webrtc"))).toBeTruthy();
 
-      await a.node.connect(bCircuit);
+      await a.node.connect([bNodeAddresses[0]]);
       await vi.waitFor(
         () => expect(a.node.isConnected(b.nodeId)).toBe(true),
         WAIT_OPTS,
@@ -176,13 +179,13 @@ describe("relay integration", () => {
     async () => {
       const wrong = computeNetworkAccessBytes("not-the-secret");
       const n = await spawn({ accessBytes: wrong });
-      await expect(n.node.connect(relay.multiaddr)).rejects.toThrow(
+      await expect(n.node.connect([relay.multiaddr])).rejects.toThrow(
         /Access denied/,
       );
       // Second attempt: libp2p may surface the closed-muxer error rather
       // than peerkit's "Access denied" — the relay-side stickiness is
       // proven by `peerCount()` staying 0 across both attempts.
-      await expect(n.node.connect(relay.multiaddr)).rejects.toThrow();
+      await expect(n.node.connect([relay.multiaddr])).rejects.toThrow();
       expect(relay.relay.peerCount()).toBe(0);
     },
     TEST_TIMEOUT_MS,
@@ -193,7 +196,7 @@ describe("relay integration", () => {
     async () => {
       const n = await spawn();
       const { info, bytes } = await makeSignedAgentInfo();
-      await n.node.connect(relay.multiaddr);
+      await n.node.connect([relay.multiaddr]);
       await vi.waitFor(
         () => expect(relay.relay.peerCount()).toBe(1),
         WAIT_OPTS,

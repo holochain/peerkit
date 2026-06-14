@@ -1,5 +1,4 @@
 import type {
-  Address,
   Connection,
   PeerId,
   Stream,
@@ -7,30 +6,26 @@ import type {
 } from "@libp2p/interface";
 import { peerIdFromString } from "@libp2p/peer-id";
 import { getLogger, type Logger } from "@logtape/logtape";
-import {
-  CODE_P2P,
-  CODE_P2P_CIRCUIT,
-  CODE_WEBRTC,
-  multiaddr,
-} from "@multiformats/multiaddr";
-import type { Libp2p } from "libp2p";
-import { encodeFrame, FrameDecoder } from "./frame.js";
+import { multiaddr } from "@multiformats/multiaddr";
 import type {
   AgentsReceivedCallback,
-  MessageHandler,
-  NetworkAccessHandler,
-  ITransport,
-  IStream,
-  NetworkAccessBytes,
-  NodeId,
-  RelayDialAddress,
   ConnectedToRelayCallback,
+  CustomStreamCreatedCallback,
+  IStream,
+  ITransport,
+  MessageHandler,
+  NetworkAccessBytes,
+  NetworkAccessHandler,
   NodeAddress,
+  NodeId,
   PeerConnectedCallback,
   PeerDisconnectedCallback,
-  CustomStreamCreatedCallback,
+  RelayDialAddress,
 } from "@peerkit/api";
+import type { Libp2p } from "libp2p";
+import { getDialableAddresses } from "./address.js";
 import { CustomStream } from "./custom-stream.js";
+import { encodeFrame, FrameDecoder } from "./frame.js";
 import { createTransportMetrics, type TransportMetrics } from "./metrics.js";
 
 /**
@@ -223,12 +218,48 @@ export class TransportLibp2p implements ITransport {
     return this.libp2p.getMultiaddrs().map((m) => m.toString());
   }
 
-  async connect(nodeAddress: NodeAddress): Promise<void> {
-    this.logger.info("Connecting to node {*}", { nodeAddress });
-    const connection = await this.libp2p.dial(multiaddr(nodeAddress));
+  async connect(nodeAddresses: NodeAddress[]): Promise<void> {
+    this.logger.info("Connecting to node {*}", { nodeAddresses });
+    // Dial direct address first if exists. If the dial fails or a direct
+    // address does not exist, fall back to the relayed address.
+    // If no address exists, throw an error.
+    if (nodeAddresses.length === 0) {
+      throw new Error("connect called with an empty list of addresses");
+    }
+
+    const { directAddress, relayedAddress } =
+      getDialableAddresses(nodeAddresses);
+    if (!directAddress && !relayedAddress) {
+      throw new Error("connect called with invalid addresses");
+    }
+
+    let connection: Connection | undefined;
+    if (directAddress) {
+      try {
+        connection = await this.libp2p.dial(multiaddr(directAddress));
+      } catch (error) {
+        this.logger.warn("Dialing direct address failed {*}", {
+          directAddress,
+          error,
+        });
+      }
+    }
+    if (!connection && relayedAddress) {
+      try {
+        connection = await this.libp2p.dial(multiaddr(relayedAddress));
+      } catch (error) {
+        this.logger.error("Dialing relayed address failed {*}", {
+          relayedAddress,
+          error,
+        });
+      }
+    }
+
+    if (!connection) {
+      return Promise.reject(new Error("Connection failed"));
+    }
 
     this.logger.debug("Node dial complete, starting access handshake {*}", {
-      nodeAddress,
       peerId: connection.remotePeer.toString(),
     });
 
@@ -388,37 +419,30 @@ export class TransportLibp2p implements ITransport {
               // Register a once-listener for the dialable relay address.
               // When the node has a direct network listener, the first
               // update may carry only the local address. The circuit-relay address
-              // arrives in a later update. Re-register with { once: true } after
-              // each non-matching update, to keep listening without leaking the
-              // listener, as libp2p wraps listeners internally, which makes
-              // removeEventListener with the original reference impossible.
+              // arrives in a later update.
+              //
+              // Re-register with { once: true } after each non-matching update,
+              // to keep listening without leaking the listener, as libp2p
+              // wraps listeners internally, which makes removeEventListener
+              // with the original reference impossible.
               const registerWatcher = (): void => {
                 this.libp2p.addEventListener(
                   "self:peer:update",
                   (evt) => {
-                    const addresses = evt.detail.peer.addresses;
-                    // Prefer a WebRTC relay address. Fall back to plain p2p-circuit
-                    // for relay-only nodes that don't advertise a WebRTC transport.
-                    const dialableAddress = getDialableAddress(
-                      addresses,
-                      relayId,
-                      localPeerId,
+                    // Relay address ends with /p2p-circuit or /p2p-circuit/<protocol>
+                    // (here /p2p-circuit/webrtc).
+                    // Append /p2p/<peerID> to form a dialable address.
+                    const addresses = evt.detail.peer.addresses.map((a) =>
+                      a.multiaddr.encapsulate(`/p2p/${localPeerId}`).toString(),
                     );
-                    if (dialableAddress) {
-                      connectedToRelayCallback(
-                        dialableAddress,
-                        relayId,
-                        this,
-                      ).catch((error) => {
+                    connectedToRelayCallback(addresses, relayId, this).catch(
+                      (error) => {
                         this.logger.error(
                           "ConnectedToRelayCallback produced an error {*}",
                           { error },
                         );
-                      });
-                    } else {
-                      // Circuit relay address not in this update yet — wait for next.
-                      registerWatcher();
-                    }
+                      },
+                    );
                   },
                   { once: true },
                 );
@@ -701,47 +725,4 @@ export class TransportLibp2p implements ITransport {
       );
     }
   };
-}
-
-function getDialableAddress(
-  addresses: Address[],
-  relayId: string,
-  localPeerId: string,
-) {
-  // Find circuit relay component in addresses, with or without WebRTC
-  // component, preferring one with WebRTC.
-  const relayedAddress =
-    addresses.find((address) => {
-      const components = address.multiaddr.getComponents();
-      const relayIdx = components.findIndex(
-        (c) => c.code === CODE_P2P && c.value === relayId,
-      );
-      return (
-        relayIdx !== -1 &&
-        components[relayIdx + 1]?.code === CODE_P2P_CIRCUIT &&
-        components[relayIdx + 2]?.code === CODE_WEBRTC
-      );
-    }) ??
-    addresses.find((address) => {
-      const components = address.multiaddr.getComponents();
-      const relayIdx = components.findIndex(
-        (c) => c.code === CODE_P2P && c.value === relayId,
-      );
-      return (
-        relayIdx !== -1 && components[relayIdx + 1]?.code === CODE_P2P_CIRCUIT
-      );
-    });
-  if (!relayedAddress) {
-    return undefined;
-  }
-  // Append local peer ID to form a dialable address.
-  const components = relayedAddress.multiaddr.getComponents();
-  const lastComponent = components[components.length - 1];
-  // Relay-only addresses already end with /p2p/<localId>.
-  // WebRTC addresses end with /webrtc and need it appended.
-  const dialableAddress =
-    lastComponent?.code === CODE_P2P && lastComponent.value === localPeerId
-      ? relayedAddress.multiaddr.toString()
-      : `${relayedAddress.multiaddr.toString()}/p2p/${localPeerId}`;
-  return dialableAddress;
 }

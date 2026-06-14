@@ -142,9 +142,7 @@ test("Node connects to another node using address learned from relay", async () 
   );
 
   // Node 2 connects to node 1 using the agent info the relay provided.
-  const node1CircuitAddress = node1AgentInfo.addresses[0];
-  expect(node1CircuitAddress).toBeDefined();
-  await node2.transport.connect(node1CircuitAddress!);
+  await node2.transport.connect(node1AgentInfo.addresses!);
 
   // Node 2 must receive the third agent info, the one only node 1 holds.
   // This confirms node 1 sent its full store.

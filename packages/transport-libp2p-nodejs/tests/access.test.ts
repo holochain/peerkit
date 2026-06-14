@@ -55,7 +55,7 @@ test("Access handshake initiator closes connection when responder is denied", as
     networkAccessHandler: async (_fromPeer, _bytes) => false, // Denies responder
   });
 
-  await expect(initiator.connect(responderAddress)).rejects.toThrow(
+  await expect(initiator.connect([responderAddress])).rejects.toThrow(
     /Access denied/,
   );
 
@@ -91,7 +91,7 @@ test("Outbound access handshake times out when responder sends no response", asy
     handshakeTimeoutMs: 50,
   });
 
-  await expect(node.connect(silentAddress)).rejects.toThrow(/timed out/);
+  await expect(node.connect([silentAddress])).rejects.toThrow(/timed out/);
 
   // The silent node's peer ID was never granted access — sendAgents should throw.
   await expect(
@@ -160,7 +160,7 @@ test("Valid network access bytes grant connection to other node", async () => {
     peerConnectedCallback: peerConnectedCallback2,
   });
 
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   await vi.waitFor(() => expect(peerConnectedCallback1).toHaveBeenCalled());
   await vi.waitFor(() => expect(peerConnectedCallback2).toHaveBeenCalled());
@@ -197,7 +197,7 @@ test("Invalid network access bytes deny connection to initiating node", async ()
     peerConnectedCallback: peerConnectedCallback2,
   });
 
-  await expect(node2.connect(address1)).rejects.toThrow();
+  await expect(node2.connect([address1])).rejects.toThrow();
   expect(peerConnectedCallback1).to.not.toHaveBeenCalled();
   expect(peerConnectedCallback2).to.not.toHaveBeenCalled();
 
@@ -232,7 +232,7 @@ test("Invalid network access bytes deny connection to remote node", async () => 
     peerConnectedCallback: peerConnectedCallback2,
   });
 
-  await expect(node2.connect(address1)).rejects.toThrow();
+  await expect(node2.connect([address1])).rejects.toThrow();
   expect(peerConnectedCallback1).to.not.toHaveBeenCalled();
   expect(peerConnectedCallback2).to.not.toHaveBeenCalled();
 

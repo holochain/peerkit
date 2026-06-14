@@ -13,14 +13,14 @@ afterEach(reset);
 test("Two nodes exchange agents bidirectionally", async () => {
   // Create node 1 on a known port so node 2 can dial it directly.
   const node1Port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${node1Port}/ws`;
+  const node1Addresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${node1Port}/ws`];
   const node1 = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
     messageHandler: async () => {},
   })
     .withId("node1")
-    .withAddresses([node1DialAddr])
+    .withAddresses(node1Addresses)
     .build();
   // Pre-populate node 1's agent store with its own signed agent info, so it
   // has something to send when node 2 connects.
@@ -28,7 +28,7 @@ test("Two nodes exchange agents bidirectionally", async () => {
     signAgentInfo(
       {
         agentId: node1.keyPair.agentId(),
-        addresses: [node1DialAddr],
+        addresses: node1Addresses,
         expiresAt: Date.now() + 60_000,
       },
       node1.keyPair,
@@ -59,7 +59,7 @@ test("Two nodes exchange agents bidirectionally", async () => {
 
   // Node 2 dials node 1. Both sides fire peerConnectedCallback, so both
   // send their stored agents to the other.
-  await node2.transport.connect(node1DialAddr);
+  await node2.transport.connect(node1Addresses);
 
   // Node 2 should receive node 1's agent info.
   await vi.waitFor(
@@ -78,7 +78,7 @@ test("Two nodes exchange agents bidirectionally", async () => {
 
 test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const node1DialAddr: NodeAddress = `/ip4/127.0.0.1/tcp/${port}/ws`;
+  const node1DialAddresses: NodeAddress[] = [`/ip4/127.0.0.1/tcp/${port}/ws`];
 
   const receivedMessages: Array<{ fromAgent: string; text: string }> = [];
 
@@ -94,7 +94,7 @@ test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
     },
   })
     .withId("node1")
-    .withAddresses([node1DialAddr])
+    .withAddresses(node1DialAddresses)
     .build();
 
   const node2 = await new PeerkitNodeBuilder({
@@ -105,7 +105,7 @@ test("PeerkitNode.send delivers a message addressed by AgentId", async () => {
     .withId("node2")
     .build();
 
-  await node2.transport.connect(node1DialAddr);
+  await node2.transport.connect(node1DialAddresses);
 
   // node2.send() resolves node1's AgentId to a NodeId internally — the caller
   // never needs to know the transport-level NodeId.

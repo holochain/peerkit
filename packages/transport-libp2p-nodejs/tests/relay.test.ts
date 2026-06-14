@@ -114,7 +114,7 @@ test("Relay knows node's agent infos after agent exchange", async () => {
     connectedToRelayCallback: async (_address, _nodeId, _transport) => {},
     messageHandler: async (_message) => {},
   });
-  await node.connect(relayAddress);
+  await node.connect([relayAddress]);
 
   // Relay sends agent infos to node
   const agentInfosOnRelay = new TextEncoder().encode("relay-initiated");

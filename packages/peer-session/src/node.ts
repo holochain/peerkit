@@ -15,7 +15,7 @@ export interface NodeEventCallbacks {
   onPeerDisconnected(alias: string): void;
   onAgentsReceived(agentIds: AgentId[]): void;
   onMessageReceived(alias: string, text: string): void;
-  onRelayConnected(address: NodeAddress): void;
+  onRelayConnected(addresses: NodeAddress[]): void;
 }
 
 export interface NodeSession {
@@ -113,8 +113,8 @@ export async function startNode(options: {
         options.callbacks.onPeerDisconnected(alias);
       }
     })
-    .withRelayConnectedObserver((address) => {
-      options.callbacks.onRelayConnected(address);
+    .withRelayConnectedObserver((addresses) => {
+      options.callbacks.onRelayConnected(addresses);
     });
   if (options.addresses) {
     builder.withAddresses(options.addresses);
@@ -145,11 +145,11 @@ export async function startNode(options: {
       }
       if (!node.isConnected(agentId)) {
         const info = agentStore.get(agentId);
-        const address = info?.addresses[0];
-        if (!address) {
+        const addresses = info?.addresses;
+        if (!addresses || addresses.length === 0) {
           throw new Error(`No address known for alias ${alias}`);
         }
-        await node.transport.connect(address);
+        await node.transport.connect(addresses);
       }
       await sendTextMessage(node, agentId, text);
     },

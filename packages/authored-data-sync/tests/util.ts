@@ -13,7 +13,7 @@ export interface TestNode {
   dataSync: AuthoredDataSync;
   store: IAuthoredDataSyncStore;
   node: PeerkitNode;
-  nodeAddress: NodeAddress;
+  nodeAddresses: NodeAddress[];
   shutDown: () => Promise<void>;
 }
 
@@ -34,7 +34,7 @@ export async function createTestNode(opts: {
   );
 
   const port = await getPort({ port: portNumbers(30_000, 40_000) });
-  const address = `/ip4/0.0.0.0/tcp/${port}/ws`;
+  const addresses = [`/ip4/0.0.0.0/tcp/${port}/ws`];
 
   const node = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
@@ -42,7 +42,7 @@ export async function createTestNode(opts: {
     messageHandler: async () => {},
   })
     .withId(opts.id)
-    .withAddresses([address])
+    .withAddresses(addresses)
     .withNetworkAccessBytes(new Uint8Array([0]))
     .withModule(dataSync)
     .build();
@@ -51,7 +51,7 @@ export async function createTestNode(opts: {
     dataSync,
     store,
     node,
-    nodeAddress: address,
+    nodeAddresses: addresses,
     shutDown: () => node.shutDown(),
   };
 }

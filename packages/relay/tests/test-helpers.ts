@@ -153,8 +153,8 @@ export interface TestNode {
   readonly received: ReceivedMessage[];
   readonly receivedAgents: ReceivedMessage[];
   /** Maps relayId → fully dialable `/…/p2p-circuit/p2p/<localId>` address. */
-  readonly circuitAddrs: Map<string, string>;
-  waitForCircuitAddr(relayId: string, timeoutMs?: number): Promise<string>;
+  readonly circuitAddrs: Map<string, string[]>;
+  waitForCircuitAddr(relayId: string, timeoutMs?: number): Promise<string[]>;
   shutdown(): Promise<void>;
 }
 
@@ -169,7 +169,7 @@ export async function startTestNode(
   const secret = opts.secret ?? DEFAULT_SECRET;
   const received: ReceivedMessage[] = [];
   const receivedAgents: ReceivedMessage[] = [];
-  const circuitAddrs = new Map<string, string>();
+  const circuitAddrs = new Map<string, string[]>();
   const node = await createNode({
     // `/p2p-circuit` accepts inbound relayed connections; `/webrtc` is the
     // node transport's direct-connection listener. The node dials the relay
@@ -184,8 +184,8 @@ export async function startTestNode(
     agentsReceivedCallback: async (from, bytes) => {
       receivedAgents.push({ from, bytes });
     },
-    connectedToRelayCallback: async (relayAddress, relayNodeId) => {
-      circuitAddrs.set(relayNodeId, relayAddress);
+    connectedToRelayCallback: async (relayAddresses, relayNodeId) => {
+      circuitAddrs.set(relayNodeId, relayAddresses);
     },
     bootstrapRelays: opts.bootstrapRelays
       ? [...opts.bootstrapRelays]
@@ -208,11 +208,11 @@ export async function startTestNode(
         },
         { timeout: timeoutMs, interval: 25 },
       );
-      const addr = circuitAddrs.get(relayId);
-      if (addr === undefined) {
-        throw new Error(`circuit address for relay ${relayId} not captured`);
+      const addrs = circuitAddrs.get(relayId);
+      if (addrs === undefined || addrs.length === 0) {
+        throw new Error(`circuit addresses for relay ${relayId} not captured`);
       }
-      return addr;
+      return addrs;
     },
     shutdown: async () => {
       await node.shutDown();

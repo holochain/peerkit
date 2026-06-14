@@ -64,7 +64,7 @@ test("Send a message after having been granted access", async () => {
   const { node: node2 } = await createNode({
     id: "node2",
   });
-  await node2.connect(address);
+  await node2.connect([address]);
 
   await node2.send(node1.getNodeId(), new TextEncoder().encode("hello"));
 
@@ -102,7 +102,7 @@ test("Send a message both ways on the same stream", async () => {
     id: "node2",
     messageHandler: messageHandler2,
   });
-  await node2.connect(address);
+  await node2.connect([address]);
 
   // Send and receive message from node 2 to node 1
   await node2.send(node1.getNodeId(), new TextEncoder().encode("hello"));

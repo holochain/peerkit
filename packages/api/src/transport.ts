@@ -31,14 +31,14 @@ export type MessageHandler = (
  * Called when a connection to the relay is complete, including the network
  * access handshake, and the node can be contacted through the relay.
  *
- * Provides the node's own dial address, fully qualified to be shared with
+ * Provides the node's own dial addresses, fully qualified to be shared with
  * peers so they can reach this node via the relay.
  *
  * Fire-and-forget notification. The transport does not await this, but logs
  * errors.
  */
 export type ConnectedToRelayCallback = (
-  nodeAddress: NodeAddress,
+  nodeAddresses: NodeAddress[],
   relayNodeId: NodeId,
   transport: ITransport,
 ) => Promise<void>;
@@ -154,14 +154,16 @@ export interface ITransport {
   getNodeId(): NodeId;
 
   /**
-   * Establish a connection to a known peer by its full address.
+   * Establish a connection to a known peer by its dialable addresses.
    *
    * If the connection is routed through a relay, the address must include the
    * relay address.
    *
-   * @param nodeAddress The dialable address of the node to connect to
+   * @param nodeAddresses The dialable addresses of the node to connect to
+   *
+   * @throws when `nodeAddresses` is an empty list
    */
-  connect(nodeAddress: NodeAddress): Promise<void>;
+  connect(nodeAddresses: NodeAddress[]): Promise<void>;
 
   /**
    * Send opaque agent-info bytes to a peer.
