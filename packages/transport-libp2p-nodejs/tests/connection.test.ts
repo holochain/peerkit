@@ -26,7 +26,7 @@ test("isConnected returns false before connect, true while connected, false afte
   expect(node1.isConnected(node2.getNodeId())).toBe(false);
   expect(node2.isConnected(node1.getNodeId())).toBe(false);
 
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   // connect() resolves after the access handshake, so the connection is live on node2.
   expect(node2.isConnected(node1.getNodeId())).toBe(true);
@@ -62,7 +62,7 @@ test("getConnectedPeers returns connected peer NodeIds and is empty after discon
   expect(node1.getConnectedPeers()).toHaveLength(0);
   expect(node2.getConnectedPeers()).toHaveLength(0);
 
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   // node2 sees node1 immediately after connect().
   expect(node2.getConnectedPeers()).toContain(node1.getNodeId());
@@ -136,7 +136,7 @@ test("peerDisconnectedCallback fires when connected peer disconnects", async () 
     },
   });
 
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   // Wait for the access handshake to complete so peerConnectedCallback has fired.
   await vi.waitFor(() => expect(connectedNodeIds).toHaveLength(1), {
@@ -171,7 +171,7 @@ test("peerDisconnectedCallback fires when peer shuts down abruptly", async () =>
     },
   });
 
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   // Wait for the access handshake to complete so the mapping is established.
   await vi.waitFor(() => expect(connectedNodeIds).toHaveLength(1), {

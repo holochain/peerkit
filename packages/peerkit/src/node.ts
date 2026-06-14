@@ -77,7 +77,7 @@ export class PeerkitNodeBuilder {
   agentsReceivedObserver?: (agentIds: AgentId[]) => void;
   peerConnectedObserver?: (fromAgent: AgentId) => void;
   peerDisconnectedObserver?: (fromAgent: AgentId) => void;
-  connectedToRelayObserver?: (address: NodeAddress) => void;
+  connectedToRelayObserver?: (addresses: NodeAddress[]) => void;
   private readonly modules: INodeModule[] = [];
 
   readonly networkAccessHandler: NetworkAccessHandler;
@@ -148,7 +148,7 @@ export class PeerkitNodeBuilder {
     return this;
   }
 
-  withRelayConnectedObserver(fn: (address: NodeAddress) => void): this {
+  withRelayConnectedObserver(fn: (addresses: NodeAddress[]) => void): this {
     this.connectedToRelayObserver = fn;
     return this;
   }
@@ -327,26 +327,25 @@ export class PeerkitNodeBuilder {
 
     const relayConnectedObserver = this.connectedToRelayObserver;
     const connectedToRelayCallback = async (
-      relayedNodeAddress: NodeAddress,
+      relayedNodeAddresses: NodeAddress[],
       relayNodeId: NodeId,
       transport: ITransport,
     ) => {
-      const existingAgentInfo = agentStore.get(keyPair.agentId());
-      const addresses = [
-        ...(existingAgentInfo?.addresses ?? []),
-        relayedNodeAddress,
-      ];
       try {
-        await signAndSendAgentInfo(addresses, relayNodeId, transport);
+        await signAndSendAgentInfo(
+          relayedNodeAddresses,
+          relayNodeId,
+          transport,
+        );
       } catch (error) {
         logger.error("Failed to send agents to relay {*}", {
-          relayedNodeAddress,
+          relayedNodeAddress: relayedNodeAddresses,
           relayNodeId,
           error,
         });
       }
       relayConnections.set(relayNodeId, transport);
-      relayConnectedObserver?.(relayedNodeAddress);
+      relayConnectedObserver?.(relayedNodeAddresses);
     };
 
     const transport = this.nodeTransportFactory

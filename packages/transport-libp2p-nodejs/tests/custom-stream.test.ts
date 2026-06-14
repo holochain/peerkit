@@ -73,7 +73,7 @@ test("Messages flow from the initiator to the handler", async () => {
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
   const initiatorStream = await node2.createStream(
     node1.getNodeId(),
     PROTOCOL_A,
@@ -104,7 +104,7 @@ test("Messages flow from the handler back to the initiator", async () => {
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
   const initiatorStream = await node2.createStream(
     node1.getNodeId(),
     PROTOCOL_A,
@@ -138,7 +138,7 @@ test("removeEventListener stops the listener from receiving further messages", a
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
   const initiatorStream = await node2.createStream(
     node1.getNodeId(),
     PROTOCOL_A,
@@ -179,7 +179,7 @@ test("remoteClose event fires on the handler side when the initiator closes", as
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
   const initiatorStream = await node2.createStream(
     node1.getNodeId(),
     PROTOCOL_A,
@@ -206,7 +206,7 @@ test("remoteClose event fires on the initiator side when the handler closes", as
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
   const initiatorStream = await node2.createStream(
     node1.getNodeId(),
     PROTOCOL_A,
@@ -236,7 +236,7 @@ test("isOpen() returns true while open and false after both sides close", async 
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
   const initiatorStream = await node2.createStream(
     node1.getNodeId(),
     PROTOCOL_A,
@@ -265,7 +265,7 @@ test("send() throws after the stream is closed", async () => {
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
   const initiatorStream = await node2.createStream(
     node1.getNodeId(),
     PROTOCOL_A,
@@ -297,7 +297,7 @@ test("Multiple concurrent streams on the same protocol are handled independently
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   const initiator1 = await node2.createStream(node1.getNodeId(), PROTOCOL_A);
   const initiator2 = await node2.createStream(node1.getNodeId(), PROTOCOL_A);
@@ -344,7 +344,7 @@ test("Two protocols are dispatched to their respective handlers only", async () 
   });
 
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address1);
+  await node2.connect([address1]);
 
   // Open a stream on PROTOCOL_A — only handlerA must fire.
   await node2.createStream(node1.getNodeId(), PROTOCOL_A);

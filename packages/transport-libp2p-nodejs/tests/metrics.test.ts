@@ -55,7 +55,7 @@ test("peerkit.transport.bytes records sent and received bytes", async () => {
     messageHandler,
   });
   const { node: node2 } = await createNode({ id: "node2" });
-  await node2.connect(address);
+  await node2.connect([address]);
 
   const payload = new TextEncoder().encode("hello-metrics");
   await node2.send(node1.getNodeId(), payload);

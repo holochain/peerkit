@@ -16,7 +16,7 @@ test("Authored data sync integration test", async () => {
   const hashA = a.dataSync.store(enc("hello from A"));
   const hashB = b.dataSync.store(enc("hello from B"));
 
-  await a.node.transport.connect(b.nodeAddress);
+  await a.node.transport.connect(b.nodeAddresses);
   await a.dataSync.pullFromAllPeers();
   await b.dataSync.pullFromAllPeers();
 
