@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.13](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.12...v0.1.0-alpha.13)\] - 2026-06-15
+
+### Features
+
+- Persist and reload node keypair across restarts by @veeso in [#85](https://github.com/holochain/peerkit/pull/85)
+  - Add IAgentKeyStore to @peerkit/api so the agent's private key can be loaded from and stored to caller-owned persistence. AgentKeyPair gains a static load() factory that reads the key from the store, or generates and persists a fresh one when the store is empty, keeping a stable AgentId across restarts. PeerkitNodeBuilder now requires an agentKeyStore. The CLI ships a file-backed FileAgentKeyStore and a --identity flag; tests use an in-memory store.
+- _(transport-react-native)_ Polyfill RN globals so the relay handshake completes by @veeso in [#83](https://github.com/holochain/peerkit/pull/83)
+  - React Native's Hermes runtime lacks browser globals libp2p relies on and ships a WebSocket whose `bufferedAmount` is never assigned. The missing `bufferedAmount` deadlocked the multistream-select write against the relay (libp2p backpressure treats `undefined < max` as "cannot send" and never sees `bufferedAmount === 0` to drain), and the hung write was then aborted with React Native's `undefined` timeout reason, surfacing as an opaque `EncryptionFailedError: undefined`.
+  - Add three polyfills, installed from the package entry before any libp2p module evaluates:
+  - Event-target: install Event/EventTarget/CustomEvent outright (not `??=`). RN's global Event has a read-only `type` getter and non-configurable phase constants, which break libp2p's field-declaring Event subclasses on Hermes. - text-codec: UTF-8 TextEncoder/TextDecoder. - websocket-buffered-amount: report `0` (RN sends straight to native, no JS-visible buffer) so @libp2p/websockets write backpressure resolves.
+  - Also expose a connectionGater passthrough on createNode for cleartext/LAN dev relays. Covered by unit tests for each polyfill.
+- Implement React Native transport over js-libp2p by @veeso
+  - Wires `@peerkit/transport-libp2p-react-native` to a libp2p stack configured for mobile: WebSockets (outbound) + WebRTC + circuit-relay-v2 client + noise + yamux + identify. Mobile peers are relay-mediated by design (CGNAT, no inbound listen).
+- \[**BREAKING**\] Add authored data sync module by @jost-s in [#69](https://github.com/holochain/peerkit/pull/69)
+
+### Bug Fixes
+
+- _(peerkit)_ Relay forwards newly published agent info to connected peers by @veeso in [#88](https://github.com/holochain/peerkit/pull/88)
+- _(relay)_ Prune agent info on peer disconnect by @veeso in [#80](https://github.com/holochain/peerkit/pull/80)
+  - The relay replays its full agent store to every newly connected peer, but entries were only evicted by their own 15-minute expiresAt — never on disconnect. A peer that dropped (or whose circuit reservation lapsed) stayed advertised for up to 15 minutes, so a freshly connected peer dialed its stale circuit address and the relay refused the hop with NO_RESERVATION.
+  - Remove a peer's agent info from the store when it disconnects, matched by the libp2p peer id embedded in the advertised circuit address (.../p2p-circuit/webrtc/p2p/<nodeId>). Adds IAgentStore.delete and MemoryAgentStore.delete to support it, plus a test asserting the relay no longer advertises a disconnected peer.
+
+### Miscellaneous Tasks
+
+- Remove implementation detail from comments by @veeso in [#81](https://github.com/holochain/peerkit/pull/81)
+
+### Testing
+
+- _(transport-react-native)_ Unit-test crypto, factory wiring, polyfills by @veeso
+  - Add the React Native transport's first test suite (22 tests). These cover the RN-specific surface that runs in Node CI; the end-to-end WebRTC path still needs a device/emulator and is tracked separately.
+  - Quick-crypto-noise: assert the JSI-backed ICryptoInterface (SHA-256, HKDF, ChaCha20-Poly1305) matches the pure-JS Noise reference byte-for-byte, plus interop, Uint8ArrayList inputs, and AEAD guards. `react-native-quick-crypto` is mocked with Node's API-compatible `node:crypto`. - factories: assert createNode wiring — deferred start (handlers before listen), the WebSockets + WebRTC + circuit-relay transport set, listen addresses, ICE server mapping, and conditional bootstrap-relay dial. - polyfills: assert install order (RNG -> quick-crypto -> WebRTC) and the global Buffer/process assignment.
+  - Switch the package test script from a no-op echo to `vitest --run`.
+
+### Refactor
+
+- \[**BREAKING**\] Move test logger setup to test-utils by @jost-s in [#87](https://github.com/holochain/peerkit/pull/87)
+- \[**BREAKING**\] _(authored-data-sync)_ Move shared types to api package by @jost-s
+- \[**BREAKING**\] Keep transport specific address formats contained in the transport by @jost-s in [#77](https://github.com/holochain/peerkit/pull/77)
+
 ## \[[0.1.0-alpha.12](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.11...v0.1.0-alpha.12)\] - 2026-05-28
 
 ### Features
@@ -16,6 +55,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - \[**BREAKING**\] _(relay)_ Rename `NetworkAccessBytes` field from `RelayConfig` to `networkAccessBytes` by @veeso in [#73](https://github.com/holochain/peerkit/pull/73)
   - **Breaking Change**: `RelayConfig.NetworkAccessBytes` field has been renamed to `networkAccessBytes`.
+
+### Miscellaneous Tasks
+
+- Release v0.1.0-alpha.12 by @veeso in [#75](https://github.com/holochain/peerkit/pull/75)
 
 ## \[[0.1.0-alpha.11](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.10...v0.1.0-alpha.11)\] - 2026-05-27
 
@@ -258,6 +301,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - @ThetaSinner made their first contribution in [#39](https://github.com/holochain/peerkit/pull/39)
 - @synchwire made their first contribution in [#38](https://github.com/holochain/peerkit/pull/38)
-- @veeso made their first contribution in [#24](https://github.com/holochain/peerkit/pull/24)
 
 <!-- generated by git-cliff -->

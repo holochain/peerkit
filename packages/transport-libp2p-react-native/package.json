@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-libp2p-react-native",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "private": true,
   "description": "React Native libp2p transport for peerkit",
   "keywords": [
@@ -53,8 +53,8 @@
     "@libp2p/identify": "^4.1.0",
     "@libp2p/webrtc": "^6.0.23",
     "@libp2p/websockets": "^10.1.13",
-    "@peerkit/api": "^0.1.0-alpha.12",
-    "@peerkit/transport-libp2p-core": "^0.1.0-alpha.12",
+    "@peerkit/api": "^0.1.0-alpha.13",
+    "@peerkit/transport-libp2p-core": "^0.1.0-alpha.13",
     "buffer": "^6.0.3",
     "libp2p": "^3.2.0",
     "process": "^0.11.10"
