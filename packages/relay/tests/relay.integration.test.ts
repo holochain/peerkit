@@ -155,6 +155,12 @@ describe("relay integration", () => {
       ).toBeTruthy();
       expect(aNodeAddresses.some((a) => a.includes("/webrtc"))).toBeTruthy();
       expect(bNodeAddresses.some((a) => a.includes("/webrtc"))).toBeTruthy();
+      expect(
+        aNodeAddresses.some((a) => a.includes("/p2p-circuit/p2p")),
+      ).toBeTruthy();
+      expect(
+        bNodeAddresses.some((a) => a.includes("/p2p-circuit/p2p")),
+      ).toBeTruthy();
 
       await a.node.connect([bNodeAddresses[0]]);
       await vi.waitFor(
@@ -176,7 +182,7 @@ describe("relay integration", () => {
 
   it("keeps track of connected relays", async () => {
     const a = await spawn({ bootstrapRelays: [relay.multiaddr] });
-    await vi.waitFor(() => expect(a.connectedRelays).toHaveLength(1));
+    await vi.waitFor(() => expect(a.connectedRelays.size).toBe(1));
     expect(a.connectedRelays.has(relay.relay.nodeId)).toBeTruthy();
   });
 

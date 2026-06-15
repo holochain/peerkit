@@ -97,8 +97,6 @@ program
     },
   );
 
-await program.parseAsync();
-
 // Resolves the platform's per-user data directory for persisted identity keys.
 const defaultDataDir = (): string => {
   if (process.platform === "win32") {
@@ -173,11 +171,13 @@ const main = async (
     addresses,
     agentKeyStore,
     callbacks: {
-      onRelayConnected: (address) => {
-        printAbove(`[Connected to relay]: ${address}`);
+      onRelayConnected: (nodeId) => {
+        printAbove(`[Connected to relay with ID]: ${nodeId}`);
       },
       onAddressesChanged: (addresses) => {
-        printAbove(`[Addresses changed]: ${addresses}`);
+        printAbove(
+          `[Addresses changed]: ${JSON.stringify(addresses, null, 4)}`,
+        );
       },
       onAgentsReceived: (agentIds) => {
         for (const id of agentIds) {
@@ -292,3 +292,5 @@ const main = async (
     shutdownSession();
   });
 };
+
+await program.parseAsync();

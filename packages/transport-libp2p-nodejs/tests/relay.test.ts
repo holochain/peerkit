@@ -111,7 +111,7 @@ test("Relay knows node's agent infos after agent exchange", async () => {
     },
     peerConnectedCallback: async (_nodeId, _transport) => {},
     networkAccessHandler: async () => true,
-    connectedToRelayCallback: async (_address, _nodeId, _transport) => {},
+    connectedToRelayCallback: async (_nodeId, _transport) => {},
     messageHandler: async (_message) => {},
   });
   await node.connect([relayAddress]);

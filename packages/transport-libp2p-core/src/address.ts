@@ -14,7 +14,7 @@ function isRelayed(address: NodeAddress) {
 }
 
 export function getDialableAddresses(addresses: NodeAddress[]) {
-  const relayedAddress = addresses.find(isRelayed);
-  const directAddress = addresses.find((address) => !isRelayed(address));
-  return { directAddress, relayedAddress };
+  const directAddresses = addresses.filter((address) => !isRelayed(address));
+  const relayedAddresses = addresses.filter((address) => isRelayed(address));
+  return { directAddresses, relayedAddresses };
 }
