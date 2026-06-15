@@ -196,7 +196,7 @@ export const createNode = async (options: TestNodeOptions) => {
   // Connect to all provided relays.
   if (bootstrapRelays) {
     for (const relayAddress of bootstrapRelays) {
-      await node.connect(relayAddress);
+      await node.connect([relayAddress]);
     }
   }
 

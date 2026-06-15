@@ -176,6 +176,9 @@ const main = async (
       onRelayConnected: (address) => {
         printAbove(`[Connected to relay]: ${address}`);
       },
+      onAddressesChanged: (addresses) => {
+        printAbove(`[Addresses changed]: ${addresses}`);
+      },
       onAgentsReceived: (agentIds) => {
         for (const id of agentIds) {
           printAbove(`[Peer discovered]: ${id}`);
