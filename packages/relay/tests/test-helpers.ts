@@ -191,7 +191,7 @@ export async function startTestNode(
     agentsReceivedCallback: async (from, bytes) => {
       receivedAgents.push({ from, bytes });
     },
-    connectedToRelayCallback: async (_relayAddresses, relayNodeId) => {
+    connectedToRelayCallback: async (relayNodeId) => {
       connectedRelays.add(relayNodeId);
     },
     bootstrapRelays: opts.bootstrapRelays

@@ -444,7 +444,7 @@ export class TransportLibp2p implements ITransport {
             if (this.connectedToRelayCallback) {
               const connectedToRelayCallback = this.connectedToRelayCallback;
               const relayId = relayNodeId.toString();
-              connectedToRelayCallback([], relayId, this);
+              connectedToRelayCallback(relayId, this);
             }
           })
           .catch((error) => {
