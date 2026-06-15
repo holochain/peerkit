@@ -69,7 +69,7 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
   await node1.shutDown();
 });
 
-test("withRelayConnectedObserver on node fires with the relay address", async () => {
+test("withAddressesChanged on node fires with the node addresses", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
   const relayListenAddr: RelayListenAddress = `127.0.0.1:${relayPort}`;
   const relayDialAddress: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
@@ -87,7 +87,7 @@ test("withRelayConnectedObserver on node fires with the relay address", async ()
   })
     .withId("node")
     .withBootstrapRelays([relayDialAddress])
-    .withRelayConnectedObserver((addresses) => {
+    .withAddressesChangedObserver((addresses) => {
       nodeAddresses.push(...addresses);
     })
     .build();
@@ -103,7 +103,7 @@ test("withRelayConnectedObserver on node fires with the relay address", async ()
 
 test("withAgentsReceivedObserver on relay fires when a node sends agent info", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `0.0.0.0:${relayPort}`;
+  const relayListenAddr = `127.0.0.1:${relayPort}`;
   const relayBootstrapAddr: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
 
   const receivedAgentIds: string[] = [];

@@ -29,9 +29,12 @@ export async function startTestNode(
       onPeerConnected: callbacks?.onPeerConnected ?? (() => {}),
       onPeerDisconnected: callbacks?.onPeerDisconnected ?? (() => {}),
       onAgentsReceived: callbacks?.onAgentsReceived ?? (() => {}),
-      onRelayConnected: (address) => {
+      onRelayConnected: (_address) => {
         relayConnected = true;
-        callbacks?.onRelayConnected?.(address);
+        callbacks?.onRelayConnected?.(_address);
+      },
+      onAddressesChanged: (addresses) => {
+        callbacks?.onAddressesChanged?.(addresses);
       },
       onMessageReceived: callbacks?.onMessageReceived ?? (() => {}),
     },

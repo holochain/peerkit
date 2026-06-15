@@ -54,9 +54,11 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const node1 = await createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (addresses, nodeId, _transport) => {
-      node1RelayedAddresses = addresses;
+    connectedToRelayCallback: async (_addresses, nodeId, _transport) => {
       relayNodeId = nodeId;
+    },
+    addressesChangedCallback: async (addresses, _transport) => {
+      node1RelayedAddresses = addresses;
     },
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
       throw new Error("Node 1 shouldn't be sent agents");
@@ -91,12 +93,12 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const node2AgentStore: Uint8Array[] = [];
   const peersConnectedToNode2: NodeId[] = [];
   const messagesReceivedByNode2: Uint8Array[] = [];
-  let node2RelayedAddress: NodeAddress[];
+  let node2RelayedAddresses: NodeAddress[];
   const node2 = await createNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (addresses, _relayNodeId, _transport) => {
-      node2RelayedAddress = addresses;
+    addressesChangedCallback: async (addresses, _transport) => {
+      node2RelayedAddresses = addresses;
     },
     agentsReceivedCallback: async (fromNode, agentInfos) => {
       assert.equal(fromNode, relay.getNodeId());
@@ -117,7 +119,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   // Wait for node 2's connection to relay to complete.
   // Node 1 is still connected to relay, so wait for 2 connected peers.
   await vi.waitUntil(
-    () => !!node2RelayedAddress && peersConnectedToRelay.length === 2,
+    () => !!node2RelayedAddresses && peersConnectedToRelay.length === 2,
     { timeout: 5_000 },
   );
 
@@ -191,9 +193,11 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   const node1 = await createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (addresses, nodeId, _transport) => {
-      node1RelayedAddresses = addresses;
+    connectedToRelayCallback: async (_addresses, nodeId, _transport) => {
       relayNodeId = nodeId;
+    },
+    addressesChangedCallback: async (node1Addresses, _transport) => {
+      node1RelayedAddresses = node1Addresses;
     },
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
       throw new Error("Node 1 shouldn't be sent agents");
@@ -232,7 +236,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   const node2 = await createNode({
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (addresses, _nodeId, _transport) => {
+    addressesChangedCallback: async (addresses, _transport) => {
       node2RelayedAddresses = addresses;
     },
     agentsReceivedCallback: async (fromNode, agentInfos) => {
@@ -333,9 +337,11 @@ test("2 nodes fall back to relayed connection when direct connection fails", asy
   const node1 = await createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (addresses, nodeId, _transport) => {
-      node1RelayedAddresses = addresses;
+    connectedToRelayCallback: async (_addresses, nodeId, _transport) => {
       relayNodeId = nodeId;
+    },
+    addressesChangedCallback: async (addresses, _transport) => {
+      node1RelayedAddresses = addresses;
     },
     agentsReceivedCallback: async (_fromNode, _agentInfos) => {
       throw new Error("Node 1 shouldn't be sent agents");
@@ -384,7 +390,7 @@ test("2 nodes fall back to relayed connection when direct connection fails", asy
   const node2 = new TransportLibp2p(libp2pNode2, {
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (addresses, _nodeId, _transport) => {
+    addressesChangedCallback: async (addresses, _transport) => {
       node2RelayedAddresses = addresses;
     },
     agentsReceivedCallback: async (fromNode, agentInfos) => {

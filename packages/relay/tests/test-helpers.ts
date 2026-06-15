@@ -8,7 +8,7 @@
 
 import { createHash } from "node:crypto";
 import getPort from "get-port";
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
 import { createNode } from "@peerkit/transport-libp2p-nodejs";
 import type { TransportLibp2p } from "@peerkit/transport-libp2p-core";
 import {
@@ -22,6 +22,8 @@ import type {
   AgentInfoSigned,
   IAgentStore,
   NetworkAccessBytes,
+  NodeAddress,
+  NodeId,
 } from "@peerkit/api";
 import { createLogger } from "../src/logger.js";
 import { startRelay, type RunningRelay } from "../src/relay.js";
@@ -153,8 +155,9 @@ export interface TestNode {
   readonly received: ReceivedMessage[];
   readonly receivedAgents: ReceivedMessage[];
   /** Maps relayId → fully dialable `/…/p2p-circuit/p2p/<localId>` address. */
-  readonly circuitAddrs: Map<string, string[]>;
-  waitForCircuitAddr(relayId: string, timeoutMs?: number): Promise<string[]>;
+  readonly circuitAddrs: NodeAddress[];
+  readonly connectedRelays: Set<NodeId>;
+  waitForCircuitAddr(timeoutMs?: number): Promise<string[]>;
   shutdown(): Promise<void>;
 }
 
@@ -169,7 +172,8 @@ export async function startTestNode(
   const secret = opts.secret ?? DEFAULT_SECRET;
   const received: ReceivedMessage[] = [];
   const receivedAgents: ReceivedMessage[] = [];
-  const circuitAddrs = new Map<string, string[]>();
+  const circuitAddrs: NodeAddress[] = [];
+  const connectedRelays = new Set<NodeId>();
   const node = await createNode({
     // `/p2p-circuit` accepts inbound relayed connections; `/webrtc` is the
     // node transport's direct-connection listener. The node dials the relay
@@ -181,11 +185,14 @@ export async function startTestNode(
     messageHandler: async (from, bytes) => {
       received.push({ from, bytes });
     },
+    addressesChangedCallback: async (addresses, _transport) => {
+      circuitAddrs.push(...addresses);
+    },
     agentsReceivedCallback: async (from, bytes) => {
       receivedAgents.push({ from, bytes });
     },
-    connectedToRelayCallback: async (relayAddresses, relayNodeId) => {
-      circuitAddrs.set(relayNodeId, relayAddresses);
+    connectedToRelayCallback: async (_relayAddresses, relayNodeId) => {
+      connectedRelays.add(relayNodeId);
     },
     bootstrapRelays: opts.bootstrapRelays
       ? [...opts.bootstrapRelays]
@@ -196,23 +203,16 @@ export async function startTestNode(
     nodeId: node.getNodeId(),
     received,
     receivedAgents,
+    connectedRelays,
     circuitAddrs,
-    waitForCircuitAddr: async (relayId, timeoutMs = 15_000) => {
+    waitForCircuitAddr: async (timeoutMs = 15_000) => {
       await vi.waitFor(
         () => {
-          if (!circuitAddrs.has(relayId)) {
-            throw new Error(
-              `circuit address for relay ${relayId} not captured`,
-            );
-          }
+          expect(circuitAddrs.length).not.toBe(0);
         },
-        { timeout: timeoutMs, interval: 25 },
+        { timeout: timeoutMs },
       );
-      const addrs = circuitAddrs.get(relayId);
-      if (addrs === undefined || addrs.length === 0) {
-        throw new Error(`circuit addresses for relay ${relayId} not captured`);
-      }
-      return addrs;
+      return circuitAddrs;
     },
     shutdown: async () => {
       await node.shutDown();

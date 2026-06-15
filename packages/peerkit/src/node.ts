@@ -77,7 +77,8 @@ export class PeerkitNodeBuilder {
   agentsReceivedObserver?: (agentIds: AgentId[]) => void;
   peerConnectedObserver?: (fromAgent: AgentId) => void;
   peerDisconnectedObserver?: (fromAgent: AgentId) => void;
-  connectedToRelayObserver?: (addresses: NodeAddress[]) => void;
+  connectedToRelayObserver?: (relayId: NodeId) => void;
+  addressesChangedObserver?: (addresses: NodeAddress[]) => void;
   private readonly modules: INodeModule[] = [];
 
   readonly networkAccessHandler: NetworkAccessHandler;
@@ -98,62 +99,67 @@ export class PeerkitNodeBuilder {
     this.messageHandler = messageHandler;
   }
 
-  withBootstrapRelays(relays: RelayDialAddress[]): this {
+  withBootstrapRelays(relays: RelayDialAddress[]) {
     this.bootstrapRelays = relays;
     return this;
   }
 
-  withId(id: string): this {
+  withId(id: string) {
     this.id = id;
     return this;
   }
 
-  withAddresses(addresses: NodeAddress[]): this {
+  withAddresses(addresses: NodeAddress[]) {
     this.addresses = addresses;
     return this;
   }
 
-  withIceServerUrls(urls: string[]): this {
+  withIceServerUrls(urls: string[]) {
     this.iceServerUrls = urls;
     return this;
   }
 
-  withNetworkAccessBytes(bytes: NetworkAccessBytes): this {
+  withNetworkAccessBytes(bytes: NetworkAccessBytes) {
     this.networkAccessBytes = bytes;
     return this;
   }
 
-  withAgentStore(store: IAgentStore): this {
+  withAgentStore(store: IAgentStore) {
     this.agentStore = store;
     return this;
   }
 
-  withTransportFactory(factory: PeerkitNodeTransportFactory): this {
+  withTransportFactory(factory: PeerkitNodeTransportFactory) {
     this.nodeTransportFactory = factory;
     return this;
   }
 
-  withAgentsReceivedObserver(fn: (agentIds: AgentId[]) => void): this {
+  withAgentsReceivedObserver(fn: (agentIds: AgentId[]) => void) {
     this.agentsReceivedObserver = fn;
     return this;
   }
 
-  withPeerConnectedObserver(fn: (fromAgent: AgentId) => void): this {
+  withPeerConnectedObserver(fn: (fromAgent: AgentId) => void) {
     this.peerConnectedObserver = fn;
     return this;
   }
 
-  withPeerDisconnectedObserver(fn: (fromAgent: AgentId) => void): this {
+  withPeerDisconnectedObserver(fn: (fromAgent: AgentId) => void) {
     this.peerDisconnectedObserver = fn;
     return this;
   }
 
-  withRelayConnectedObserver(fn: (addresses: NodeAddress[]) => void): this {
+  withRelayConnectedObserver(fn: (relayId: NodeId) => void) {
     this.connectedToRelayObserver = fn;
     return this;
   }
 
-  withModule(module: INodeModule): this {
+  withAddressesChangedObserver(fn: (addresses: NodeAddress[]) => void) {
+    this.addressesChangedObserver = fn;
+    return this;
+  }
+
+  withModule(module: INodeModule) {
     this.modules.push(module);
     return this;
   }
@@ -327,25 +333,46 @@ export class PeerkitNodeBuilder {
 
     const relayConnectedObserver = this.connectedToRelayObserver;
     const connectedToRelayCallback = async (
-      relayedNodeAddresses: NodeAddress[],
+      _relayedNodeAddresses: NodeAddress[],
       relayNodeId: NodeId,
       transport: ITransport,
     ) => {
-      try {
-        await signAndSendAgentInfo(
-          relayedNodeAddresses,
-          relayNodeId,
-          transport,
-        );
-      } catch (error) {
-        logger.error("Failed to send agents to relay {*}", {
-          relayedNodeAddress: relayedNodeAddresses,
-          relayNodeId,
-          error,
-        });
-      }
       relayConnections.set(relayNodeId, transport);
-      relayConnectedObserver?.(relayedNodeAddresses);
+      relayConnectedObserver?.(relayNodeId);
+    };
+
+    const addressesChangedObserver = this.addressesChangedObserver;
+    const addressesChangedCallback = async (
+      addresses: NodeAddress[],
+      transport: ITransport,
+    ) => {
+      // Send updated addresses to all relays with a timeout, in sequence.
+      for (const relayNodeId of relayConnections.keys()) {
+        let timeoutId;
+        const timeout = new Promise<"timeout">((resolve) => {
+          timeoutId = setTimeout(() => resolve("timeout"), 1000);
+        });
+        try {
+          const result = await Promise.race([
+            signAndSendAgentInfo(addresses, relayNodeId, transport),
+            timeout,
+          ]);
+          clearTimeout(timeoutId);
+          if (result === "timeout") {
+            logger.warn("Timed out sending addresses to relay {*}", {
+              addresses,
+              relayNodeId,
+            });
+          }
+        } catch (error) {
+          logger.error("Failed to send addresses to relay {*}", {
+            addresses,
+            relayNodeId,
+            error,
+          });
+        }
+      }
+      addressesChangedObserver?.(addresses);
     };
 
     const transport = this.nodeTransportFactory
@@ -356,6 +383,7 @@ export class PeerkitNodeBuilder {
           bootstrapRelays: this.bootstrapRelays,
           networkAccessBytes: networkAccessBytesWithKey,
           agentsReceivedCallback,
+          addressesChangedCallback,
           peerConnectedCallback,
           peerDisconnectedCallback,
           connectedToRelayCallback,
@@ -369,6 +397,7 @@ export class PeerkitNodeBuilder {
           bootstrapRelays: this.bootstrapRelays,
           networkAccessBytes: networkAccessBytesWithKey,
           agentsReceivedCallback,
+          addressesChangedCallback,
           peerConnectedCallback,
           peerDisconnectedCallback,
           connectedToRelayCallback,

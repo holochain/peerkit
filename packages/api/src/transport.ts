@@ -61,12 +61,22 @@ export type PeerConnectedCallback = (
 /**
  * Called when a peer disconnects
  *
- * Provides the node ID as identification.
+ * Provides the node ID as identification
  *
  * Fire-and-forget notification. The transport does not await this, but logs
  * errors.
  */
 export type PeerDisconnectedCallback = (nodeId: NodeId) => Promise<void>;
+
+/**
+ * Called when a node's addresses are updated
+ *
+ * Provides the current list of dialable addresses and the transport.
+ */
+export type AddressesChangedCallback = (
+  addresses: NodeAddress[],
+  transport: ITransport,
+) => Promise<void>;
 
 /**
  * Processing hook for incoming agent-info bytes.

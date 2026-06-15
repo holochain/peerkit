@@ -5,6 +5,7 @@ import type {
   IAgentKeyStore,
   NodeAddress,
   RelayDialAddress,
+  NodeId,
 } from "@peerkit/api";
 import { MemoryAgentStore } from "@peerkit/agent-store";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
@@ -15,7 +16,8 @@ export interface NodeEventCallbacks {
   onPeerDisconnected(alias: string): void;
   onAgentsReceived(agentIds: AgentId[]): void;
   onMessageReceived(alias: string, text: string): void;
-  onRelayConnected(addresses: NodeAddress[]): void;
+  onRelayConnected(relayId: NodeId): void;
+  onAddressesChanged(addresses: NodeAddress[]): void;
 }
 
 export interface NodeSession {
@@ -115,6 +117,9 @@ export async function startNode(options: {
     })
     .withRelayConnectedObserver((addresses) => {
       options.callbacks.onRelayConnected(addresses);
+    })
+    .withAddressesChangedObserver((addresses) => {
+      options.callbacks.onAddressesChanged(addresses);
     });
   if (options.addresses) {
     builder.withAddresses(options.addresses);

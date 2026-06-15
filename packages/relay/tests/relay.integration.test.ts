@@ -145,8 +145,8 @@ describe("relay integration", () => {
     async () => {
       const a = await spawn({ bootstrapRelays: [relay.multiaddr] });
       const b = await spawn({ bootstrapRelays: [relay.multiaddr] });
-      const aNodeAddresses = await a.waitForCircuitAddr(relay.relay.nodeId);
-      const bNodeAddresses = await b.waitForCircuitAddr(relay.relay.nodeId);
+      const aNodeAddresses = await a.waitForCircuitAddr();
+      const bNodeAddresses = await b.waitForCircuitAddr();
       expect(
         aNodeAddresses.every((a) => a.includes("/p2p-circuit")),
       ).toBeTruthy();
@@ -173,6 +173,12 @@ describe("relay integration", () => {
     },
     TEST_TIMEOUT_MS,
   );
+
+  it("keeps track of connected relays", async () => {
+    const a = await spawn({ bootstrapRelays: [relay.multiaddr] });
+    await vi.waitFor(() => expect(a.connectedRelays).toHaveLength(1));
+    expect(a.connectedRelays.has(relay.relay.nodeId)).toBeTruthy();
+  });
 
   it(
     "keeps access denial sticky across reconnects from the same peer",
