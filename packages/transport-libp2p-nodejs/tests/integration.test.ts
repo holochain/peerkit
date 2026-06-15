@@ -54,7 +54,7 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
   const node1 = await createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (_addresses, nodeId, _transport) => {
+    connectedToRelayCallback: async (nodeId, _transport) => {
       relayNodeId = nodeId;
     },
     addressesChangedCallback: async (addresses, _transport) => {
@@ -193,7 +193,7 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   const node1 = await createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (_addresses, nodeId, _transport) => {
+    connectedToRelayCallback: async (nodeId, _transport) => {
       relayNodeId = nodeId;
     },
     addressesChangedCallback: async (node1Addresses, _transport) => {
@@ -337,7 +337,7 @@ test("2 nodes fall back to relayed connection when direct connection fails", asy
   const node1 = await createNode({
     id: "node1",
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (_addresses, nodeId, _transport) => {
+    connectedToRelayCallback: async (nodeId, _transport) => {
       relayNodeId = nodeId;
     },
     addressesChangedCallback: async (addresses, _transport) => {

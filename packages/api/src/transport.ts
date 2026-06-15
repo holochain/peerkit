@@ -31,14 +31,12 @@ export type MessageHandler = (
  * Called when a connection to the relay is complete, including the network
  * access handshake, and the node can be contacted through the relay.
  *
- * Provides the node's own dial addresses, fully qualified to be shared with
- * peers so they can reach this node via the relay.
+ * Provides the relay's node ID
  *
  * Fire-and-forget notification. The transport does not await this, but logs
  * errors.
  */
 export type ConnectedToRelayCallback = (
-  nodeAddresses: NodeAddress[],
   relayNodeId: NodeId,
   transport: ITransport,
 ) => Promise<void>;

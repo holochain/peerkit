@@ -333,7 +333,6 @@ export class PeerkitNodeBuilder {
 
     const relayConnectedObserver = this.connectedToRelayObserver;
     const connectedToRelayCallback = async (
-      _relayedNodeAddresses: NodeAddress[],
       relayNodeId: NodeId,
       transport: ITransport,
     ) => {
