@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/test-utils",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "description": "Test utilities for peerkit module development",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [
@@ -37,6 +37,6 @@
   },
   "dependencies": {
     "@logtape/logtape": "^2.1.3",
-    "@peerkit/api": "^0.1.0-alpha.12"
+    "@peerkit/api": "^0.1.0-alpha.13"
   }
 }

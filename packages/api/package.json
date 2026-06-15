@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/api",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "description": "Interfaces for the peerkit data sync framework",
   "keywords": [
     "peerkit",
