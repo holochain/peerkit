@@ -14,7 +14,7 @@ test("Authored data push integration test", async () => {
 
   // Connect first: push is fire-and-forget at author time, so the peer must be
   // connected before the blob is authored for it to receive the push.
-  await a.node.transport.connect(b.nodeAddress);
+  await a.node.transport.connect([b.nodeAddress]);
 
   const enc = (s: string) => new TextEncoder().encode(s);
   const hash = a.store.store(enc("hello from A"), a.node.ownAgentId);

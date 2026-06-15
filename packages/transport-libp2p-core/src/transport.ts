@@ -90,6 +90,11 @@ export interface NodeOptions extends TransportOptionsBase {
    * Defaults to 10_000 ms.
    */
   handshakeTimeoutMs?: number;
+  /**
+   * Timeout in milliseconds for dialing a node.
+   * Defaults to 10_000 ms.
+   */
+  dialTimeoutMs?: number;
 }
 
 /**
@@ -150,6 +155,7 @@ export class TransportLibp2p implements ITransport {
   private logger: Logger;
   private localNetworkAccessBytes: NetworkAccessBytes;
   private handshakeTimeoutMs: number;
+  private dialTimeoutMs: number;
   private agentsReceivedCallback: AgentsReceivedCallback;
   private networkAccessHandler: NetworkAccessHandler;
   private messageHandler?: MessageHandler;
@@ -168,6 +174,9 @@ export class TransportLibp2p implements ITransport {
       (options &&
         "handshakeTimeoutMs" in options &&
         options.handshakeTimeoutMs) ||
+      10_000;
+    this.dialTimeoutMs =
+      (options && "dialTimeoutMs" in options && options.dialTimeoutMs) ||
       10_000;
     this.agentsReceivedCallback = options.agentsReceivedCallback;
     this.networkAccessHandler = options.networkAccessHandler;
@@ -256,29 +265,35 @@ export class TransportLibp2p implements ITransport {
       throw new Error("connect called with an empty list of addresses");
     }
 
-    const { directAddress, relayedAddress } =
+    const { directAddresses, relayedAddresses } =
       getDialableAddresses(nodeAddresses);
-    if (!directAddress && !relayedAddress) {
-      throw new Error("connect called with invalid addresses");
+    if (directAddresses.length === 0 && relayedAddresses.length === 0) {
+      throw new Error("connect called without addresses");
     }
 
     let connection: Connection | undefined;
-    if (directAddress) {
+    if (directAddresses.length > 0) {
       try {
-        connection = await this.libp2p.dial(multiaddr(directAddress));
+        const multiaddresses = directAddresses.map((a) => multiaddr(a));
+        connection = await this.libp2p.dial(multiaddresses, {
+          signal: AbortSignal.timeout(this.dialTimeoutMs),
+        });
       } catch (error) {
         this.logger.warn("Dialing direct address failed {*}", {
-          directAddress,
+          directAddresses,
           error,
         });
       }
     }
-    if (!connection && relayedAddress) {
+    if (!connection && relayedAddresses.length > 0) {
       try {
-        connection = await this.libp2p.dial(multiaddr(relayedAddress));
+        const multiaddresses = relayedAddresses.map((a) => multiaddr(a));
+        connection = await this.libp2p.dial(multiaddresses, {
+          signal: AbortSignal.timeout(this.dialTimeoutMs),
+        });
       } catch (error) {
         this.logger.error("Dialing relayed address failed {*}", {
-          relayedAddress,
+          relayedAddresses,
           error,
         });
       }
@@ -444,7 +459,12 @@ export class TransportLibp2p implements ITransport {
             if (this.connectedToRelayCallback) {
               const connectedToRelayCallback = this.connectedToRelayCallback;
               const relayId = relayNodeId.toString();
-              connectedToRelayCallback(relayId, this);
+              connectedToRelayCallback(relayId, this).catch((error) => {
+                this.logger.error(
+                  "ConnectedToRelayCallback produced an error {*}",
+                  { relayId, error },
+                );
+              });
             }
           })
           .catch((error) => {

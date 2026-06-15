@@ -1,6 +1,7 @@
 import { reset } from "@logtape/logtape";
 import type {
   NodeAddress,
+  NodeId,
   RelayDialAddress,
   RelayListenAddress,
 } from "@peerkit/api";
@@ -69,6 +70,39 @@ test("withAgentsReceivedObserver on node fires with agent IDs when agents arrive
   await node1.shutDown();
 });
 
+test("withConnectedToRelay fires on relay connection", async () => {
+  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const relayListenAddr: RelayListenAddress = `127.0.0.1:${relayPort}`;
+  const relayDialAddress: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
+
+  const relay = await new PeerkitRelayBuilder(async () => true)
+    .withId("relay")
+    .withAddresses([relayListenAddr])
+    .build();
+
+  const relayNodeIds: NodeId[] = [];
+  const node = await new PeerkitNodeBuilder({
+    agentKeyStore: new MemoryAgentKeyStore(),
+    networkAccessHandler: async () => true,
+    messageHandler: async () => {},
+  })
+    .withId("node")
+    .withBootstrapRelays([relayDialAddress])
+    .withRelayConnectedObserver((relayNodeId) => relayNodeIds.push(relayNodeId))
+    .build();
+
+  // Observer fires once the node has a circuit address through the relay.
+  await vi.waitFor(
+    () => expect(relayNodeIds).toStrictEqual([relay.transport.getNodeId()]),
+    {
+      timeout: 5_000,
+    },
+  );
+
+  await node.shutDown();
+  await relay.shutDown();
+});
+
 test("withAddressesChanged on node fires with the node addresses", async () => {
   const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
   const relayListenAddr: RelayListenAddress = `127.0.0.1:${relayPort}`;
@@ -79,7 +113,7 @@ test("withAddressesChanged on node fires with the node addresses", async () => {
     .withAddresses([relayListenAddr])
     .build();
 
-  const nodeAddresses: NodeAddress[] = [];
+  let nodeAddresses: NodeAddress[] = [];
   const node = await new PeerkitNodeBuilder({
     agentKeyStore: new MemoryAgentKeyStore(),
     networkAccessHandler: async () => true,
@@ -88,7 +122,7 @@ test("withAddressesChanged on node fires with the node addresses", async () => {
     .withId("node")
     .withBootstrapRelays([relayDialAddress])
     .withAddressesChangedObserver((addresses) => {
-      nodeAddresses.push(...addresses);
+      nodeAddresses = addresses;
     })
     .build();
 

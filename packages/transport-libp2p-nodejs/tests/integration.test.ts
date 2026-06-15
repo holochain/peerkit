@@ -5,7 +5,8 @@ import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
 import { webSockets } from "@libp2p/websockets";
 import { reset } from "@logtape/logtape";
-import {
+import type {
+  ITransport,
   NodeAddress,
   NodeId,
   RelayDialAddress,
@@ -25,139 +26,178 @@ beforeEach(setupTestLogger);
 // Reset logger configuration
 afterEach(reset);
 
-test("Bootstrap with relay and 2 nodes and send message over relayed connection", async () => {
-  // Create a test agent store for the relay
-  const relayAgentStore: Uint8Array[] = [];
-  // Create the relay with a callback that pushes to the agent store when agent
-  // infos have been received.
-  const peersConnectedToRelay: NodeId[] = [];
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
+interface ReceivedMessage {
+  from: NodeId;
+  bytes: Uint8Array;
+}
+
+interface TestRelay {
+  relay: ITransport;
+  /** Dialable WebSocket address of the relay. */
+  dialAddress: RelayDialAddress;
+  /** Agent-info payloads the relay has received, in arrival order. */
+  receivedAgents: Uint8Array[];
+  /** Node IDs that completed the access handshake with the relay. */
+  connectedPeers: NodeId[];
+}
+
+/** Start a relay on a free port with the standard tracking callbacks. */
+async function startRelay(id = "relay"): Promise<TestRelay> {
+  const port = await getPort({ port: portNumbers(30_000, 40_000) });
+  const listenAddr: RelayListenAddress = `127.0.0.1:${port}`;
+  const receivedAgents: Uint8Array[] = [];
+  const connectedPeers: NodeId[] = [];
   const relay = await createRelay({
-    id: "relay",
-    addrs: [relayListenAddr],
+    id,
+    addrs: [listenAddr],
     networkAccessHandler: async (_agentId, _bytes) => true,
     agentsReceivedCallback: async (_fromNode, agentInfos) => {
-      relayAgentStore.push(agentInfos);
+      receivedAgents.push(agentInfos);
     },
     peerConnectedCallback: async (nodeId, _transport) => {
-      peersConnectedToRelay.push(nodeId);
+      connectedPeers.push(nodeId);
     },
   });
+  return {
+    relay,
+    dialAddress: `/ip4/127.0.0.1/tcp/${port}/ws`,
+    receivedAgents,
+    connectedPeers,
+  };
+}
 
-  // Create node 1 that will connect first to the relay and send it its
-  // agent info.
-  let relayNodeId = "";
-  let node1RelayedAddresses: NodeAddress[];
-  const peersConnectedToNode1: NodeId[] = [];
-  const node1 = await createNode({
-    id: "node1",
+interface TestNode {
+  node: ITransport;
+  /** Node IDs that completed the access handshake with this node. */
+  connectedPeers: NodeId[];
+  /** Agent-info payloads this node has received, in arrival order. */
+  receivedAgents: Uint8Array[];
+  /** Messages this node has received, in arrival order. */
+  messages: ReceivedMessage[];
+  /** Latest dialable address snapshot from addressesChangedCallback. */
+  addresses: () => NodeAddress[];
+}
+
+/** Start a node with the standard tracking callbacks. */
+async function startNode(options: {
+  id: string;
+  addrs: NodeAddress[];
+  bootstrapRelays: RelayDialAddress[];
+  dialTimeoutMs?: number;
+}): Promise<TestNode> {
+  const connectedPeers: NodeId[] = [];
+  const receivedAgents: Uint8Array[] = [];
+  const messages: ReceivedMessage[] = [];
+  let addresses: NodeAddress[] = [];
+  const node = await createNode({
+    id: options.id,
+    addrs: options.addrs,
+    bootstrapRelays: options.bootstrapRelays,
+    dialTimeoutMs: options.dialTimeoutMs,
     networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (nodeId, _transport) => {
-      relayNodeId = nodeId;
+    addressesChangedCallback: async (newAddresses, _transport) => {
+      addresses = newAddresses;
     },
-    addressesChangedCallback: async (addresses, _transport) => {
-      node1RelayedAddresses = addresses;
-    },
-    agentsReceivedCallback: async (_fromNode, _agentInfos) => {
-      throw new Error("Node 1 shouldn't be sent agents");
+    agentsReceivedCallback: async (_fromNode, agentInfos) => {
+      receivedAgents.push(agentInfos);
     },
     peerConnectedCallback: async (nodeId, _transport) => {
-      peersConnectedToNode1.push(nodeId);
-    },
-    messageHandler: async (_message) => {},
-    addrs: ["/p2p-circuit"], // Only bind to relay transport
-    bootstrapRelays: [relayAddress],
-  });
-
-  // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
-  await vi.waitUntil(
-    () =>
-      !!node1RelayedAddresses &&
-      !!relayNodeId &&
-      peersConnectedToRelay.length === 1,
-    { timeout: 2_000 },
-  );
-
-  // Node 1 sends its own agent info to relay.
-  await node1.sendAgents(
-    relayNodeId,
-    new TextEncoder().encode(JSON.stringify(node1RelayedAddresses!)),
-  );
-  // Await agent infos to arrive in relay's agent store.
-  await vi.waitFor(() => expect(relayAgentStore.length).toBe(1));
-
-  // Create a second node that will also connect to the relay, receive
-  // agent infos from it and then connect to node 1 through the relay.
-  const node2AgentStore: Uint8Array[] = [];
-  const peersConnectedToNode2: NodeId[] = [];
-  const messagesReceivedByNode2: Uint8Array[] = [];
-  let node2RelayedAddresses: NodeAddress[];
-  const node2 = await createNode({
-    id: "node2",
-    networkAccessHandler: async (_agentId, _bytes) => true,
-    addressesChangedCallback: async (addresses, _transport) => {
-      node2RelayedAddresses = addresses;
-    },
-    agentsReceivedCallback: async (fromNode, agentInfos) => {
-      assert.equal(fromNode, relay.getNodeId());
-      node2AgentStore.push(agentInfos);
-    },
-    peerConnectedCallback: async (nodeId, _transport) => {
-      assert.equal(nodeId, node1.getNodeId());
-      peersConnectedToNode2.push(nodeId);
+      connectedPeers.push(nodeId);
     },
     messageHandler: async (fromNode, message, _transport) => {
-      assert.equal(fromNode, node1.getNodeId());
-      messagesReceivedByNode2.push(message);
+      messages.push({ from: fromNode, bytes: message });
     },
-    addrs: ["/p2p-circuit"], // Only bind to relay transport
-    bootstrapRelays: [relayAddress],
+  });
+  return {
+    node,
+    connectedPeers,
+    receivedAgents,
+    messages,
+    addresses: () => addresses,
+  };
+}
+
+test("Bootstrap with relay and 2 nodes and send message over relayed connection", async () => {
+  const {
+    relay,
+    dialAddress,
+    receivedAgents: relayAgents,
+    connectedPeers: relayPeers,
+  } = await startRelay();
+
+  // Node 1 binds only to the relay transport.
+  const {
+    node: node1,
+    addresses: node1Addresses,
+    connectedPeers: node1Peers,
+    receivedAgents: node1Agents,
+  } = await startNode({
+    id: "node1",
+    addrs: ["/p2p-circuit"],
+    bootstrapRelays: [dialAddress],
   });
 
-  // Wait for node 2's connection to relay to complete.
-  // Node 1 is still connected to relay, so wait for 2 connected peers.
+  // Wait for node 1 to reserve a slot on the relay and publish its address.
   await vi.waitUntil(
-    () => !!node2RelayedAddresses && peersConnectedToRelay.length === 2,
+    () => node1Addresses().length > 0 && relayPeers.length === 1,
     { timeout: 5_000 },
   );
 
-  // Relay sends agent infos from agent store to node 2.
-  assert(relayAgentStore[0]);
-  await relay.sendAgents(node2.getNodeId(), relayAgentStore[0]);
+  // Node 1 sends its own (relayed) address to the relay as agent info.
+  await node1.sendAgents(
+    relay.getNodeId(),
+    new TextEncoder().encode(JSON.stringify(node1Addresses())),
+  );
+  await vi.waitFor(() => expect(relayAgents.length).toBe(1));
 
-  await vi.waitFor(() => expect(node2AgentStore.length).toBe(1));
+  // Node 2 also binds only to the relay transport.
+  const {
+    node: node2,
+    addresses: node2Addresses,
+    connectedPeers: node2Peers,
+    receivedAgents: node2Agents,
+    messages: node2Messages,
+  } = await startNode({
+    id: "node2",
+    addrs: ["/p2p-circuit"],
+    bootstrapRelays: [dialAddress],
+  });
+
+  // Node 1 is still connected to the relay, so wait for 2 connected peers.
+  await vi.waitUntil(
+    () => node2Addresses().length > 0 && relayPeers.length === 2,
+    { timeout: 5_000 },
+  );
+
+  // Relay forwards node 1's stored agent info to node 2.
+  assert(relayAgents[0]);
+  await relay.sendAgents(node2.getNodeId(), relayAgents[0]);
+  await vi.waitFor(() => expect(node2Agents.length).toBe(1));
 
   // Node 2 connects to node 1 over the relay.
-  const node1Addresses: NodeAddress[] = JSON.parse(
-    new TextDecoder().decode(node2AgentStore[0]),
+  const node1AddressList: NodeAddress[] = JSON.parse(
+    new TextDecoder().decode(node2Agents[0]),
   );
-  // No peers should be connected to node 1.
-  assert.deepEqual(peersConnectedToNode1, []);
-  // No peers should be connected to node 2.
-  assert.deepEqual(peersConnectedToNode2, []);
-  await node2.connect(node1Addresses);
+  // Neither node has any peers yet.
+  assert.deepEqual(node1Peers, []);
+  assert.deepEqual(node2Peers, []);
+  await node2.connect(node1AddressList);
 
   // Await the peerConnectedCallback to have fired for both nodes.
-  await vi.waitUntil(
-    () =>
-      peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
-  );
+  await vi.waitUntil(() => node1Peers.length === 1 && node2Peers.length === 1);
 
   // Node 1 sends a message to node 2 over the relay.
-  // Node 1 learned node 2's ID from the peersConnectedCallback.
-  await node1.send(
-    peersConnectedToNode1[0],
-    new TextEncoder().encode("hello-from-node1"),
-  );
+  // Node 1 learned node 2's ID from the peerConnectedCallback.
+  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
 
-  await vi.waitFor(() => expect(messagesReceivedByNode2.length).toBe(1));
-  assert(messagesReceivedByNode2[0]);
+  await vi.waitFor(() => expect(node2Messages.length).toBe(1));
+  assert.equal(node2Messages[0]?.from, node1.getNodeId());
   assert.equal(
-    new TextDecoder().decode(messagesReceivedByNode2[0]),
+    new TextDecoder().decode(node2Messages[0]?.bytes),
     "hello-from-node1",
   );
+  // Node 1 should never have been sent agent info.
+  expect(node1Agents).toHaveLength(0);
 
   await node1.shutDown();
   await node2.shutDown();
@@ -165,124 +205,74 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
 });
 
 test("Bootstrap with relay and 2 nodes and send message over direct connection", async () => {
-  // Create a test agent store for the relay
-  const relayAgentStore: Uint8Array[] = [];
-  // Create the relay with a callback that pushes to the agent store when agent
-  // infos have been received.
-  const peersConnectedToRelay: NodeId[] = [];
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr = `127.0.0.1:${relayPort}`;
-  const relayAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-  const relay = await createRelay({
-    id: "relay",
-    addrs: [relayListenAddr],
-    networkAccessHandler: async (_agentId, _bytes) => true,
-    agentsReceivedCallback: async (_fromNode, agentInfos) => {
-      relayAgentStore.push(agentInfos);
-    },
-    peerConnectedCallback: async (nodeId, _transport) => {
-      peersConnectedToRelay.push(nodeId);
-    },
-  });
+  const {
+    relay,
+    dialAddress,
+    receivedAgents: relayAgents,
+    connectedPeers: relayPeers,
+  } = await startRelay();
 
-  // Create node 1 that will connect first to the relay and send it its
-  // agent info.
-  let relayNodeId = "";
-  let node1RelayedAddresses: NodeAddress[];
-  const peersConnectedToNode1: NodeId[] = [];
-  const node1 = await createNode({
+  // Node 1 listens on relay + WebRTC, so it advertises a dialable direct
+  // address as well as a relayed one.
+  const {
+    node: node1,
+    addresses: node1Addresses,
+    connectedPeers: node1Peers,
+    receivedAgents: node1Agents,
+  } = await startNode({
     id: "node1",
-    networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (nodeId, _transport) => {
-      relayNodeId = nodeId;
-    },
-    addressesChangedCallback: async (node1Addresses, _transport) => {
-      node1RelayedAddresses = node1Addresses;
-    },
-    agentsReceivedCallback: async (_fromNode, _agentInfos) => {
-      throw new Error("Node 1 shouldn't be sent agents");
-    },
-    peerConnectedCallback: async (nodeId, _transport) => {
-      peersConnectedToNode1.push(nodeId);
-    },
-    messageHandler: async (_message) => {},
     addrs: ["/p2p-circuit", "/webrtc"],
-    bootstrapRelays: [relayAddress],
+    bootstrapRelays: [dialAddress],
   });
 
-  // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
   await vi.waitUntil(
     () =>
-      !!node1RelayedAddresses &&
-      !!relayNodeId &&
-      peersConnectedToRelay.length === 1,
+      node1Addresses().some((a) => a.includes("/webrtc")) &&
+      relayPeers.length === 1,
     { timeout: 5_000 },
   );
 
-  // Node 1 sends its own agent info to relay.
   await node1.sendAgents(
-    relayNodeId,
-    new TextEncoder().encode(JSON.stringify(node1RelayedAddresses!)),
+    relay.getNodeId(),
+    new TextEncoder().encode(JSON.stringify(node1Addresses())),
   );
-  // Await agent infos to arrive in relay's agent store.
-  await vi.waitFor(() => expect(relayAgentStore.length).toBe(1));
+  await vi.waitFor(() => expect(relayAgents.length).toBe(1));
 
-  // Create a second node that will also connect to the relay, receive
-  // agent infos from it and then connect to node 1 through the relay.
-  const node2AgentStore: Uint8Array[] = [];
-  const messagesReceivedByNode2: Uint8Array[] = [];
-  let node2RelayedAddresses: NodeAddress[];
-  const peersConnectedToNode2: NodeId[] = [];
-  const node2 = await createNode({
+  const {
+    node: node2,
+    addresses: node2Addresses,
+    connectedPeers: node2Peers,
+    receivedAgents: node2Agents,
+    messages: node2Messages,
+  } = await startNode({
     id: "node2",
-    networkAccessHandler: async (_agentId, _bytes) => true,
-    addressesChangedCallback: async (addresses, _transport) => {
-      node2RelayedAddresses = addresses;
-    },
-    agentsReceivedCallback: async (fromNode, agentInfos) => {
-      assert.equal(fromNode, relay.getNodeId());
-      node2AgentStore.push(agentInfos);
-    },
-    peerConnectedCallback: async (nodeId, _transport) => {
-      assert.equal(nodeId, node1.getNodeId());
-      peersConnectedToNode2.push(nodeId);
-    },
-    messageHandler: async (fromNode, message, _transport) => {
-      assert.equal(fromNode, node1.getNodeId());
-      messagesReceivedByNode2.push(message);
-    },
     addrs: ["/p2p-circuit", "/webrtc"],
-    bootstrapRelays: [relayAddress],
+    bootstrapRelays: [dialAddress],
   });
 
-  // Wait for node 2's connection to relay to complete.
-  // Node 1 is still connected to relay, so wait for 2 connected peers.
   await vi.waitUntil(
-    () => !!node2RelayedAddresses && peersConnectedToRelay.length === 2,
+    () =>
+      node2Addresses().some((a) => a.includes("/webrtc")) &&
+      relayPeers.length === 2,
     { timeout: 5_000 },
   );
 
-  // Relay sends agent infos from agent store to node 2.
-  assert(relayAgentStore[0]);
-  await relay.sendAgents(node2.getNodeId(), relayAgentStore[0]);
+  // Relay forwards node 1's stored agent info to node 2.
+  assert(relayAgents[0]);
+  await relay.sendAgents(node2.getNodeId(), relayAgents[0]);
+  await vi.waitFor(() => expect(node2Agents.length).toBe(1));
 
-  await vi.waitFor(() => expect(node2AgentStore.length).toBe(1));
-
-  // Node 2 connects to node 1 over the relay.
-  const node1Address = JSON.parse(new TextDecoder().decode(node2AgentStore[0]));
-  // No peers should be connected to node 1.
-  assert.deepEqual(peersConnectedToNode1, []);
-  // No peers should be connected to node 2.
-  assert.deepEqual(peersConnectedToNode2, []);
-  await node2.connect(node1Address);
-
-  // Await the peerConnectedCallback to have fired for both nodes.
-  await vi.waitUntil(
-    () =>
-      peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
+  // Node 2 connects to node 1; the WebRTC address yields a direct connection.
+  const node1AddressList: NodeAddress[] = JSON.parse(
+    new TextDecoder().decode(node2Agents[0]),
   );
+  assert.deepEqual(node1Peers, []);
+  assert.deepEqual(node2Peers, []);
+  await node2.connect(node1AddressList);
 
-  // Wait for the connection upgrade to a direct connection.
+  await vi.waitUntil(() => node1Peers.length === 1 && node2Peers.length === 1);
+
+  // Wait for the direct connection to be established on both sides.
   await vi.waitUntil(
     () =>
       node1.isDirectConnection(node2.getNodeId()) &&
@@ -291,18 +281,15 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   );
 
   // Node 1 sends a message to node 2 over the direct connection.
-  // Node 1 learned node 2's ID from the peersConnectedCallback.
-  await node1.send(
-    peersConnectedToNode1[0],
-    new TextEncoder().encode("hello-from-node1"),
-  );
+  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
 
-  await vi.waitFor(() => expect(messagesReceivedByNode2.length).toBe(1));
-  assert(messagesReceivedByNode2[0]);
+  await vi.waitFor(() => expect(node2Messages.length).toBe(1));
+  assert.equal(node2Messages[0]?.from, node1.getNodeId());
   assert.equal(
-    new TextDecoder().decode(messagesReceivedByNode2[0]),
+    new TextDecoder().decode(node2Messages[0]?.bytes),
     "hello-from-node1",
   );
+  expect(node1Agents).toHaveLength(0);
 
   await node1.shutDown();
   await node2.shutDown();
@@ -310,67 +297,31 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
 });
 
 test("2 nodes fall back to relayed connection when direct connection fails", async () => {
-  // Create a test agent store for the relay
-  const relayAgentStore: Uint8Array[] = [];
-  // Create the relay with a callback that pushes to the agent store when agent
-  // infos have been received.
-  const peersConnectedToRelay: NodeId[] = [];
-  const relayPort = await getPort({ port: portNumbers(30_000, 40_000) });
-  const relayListenAddr: RelayListenAddress = `127.0.0.1:${relayPort}`;
-  const relayDialAddress: RelayDialAddress = `/ip4/127.0.0.1/tcp/${relayPort}/ws`;
-  const relay = await createRelay({
-    id: "relay",
-    addrs: [relayListenAddr],
-    networkAccessHandler: async (_agentId, _bytes) => true,
-    agentsReceivedCallback: async (_fromNode, agentInfos) => {
-      relayAgentStore.push(agentInfos);
-    },
-    peerConnectedCallback: async (nodeId, _transport) => {
-      peersConnectedToRelay.push(nodeId);
-    },
-  });
+  const { relay, dialAddress, connectedPeers: relayPeers } = await startRelay();
 
-  // Create node 1 that will connect first.
-  let relayNodeId = "";
-  let node1RelayedAddresses: NodeAddress[] = [];
-  const peersConnectedToNode1: NodeId[] = [];
-  const node1 = await createNode({
+  // Node 1 listens on relay + WebRTC.
+  const {
+    node: node1,
+    addresses: node1Addresses,
+    connectedPeers: node1Peers,
+  } = await startNode({
     id: "node1",
-    networkAccessHandler: async (_agentId, _bytes) => true,
-    connectedToRelayCallback: async (nodeId, _transport) => {
-      relayNodeId = nodeId;
-    },
-    addressesChangedCallback: async (addresses, _transport) => {
-      node1RelayedAddresses = addresses;
-    },
-    agentsReceivedCallback: async (_fromNode, _agentInfos) => {
-      throw new Error("Node 1 shouldn't be sent agents");
-    },
-    peerConnectedCallback: async (nodeId, _transport) => {
-      peersConnectedToNode1.push(nodeId);
-    },
-    messageHandler: async (_message) => {},
     addrs: ["/p2p-circuit", "/webrtc"],
-    bootstrapRelays: [relayDialAddress],
+    bootstrapRelays: [dialAddress],
   });
 
-  // Wait for node 1's connection to the relay to be ready before node 2 dials through it.
   await vi.waitUntil(
-    () =>
-      !!node1RelayedAddresses &&
-      !!relayNodeId &&
-      peersConnectedToRelay.length === 1,
+    () => node1Addresses().length > 0 && relayPeers.length === 1,
     { timeout: 5_000 },
   );
 
-  // Create a second node that will also connect to the relay, receive
-  // agent infos from it and then connect to node 1 through the relay.
+  // Node 2 deliberately omits the WebRTC transport, so node 1's direct dial
+  // fails and the connection must fall back to the relay. It is built by hand
+  // because the factory always wires WebRTC in.
   const libp2pNode2 = await createLibp2p({
     // Defer listening so TransportLibp2p can register protocol handlers
     // (including /peerkit/access/v1) before any inbound connection arrives.
     start: false,
-    // Do not add WebRTC as transport, because it's impractical to reject
-    // the connection then.
     transports: [webSockets(), circuitRelayTransport()],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
@@ -379,64 +330,182 @@ test("2 nodes fall back to relayed connection when direct connection fails", asy
       listen: ["/p2p-circuit", "/webrtc"],
     },
   });
-  // Construct a fake WebRTC address for node 2 under which node 1 will
-  // contact it.
-  const fakeWebrtcAddr = `${relayDialAddress}/p2p/${relayNodeId}/p2p-circuit/webrtc/p2p/${libp2pNode2.peerId}`;
+  // Fake WebRTC address node 1 will try (and fail) to dial directly.
+  const fakeWebrtcAddr = `${dialAddress}/p2p/${relay.getNodeId()}/p2p-circuit/webrtc/p2p/${libp2pNode2.peerId}`;
 
-  const node2AgentStore: Uint8Array[] = [];
-  const messagesReceivedByNode2: Uint8Array[] = [];
-  let node2RelayedAddresses: NodeAddress[] = [];
-  const peersConnectedToNode2: NodeId[] = [];
+  let node2Addresses: NodeAddress[] = [];
+  const node2Peers: NodeId[] = [];
+  const node2Messages: ReceivedMessage[] = [];
   const node2 = new TransportLibp2p(libp2pNode2, {
     id: "node2",
     networkAccessHandler: async (_agentId, _bytes) => true,
     addressesChangedCallback: async (addresses, _transport) => {
-      node2RelayedAddresses = addresses;
+      node2Addresses = addresses;
     },
-    agentsReceivedCallback: async (fromNode, agentInfos) => {
-      assert.equal(fromNode, relay.getNodeId());
-      node2AgentStore.push(agentInfos);
-    },
+    agentsReceivedCallback: async (_fromNode, _agentInfos) => {},
     peerConnectedCallback: async (nodeId, _transport) => {
       assert.equal(nodeId, node1.getNodeId());
-      peersConnectedToNode2.push(nodeId);
+      node2Peers.push(nodeId);
     },
     messageHandler: async (fromNode, message, _transport) => {
       assert.equal(fromNode, node1.getNodeId());
-      messagesReceivedByNode2.push(message);
+      node2Messages.push({ from: fromNode, bytes: message });
     },
   });
   await libp2pNode2.start();
-  await node2.connectToRelays([relayDialAddress]);
+  await node2.connectToRelays([dialAddress]);
 
-  // Wait for node 2's connection to relay to complete.
-  // Node 1 is still connected to relay, so wait for 2 connected peers.
   await vi.waitUntil(
-    () => node2RelayedAddresses.length && peersConnectedToRelay.length === 2,
+    () => node2Addresses.length > 0 && relayPeers.length === 2,
     { timeout: 5_000 },
   );
 
-  // Node 1 connects to node 2 with the fake WebRTC address and a
-  // functional relayed address.
-  await node1.connect([fakeWebrtcAddr, node2RelayedAddresses[0]]);
+  // Node 1 dials the fake WebRTC (direct) address first, then node 2's real
+  // relayed address.
+  await node1.connect([fakeWebrtcAddr, ...node2Addresses]);
 
-  // Await the peerConnectedCallback to have fired for both nodes.
-  await vi.waitUntil(
-    () =>
-      peersConnectedToNode1.length === 1 && peersConnectedToNode2.length === 1,
-  );
+  await vi.waitUntil(() => node1Peers.length === 1 && node2Peers.length === 1);
+
+  // The connection is relayed, not direct.
+  assert.equal(node1.isDirectConnection(node2.getNodeId()), false);
 
   // Node 1 sends a message to node 2 over the relayed connection.
-  // Node 1 learned node 2's ID from the peersConnectedCallback.
-  await node1.send(
-    peersConnectedToNode1[0],
-    new TextEncoder().encode("hello-from-node1"),
+  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+
+  await vi.waitFor(() => expect(node2Messages.length).toBe(1));
+  assert.equal(node2Messages[0]?.from, node1.getNodeId());
+  assert.equal(
+    new TextDecoder().decode(node2Messages[0]?.bytes),
+    "hello-from-node1",
   );
 
-  await vi.waitFor(() => expect(messagesReceivedByNode2.length).toBe(1));
-  assert(messagesReceivedByNode2[0]);
+  await node1.shutDown();
+  await node2.shutDown();
+  await relay.shutDown();
+});
+
+test("connect tries multiple direct addresses and connects via a reachable one", async () => {
+  // A dead direct address sits ahead of node 1's real addresses; the direct
+  // connection must still form via the reachable WebRTC address.
+  const { relay, dialAddress, connectedPeers: relayPeers } = await startRelay();
+
+  const {
+    node: node1,
+    addresses: node1Addresses,
+    connectedPeers: node1Peers,
+  } = await startNode({
+    id: "node1",
+    addrs: ["/p2p-circuit", "/webrtc"],
+    bootstrapRelays: [dialAddress],
+  });
+
+  await vi.waitUntil(
+    () => node1Addresses().length > 0 && relayPeers.length === 1,
+    { timeout: 5_000 },
+  );
+
+  const {
+    node: node2,
+    addresses: node2Addresses,
+    connectedPeers: node2Peers,
+    messages: node2Messages,
+  } = await startNode({
+    id: "node2",
+    addrs: ["/p2p-circuit", "/webrtc"],
+    bootstrapRelays: [dialAddress],
+    dialTimeoutMs: 2_000, // Short dial timeout for the test
+  });
+
+  await vi.waitUntil(
+    () => node2Addresses().length > 0 && relayPeers.length === 2,
+    { timeout: 5_000 },
+  );
+
+  // Unreachable direct address (nothing listens on port 1) first.
+  const deadDirectAddr = `/ip4/127.0.0.1/tcp/1/ws/p2p/${node1.getNodeId()}`;
+  await node2.connect([deadDirectAddr, ...node1Addresses()]);
+
+  // Both sides observe the peer despite the dead entry in the list.
+  await vi.waitUntil(() => node1Peers.length === 1 && node2Peers.length === 1, {
+    timeout: 5_000,
+  });
+
+  // The reachable direct address yields a direct connection, not a relayed one.
+  await vi.waitUntil(
+    () =>
+      node1.isDirectConnection(node2.getNodeId()) &&
+      node2.isDirectConnection(node1.getNodeId()),
+    { timeout: 10_000 },
+  );
+
+  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+  await vi.waitFor(() => expect(node2Messages.length).toBe(1));
+  assert.equal(node2Messages[0]?.from, node1.getNodeId());
   assert.equal(
-    new TextDecoder().decode(messagesReceivedByNode2[0]),
+    new TextDecoder().decode(node2Messages[0]?.bytes),
+    "hello-from-node1",
+  );
+
+  await node1.shutDown();
+  await node2.shutDown();
+  await relay.shutDown();
+});
+
+test("connect tries multiple relayed addresses and connects via a reachable one", async () => {
+  // A dead relay address sits ahead of node 1's real relayed address; the
+  // relayed connection must still form via the live relay.
+  const { relay, dialAddress, connectedPeers: relayPeers } = await startRelay();
+
+  const {
+    node: node1,
+    addresses: node1Addresses,
+    connectedPeers: node1Peers,
+  } = await startNode({
+    id: "node1",
+    addrs: ["/p2p-circuit"], // No direct connection possible.
+    bootstrapRelays: [dialAddress],
+  });
+
+  await vi.waitUntil(
+    () => node1Addresses().length > 0 && relayPeers.length === 1,
+    { timeout: 5_000 },
+  );
+
+  const {
+    node: node2,
+    addresses: node2Addresses,
+    connectedPeers: node2Peers,
+    messages: node2Messages,
+  } = await startNode({
+    id: "node2",
+    addrs: ["/p2p-circuit"],
+    bootstrapRelays: [dialAddress],
+  });
+
+  await vi.waitUntil(
+    () => node2Addresses().length > 0 && relayPeers.length === 2,
+    { timeout: 5_000 },
+  );
+
+  // Relayed address routed through a relay that isn't running. Its peer id
+  // differs from the live relay, so libp2p can't reuse the live connection.
+  const deadRelayPort = await getPort({ port: portNumbers(30_000, 40_000) });
+  const deadRelayedAddr = `/ip4/127.0.0.1/tcp/${deadRelayPort}/ws/p2p/QmDeadReLay/p2p-circuit/p2p/${node1.getNodeId()}`;
+
+  // Dead relayed address first, node 1's real relayed address second.
+  await node2.connect([deadRelayedAddr, ...node1Addresses()]);
+
+  await vi.waitUntil(() => node1Peers.length === 1 && node2Peers.length === 1, {
+    timeout: 5_000,
+  });
+  // The connection is relayed.
+  assert.equal(node2.isDirectConnection(node1.getNodeId()), false);
+
+  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+  await vi.waitFor(() => expect(node2Messages.length).toBe(1));
+  assert.equal(node2Messages[0]?.from, node1.getNodeId());
+  assert.equal(
+    new TextDecoder().decode(node2Messages[0]?.bytes),
     "hello-from-node1",
   );
 
