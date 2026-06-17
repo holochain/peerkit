@@ -1,5 +1,5 @@
 import { assert, expect, test } from "vitest";
-import { xorHashes } from "../src/pull";
+import { xorHashes } from "../src/pull.js";
 
 test("Empty set yields all zeroes", () => {
   assert.deepEqual(xorHashes([]), new Uint8Array(new Array(32).fill(0)));

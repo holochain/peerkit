@@ -1,15 +1,15 @@
 import { reset } from "@logtape/logtape";
 import { blake2s } from "@noble/hashes/blake2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { AgentId, Hash } from "@peerkit/api";
-import { setupTestLogger } from "@peerkit/test-utils";
+import type { AgentId, Hash } from "@peerkit/api";
+import { setupTestLogger, makeStreamPair, MockNode } from "@peerkit/test-utils";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
   AuthoredDataSync,
   FullReplicationStrategy,
   MemoryBlobStore,
 } from "../src/index.js";
-import { createMockPeer, makeStreamPair, MockNode } from "./mock-node.js";
+import { createMockPeer } from "./mock-node.js";
 
 const AUTHORED_DATA_SYNC_PROTOCOL = "/peerkit/authored-data-pull/v1";
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -74,7 +74,7 @@ test("Pull responses return blobs since recent timestamp", async () => {
     await syncA.pullFromAllPeers();
 
     expect(acceptSpy).to.toHaveBeenCalledOnce();
-    expect(acceptSpy.mock.calls[0][2]).toEqual(2_000);
+    expect(acceptSpy.mock.calls[0]![2]).toEqual(2_000);
     expect(storeA.getByAuthorSince("agent-b", 0)).toHaveLength(2);
   } finally {
     vi.useRealTimers();

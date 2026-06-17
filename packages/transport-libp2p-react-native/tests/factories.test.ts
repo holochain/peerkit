@@ -1,5 +1,5 @@
-import type { ITransport } from "@peerkit/api";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import type { CreateNodeOptions } from "../src/factories.js";
 
 // `createNode` is pure wiring: it assembles a libp2p config, constructs the
 // shared core transport, starts the node, and optionally dials relays. None of
@@ -81,7 +81,7 @@ describe("createNode", () => {
     // libp2p must be created with `start: false`, and the node started only
     // after the core transport is constructed — otherwise an inbound stream
     // could arrive before `/peerkit/access/v1` is registered.
-    await createNode({});
+    await createNode({} as unknown as CreateNodeOptions);
 
     expect(captured.libp2pConfig?.start).toBe(false);
     expect(startSpy).toHaveBeenCalledTimes(1);
@@ -91,7 +91,7 @@ describe("createNode", () => {
   test("configures the mobile transport set", async () => {
     // WebRTC (node-to-node) + WebRTC Direct (browser-safe relay dial) +
     // circuit-relay-v2. No plain websockets, no raw TCP, no listener.
-    await createNode({});
+    await createNode({} as unknown as CreateNodeOptions);
 
     expect(captured.libp2pConfig?.transports).toEqual([
       { tag: "webrtc" },
@@ -101,7 +101,7 @@ describe("createNode", () => {
   });
 
   test("defaults to the relay-circuit + webrtc listen addresses", async () => {
-    await createNode({});
+    await createNode({} as unknown as CreateNodeOptions);
 
     expect(captured.libp2pConfig?.addresses).toEqual({
       listen: defaultNodeListenAddrs,
@@ -111,7 +111,7 @@ describe("createNode", () => {
 
   test("overrides listen addresses when `addrs` is provided", async () => {
     const addrs = ["/p2p-circuit"];
-    await createNode({ addrs });
+    await createNode({ addrs } as unknown as CreateNodeOptions);
 
     expect(captured.libp2pConfig?.addresses).toEqual({ listen: addrs });
   });
@@ -119,7 +119,7 @@ describe("createNode", () => {
   test("maps `iceServerUrls` into the WebRTC rtcConfiguration", async () => {
     await createNode({
       iceServerUrls: ["stun:stun.example:3478", "turn:turn.example:3478"],
-    });
+    } as unknown as CreateNodeOptions);
 
     expect(captured.webRtcArg?.rtcConfiguration?.iceServers).toEqual([
       { urls: "stun:stun.example:3478" },
@@ -128,20 +128,20 @@ describe("createNode", () => {
   });
 
   test("leaves iceServers undefined when no URLs are given", async () => {
-    await createNode({});
+    await createNode({} as unknown as CreateNodeOptions);
 
     expect(captured.webRtcArg?.rtcConfiguration?.iceServers).toBeUndefined();
   });
 
   test("dials bootstrap relays when provided", async () => {
     const bootstrapRelays = ["/dns4/relay.example/tcp/443/wss/p2p/12D3Koo"];
-    await createNode({ bootstrapRelays });
+    await createNode({ bootstrapRelays } as unknown as CreateNodeOptions);
 
     expect(connectToRelaysSpy).toHaveBeenCalledExactlyOnceWith(bootstrapRelays);
   });
 
   test("does not dial relays when none are provided", async () => {
-    await createNode({});
+    await createNode({} as unknown as CreateNodeOptions);
 
     expect(connectToRelaysSpy).not.toHaveBeenCalled();
   });
@@ -149,13 +149,13 @@ describe("createNode", () => {
   test("does not dial relays for an empty bootstrap list", async () => {
     // An empty array is falsy-length: the fire-and-forget dial must be skipped
     // rather than invoked with nothing to connect to.
-    await createNode({ bootstrapRelays: [] });
+    await createNode({ bootstrapRelays: [] } as unknown as CreateNodeOptions);
 
     expect(connectToRelaysSpy).not.toHaveBeenCalled();
   });
 
   test("returns the constructed transport", async () => {
-    const transport: ITransport = await createNode({});
+    const transport = await createNode({} as unknown as CreateNodeOptions);
     expect(transport).toBeDefined();
     expect(transport.connectToRelays).toBe(connectToRelaysSpy);
   });

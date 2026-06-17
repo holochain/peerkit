@@ -52,6 +52,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build:dist
+      - run: npm run check:tests # type check test files
       - run: npm test
 
   publish-check:

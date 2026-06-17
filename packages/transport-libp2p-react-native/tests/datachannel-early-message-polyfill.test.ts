@@ -108,7 +108,7 @@ describe("installDataChannelEarlyMessagePolyfill", () => {
     };
 
     expect(received).toHaveLength(1);
-    expect([...new Uint8Array(received[0])]).toEqual([1, 2, 3]);
+    expect([...new Uint8Array(received[0]!)]).toEqual([1, 2, 3]);
   });
 
   test("does not re-deliver live messages once the consumer is attached", () => {

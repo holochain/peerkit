@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@logtape/logtape": "^2.0.5",
+    "@opentelemetry/sdk-metrics": "2.7.1",
     "@peerkit/metrics": "^0.1.0-alpha.13",
     "@peerkit/test-utils": "^0.1.0-alpha.13"
   }

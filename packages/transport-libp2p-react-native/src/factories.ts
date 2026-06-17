@@ -4,7 +4,7 @@ import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import type { ConnectionGater } from "@libp2p/interface";
-import type { ITransport, NodeAddress, RelayDialAddress } from "@peerkit/api";
+import type { NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
   type NodeOptions,
@@ -80,9 +80,7 @@ export interface CreateNodeOptions extends NodeOptions {
  * no relayed connection that can be upgraded by hole-punching; WebRTC ICE
  * provides the only viable direct-connection path on mobile.
  */
-export async function createNode(
-  options: CreateNodeOptions,
-): Promise<ITransport> {
+export async function createNode(options: CreateNodeOptions) {
   // Build array of ICE servers if provided or leave undefined to use
   // libp2p default.
   const iceServers =

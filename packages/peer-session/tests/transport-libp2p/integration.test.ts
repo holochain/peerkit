@@ -117,8 +117,8 @@ test(
     await vi.waitFor(() => expect(aConnected).toHaveLength(1), {
       timeout: 10_000,
     });
-    const bAlias = aConnected[0].alias;
-    const aAlias = sessionA.listPeers()[0].alias;
+    const bAlias = aConnected[0]!.alias;
+    const aAlias = sessionA.listPeers()[0]!.alias;
 
     // Disconnect with an non-existing alias throws.
     await expect(sessionB.disconnect("harold")).rejects.toThrow(
