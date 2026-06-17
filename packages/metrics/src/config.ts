@@ -53,7 +53,7 @@ let activeProvider: MeterProvider | undefined;
  * Must be called at most once between {@link shutdownMetrics} calls; a second
  * call without prior shutdown rejects.
  */
-export async function initMetrics(cfg: MetricsConfig): Promise<void> {
+export async function initMetrics(cfg: MetricsConfig) {
   if (activeProvider) {
     throw new Error(
       "Metrics already initialised. Call shutdownMetrics() before re-initialising.",
@@ -91,7 +91,7 @@ export async function initMetrics(cfg: MetricsConfig): Promise<void> {
  *
  * Safe to call when metrics have not been initialised.
  */
-export async function shutdownMetrics(): Promise<void> {
+export async function shutdownMetrics() {
   if (!activeProvider) {
     return;
   }

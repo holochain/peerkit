@@ -192,12 +192,15 @@ test("Bootstrap with relay and 2 nodes and send message over relayed connection"
 
   // Node 1 sends a message to node 2 over the relay.
   // Node 1 learned node 2's ID from the peerConnectedCallback.
-  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+  await node1.send(
+    node1Peers[0]!,
+    new TextEncoder().encode("hello-from-node1"),
+  );
 
   await vi.waitFor(() => expect(node2Messages.length).toBe(1));
-  assert.equal(node2Messages[0]?.from, node1.getNodeId());
+  assert.equal(node2Messages[0]!.from, node1.getNodeId());
   assert.equal(
-    new TextDecoder().decode(node2Messages[0]?.bytes),
+    new TextDecoder().decode(node2Messages[0]!.bytes),
     "hello-from-node1",
   );
   // Node 1 should never have been sent agent info.
@@ -285,12 +288,15 @@ test("Bootstrap with relay and 2 nodes and send message over direct connection",
   );
 
   // Node 1 sends a message to node 2 over the direct connection.
-  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+  await node1.send(
+    node1Peers[0]!,
+    new TextEncoder().encode("hello-from-node1"),
+  );
 
   await vi.waitFor(() => expect(node2Messages.length).toBe(1));
-  assert.equal(node2Messages[0]?.from, node1.getNodeId());
+  assert.equal(node2Messages[0]!.from, node1.getNodeId());
   assert.equal(
-    new TextDecoder().decode(node2Messages[0]?.bytes),
+    new TextDecoder().decode(node2Messages[0]!.bytes),
     "hello-from-node1",
   );
   expect(node1Agents).toHaveLength(0);
@@ -376,12 +382,15 @@ test("2 nodes fall back to relayed connection when direct connection fails", asy
   assert.equal(node1.isDirectConnection(node2.getNodeId()), false);
 
   // Node 1 sends a message to node 2 over the relayed connection.
-  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+  await node1.send(
+    node1Peers[0]!,
+    new TextEncoder().encode("hello-from-node1"),
+  );
 
   await vi.waitFor(() => expect(node2Messages.length).toBe(1));
-  assert.equal(node2Messages[0]?.from, node1.getNodeId());
+  assert.equal(node2Messages[0]!.from, node1.getNodeId());
   assert.equal(
-    new TextDecoder().decode(node2Messages[0]?.bytes),
+    new TextDecoder().decode(node2Messages[0]!.bytes),
     "hello-from-node1",
   );
 
@@ -444,11 +453,14 @@ test("connect tries multiple direct addresses and connects via a reachable one",
     { timeout: 10_000 },
   );
 
-  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+  await node1.send(
+    node1Peers[0]!,
+    new TextEncoder().encode("hello-from-node1"),
+  );
   await vi.waitFor(() => expect(node2Messages.length).toBe(1));
-  assert.equal(node2Messages[0]?.from, node1.getNodeId());
+  assert.equal(node2Messages[0]!.from, node1.getNodeId());
   assert.equal(
-    new TextDecoder().decode(node2Messages[0]?.bytes),
+    new TextDecoder().decode(node2Messages[0]!.bytes),
     "hello-from-node1",
   );
 
@@ -507,7 +519,10 @@ test("connect tries multiple relayed addresses and connects via a reachable one"
   // The connection is relayed.
   assert.equal(node2.isDirectConnection(node1.getNodeId()), false);
 
-  await node1.send(node1Peers[0], new TextEncoder().encode("hello-from-node1"));
+  await node1.send(
+    node1Peers[0]!,
+    new TextEncoder().encode("hello-from-node1"),
+  );
   await vi.waitFor(() => expect(node2Messages.length).toBe(1));
   assert.equal(node2Messages[0]?.from, node1.getNodeId());
   assert.equal(

@@ -1,9 +1,9 @@
 import { reset } from "@logtape/logtape";
 import type { AgentId } from "@peerkit/api";
-import { setupTestLogger } from "@peerkit/test-utils";
+import { setupTestLogger, makeStreamPair } from "@peerkit/test-utils";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { encodePushMessage } from "../src/push.js";
-import { createMockPeer, makeStreamPair, type MockPeer } from "./mock-node.js";
+import { createMockPeer, type MockPeer } from "./mock-node.js";
 
 const AUTHORED_DATA_PUSH_PROTOCOL = "/peerkit/authored-data-push/v1";
 const enc = (s: string) => new TextEncoder().encode(s);

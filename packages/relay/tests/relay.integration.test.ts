@@ -101,7 +101,7 @@ describe("relay integration", () => {
       );
       const { bytes } = await makeSignedAgentInfo();
       // Corrupt the cbor payload so the signature can no longer verify.
-      bytes[bytes.length - 1] ^= 0xff;
+      bytes[bytes.length - 1]! ^= 0xff;
       await n.node.sendAgents(relay.relay.nodeId, bytes);
       // Give the relay time to process (and reject) the payload.
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -165,7 +165,7 @@ describe("relay integration", () => {
         bNodeAddresses.some((a) => a.includes("/p2p-circuit/p2p")),
       ).toBeTruthy();
 
-      await a.node.connect([bNodeAddresses[0]]);
+      await a.node.connect([bNodeAddresses[0]!]);
       await vi.waitFor(
         () => expect(a.node.isConnected(b.nodeId)).toBe(true),
         WAIT_OPTS,
@@ -183,11 +183,15 @@ describe("relay integration", () => {
     TEST_TIMEOUT_MS,
   );
 
-  it("keeps track of connected relays", async () => {
-    const a = await spawn({ bootstrapRelays: [relay.multiaddr] });
-    await vi.waitFor(() => expect(a.connectedRelays.size).toBe(1));
-    expect(a.connectedRelays.has(relay.relay.nodeId)).toBeTruthy();
-  });
+  it(
+    "keeps track of connected relays",
+    async () => {
+      const a = await spawn({ bootstrapRelays: [relay.multiaddr] });
+      await vi.waitFor(() => expect(a.connectedRelays.size).toBe(1), WAIT_OPTS);
+      expect(a.connectedRelays.has(relay.relay.nodeId)).toBeTruthy();
+    },
+    TEST_TIMEOUT_MS,
+  );
 
   it(
     "keeps access denial sticky across reconnects from the same peer",

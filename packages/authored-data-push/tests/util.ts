@@ -1,5 +1,5 @@
 import type { NodeAddress } from "@peerkit/api";
-import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
+import type { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
 import { MemoryBlobStore } from "@peerkit/authored-data-pull";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import { AuthoredDataPush, FullReplicationPolicy } from "../src/index.js";

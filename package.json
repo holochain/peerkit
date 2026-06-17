@@ -47,6 +47,7 @@
     "fmt:check": "prettier . --check",
     "test": "vitest --run",
     "build:dist": "tsc --build",
+    "check:tests": "tsc --build && tsc -p tsconfig.tests.json",
     "prebuild:docs": "npm run build:dist",
     "build:docs": "typedoc",
     "build": "npm run build:docs",

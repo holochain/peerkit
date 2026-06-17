@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["packages/*/src", "packages/*/tests"],
+  "references": [
+    { "path": "packages/api" },
+    { "path": "packages/agent-store" },
+    { "path": "packages/metrics" },
+    { "path": "packages/transport-libp2p-core" },
+    { "path": "packages/transport-libp2p-nodejs" },
+    { "path": "packages/transport-libp2p-react-native" },
+    { "path": "packages/transport-libp2p" },
+    { "path": "packages/peerkit" },
+    { "path": "packages/authored-data-pull" },
+    { "path": "packages/authored-data-push" },
+    { "path": "packages/peer-session" },
+    { "path": "packages/cli" },
+    { "path": "packages/relay" },
+    { "path": "packages/test-utils" }
+  ]
+}

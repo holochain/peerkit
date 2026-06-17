@@ -1,14 +1,14 @@
 import * as ed25519 from "@noble/ed25519";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import type { AgentInfo, AgentInfoSigned } from "@peerkit/api";
+import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 import { expect, test } from "vitest";
-import { AgentKeyPair, decodeAgentId } from "../src/agent.js";
-import { AgentInfo, AgentInfoSigned } from "@peerkit/api";
 import {
   buildOwnAgentInfo,
   signAgentInfo,
   verifyAgentInfo,
 } from "../src/agent-info.js";
-import { MemoryAgentKeyStore } from "@peerkit/test-utils";
+import { AgentKeyPair, decodeAgentId } from "../src/agent.js";
 
 test("agentId round-trips through decodeAgentId", async () => {
   const keyPair = await AgentKeyPair.load_or_create(new MemoryAgentKeyStore());

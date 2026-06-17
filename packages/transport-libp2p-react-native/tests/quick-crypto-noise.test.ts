@@ -87,7 +87,7 @@ describe("quickCryptoNoise.chaCha20Poly1305Encrypt", () => {
       ASSOCIATED_DATA,
       KEY,
     );
-    expect(bytes(actual)).toEqual(bytes(expected));
+    expect(bytes(actual.subarray())).toEqual(bytes(expected.subarray()));
     // ciphertext length + 16-byte Poly1305 tag.
     expect(actual).toHaveLength(PLAINTEXT.length + 16);
   });
