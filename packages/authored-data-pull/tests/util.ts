@@ -4,7 +4,7 @@ import type {
   IDataDistributionPolicy,
   NodeAddress,
 } from "@peerkit/api";
-import { IAuthoredDataSyncStore } from "@peerkit/api/authored-data-pull";
+import type { IAuthoredDataSyncStore } from "@peerkit/api/authored-data";
 import { MemoryBlobStore } from "@peerkit/data-store";
 import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
 import { MemoryAgentKeyStore } from "@peerkit/test-utils";

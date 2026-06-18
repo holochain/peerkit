@@ -7,10 +7,7 @@ import type {
   IPeerkitNode,
   IStream,
 } from "@peerkit/api";
-import type {
-  Blob,
-  IAuthoredDataSyncStore,
-} from "@peerkit/api/authored-data-pull";
+import type { Blob, IAuthoredDataSyncStore } from "@peerkit/api/authored-data";
 import { BufferedStream } from "./buffered-stream.js";
 import { FullReplicationPolicy } from "./distribution.js";
 import {
