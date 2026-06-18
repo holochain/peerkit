@@ -3,7 +3,11 @@
  * agent store -> relay -> HTTP server. Handles signals + shutdown.
  */
 
-import type { RelayConfig } from "./config.js";
+import {
+  DEFAULT_LOG_LEVEL,
+  DEFAULT_RELAY_ID,
+  type RelayConfig,
+} from "./config.js";
 import { createLogger } from "./logger.js";
 import {
   initRelayMetrics,
@@ -32,9 +36,11 @@ export type { RelayCertificate } from "@peerkit/api";
 export { generateRelayCertificate } from "@peerkit/peerkit";
 
 export async function run(config: RelayConfig): Promise<void> {
-  const logger = createLogger({ level: config.logLevel, id: config.id });
+  const id = config.id ?? DEFAULT_RELAY_ID;
+  const logLevel = config.logLevel ?? DEFAULT_LOG_LEVEL;
+  const logger = createLogger({ level: logLevel, id });
   logger.info("starting relay", {
-    logLevel: config.logLevel,
+    logLevel,
     listenAddrs: config.listenAddrs,
     publicIp: config.publicIp,
     otelEnabled: config.otel !== undefined,
@@ -52,7 +58,7 @@ export async function run(config: RelayConfig): Promise<void> {
     });
     await initRelayMetrics({
       enabled: config.otel !== undefined,
-      relayId: config.id,
+      relayId: id,
       otlpEndpoint: config.otel?.otlpEndpoint,
       exportIntervalMs: config.otel?.exportIntervalMs,
       headers: config.otel?.headers,
