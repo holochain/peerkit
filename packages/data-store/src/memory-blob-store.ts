@@ -5,7 +5,7 @@ import type {
   Blob,
   IAuthoredDataSyncStore,
   StoredBlob,
-} from "@peerkit/api/authored-data-pull";
+} from "@peerkit/api/authored-data";
 
 const DEFAULT_MAX_BLOB_SIZE = 1024 * 1024 * 20; // 20 MiB
 

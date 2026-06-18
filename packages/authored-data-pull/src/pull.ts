@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { AgentId, Hash } from "@peerkit/api";
-import type { Blob } from "@peerkit/api/authored-data-pull";
+import type { Blob } from "@peerkit/api/authored-data";
 import { decode, encode } from "cbor-x";
 
 const logger = getLogger(["peerkit", "authored-data-pull"]);

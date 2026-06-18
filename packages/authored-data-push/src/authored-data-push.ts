@@ -1,9 +1,6 @@
 import { getLogger, type Logger } from "@logtape/logtape";
 import type { AgentId, INodeModule, IPeerkitNode, IStream } from "@peerkit/api";
-import type {
-  Blob,
-  IAuthoredDataSyncStore,
-} from "@peerkit/api/authored-data-pull";
+import type { Blob, IAuthoredDataSyncStore } from "@peerkit/api/authored-data";
 import { BufferedStream } from "./buffered-stream.js";
 import { decodePushMessage, encodePushMessage } from "./push.js";
 
