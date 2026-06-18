@@ -12,7 +12,7 @@
 import { PeerkitRelayBuilder } from "@peerkit/peerkit";
 import type { IAgentStore, ITransport, NodeId } from "@peerkit/api";
 import type { Logger } from "./logger.js";
-import type { RelayConfig } from "./config.js";
+import { DEFAULT_RELAY_ID, type RelayConfig } from "./config.js";
 import {
   recordAgentsReceived,
   recordAgentsReplayed,
@@ -45,7 +45,7 @@ export async function startRelay(
   const lifecycle = logger.getChild("lifecycle");
 
   const builder = new PeerkitRelayBuilder(config.networkAccessHandler)
-    .withId(config.id)
+    .withId(config.id ?? DEFAULT_RELAY_ID)
     .withAddresses([...config.listenAddrs])
     .withNetworkAccessBytes(config.networkAccessBytes)
     .withAgentStore(agentStore);
