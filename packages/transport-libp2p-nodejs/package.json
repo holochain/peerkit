@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-libp2p-nodejs",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.14",
   "description": "Node.js libp2p transport for peerkit",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "license": "CAL-1.0",
@@ -41,8 +41,8 @@
     "@libp2p/webrtc": "^6.0.23",
     "@multiformats/multiaddr": "^13.0.1",
     "@peculiar/x509": "^2.0.0",
-    "@peerkit/api": "^0.1.0-alpha.13",
-    "@peerkit/transport-libp2p-core": "^0.1.0-alpha.13",
+    "@peerkit/api": "^0.1.0-alpha.14",
+    "@peerkit/transport-libp2p-core": "^0.1.0-alpha.14",
     "libp2p": "^3.2.0",
     "multiformats": "^13.4.2",
     "reflect-metadata": "^0.2.2"
@@ -50,7 +50,7 @@
   "devDependencies": {
     "@logtape/logtape": "^2.0.5",
     "@opentelemetry/sdk-metrics": "2.7.1",
-    "@peerkit/metrics": "^0.1.0-alpha.13",
-    "@peerkit/test-utils": "^0.1.0-alpha.13"
+    "@peerkit/metrics": "^0.1.0-alpha.14",
+    "@peerkit/test-utils": "^0.1.0-alpha.14"
   }
 }
