@@ -3,21 +3,52 @@ name: Publish Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       is-release: ${{ steps.label.outputs.result }}
     steps:
+      # A manual dispatch always publishes. For pushes, GitHub's commit->PR
+      # association is eventually consistent and is often not indexed yet when
+      # the push event fires on merge, so retry before giving up on a release.
       - name: Check for release label on merged PR
         id: label
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
-          RESULT=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/pulls \
-            --jq 'any(.[].labels[].name; . == "release")' 2>/dev/null || echo "false")
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          result=false
+          for attempt in $(seq 1 6); do
+            if ! pulls=$(gh api "repos/$REPO/commits/$SHA/pulls"); then
+              echo "PR lookup failed (attempt $attempt), retrying..." >&2
+              sleep 10
+              continue
+            fi
+            if [ "$(echo "$pulls" | jq 'length')" -eq 0 ]; then
+              echo "No PR association yet (attempt $attempt), retrying..." >&2
+              sleep 10
+              continue
+            fi
+            if echo "$pulls" | jq -e 'any(.[].labels[].name; . == "release")' > /dev/null; then
+              result=true
+            fi
+            break
+          done
+          echo "result=$result" >> "$GITHUB_OUTPUT"
 
   publish:
     needs: check
@@ -27,7 +58,7 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
