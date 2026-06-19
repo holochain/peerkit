@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.14](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.13...v0.1.0-alpha.14)\] - 2026-06-19
+
+### Features
+
+- _(relay)_ Make id and logLevel optional in RelayConfig by @veeso in [#99](https://github.com/holochain/peerkit/pull/99)
+  - The relay applies a default id (peerkit-relay) and log level (info) when the caller omits them, so thin wrappers around run() no longer need to supply every field.
+- _(cli)_ Add authored data sync commands by @jost-s in [#76](https://github.com/holochain/peerkit/pull/76)
+- \[**BREAKING**\] _(transport-libp2p)_ Switch relay transport to WebRTC Direct by @veeso in [#89](https://github.com/holochain/peerkit/pull/89)
+  - Replace the WebSockets transport with WebRTC Direct in the Node.js and React Native transports, for both nodes and relays. Nodes now configure WebRTC + WebRTC Direct + circuit-relay-v2 client; relays configure WebRTC Direct + circuit-relay-v2 server.
+  - WebRTC Direct binds over UDP and generates an ephemeral certificate at start, so the certhash is only known at runtime. To announce a NAT'd relay's dialable address, the static `buildRelayAnnounceAddr` is replaced by a libp2p `announceFilter` (`publicIpAnnounceFilter`) that rewrites each announced address to the public IP at runtime, preserving the live certhash. The host-rewrite helper is exposed as `rewriteHostToPublicIp`.
+  - `hostPortToMultiaddr` now emits `/ip4|ip6/<host>/udp/<port>/webrtc-direct` and drops DNS/hostname support (WebRTC Direct dials IP literals).
+  - **Breaking Change**: `buildRelayAnnounceAddr` is removed; relay announce is
+    now driven by `publicIp` via an internal announceFilter. Relays and nodes
+    no longer speak WebSockets.
+- \[**BREAKING**\] Add authored data push module by @jost-s in [#90](https://github.com/holochain/peerkit/pull/90)
+
+### Bug Fixes
+
+- \[**BREAKING**\] Fall back to relayed connection when direct ones fail by @jost-s
+
+### Miscellaneous Tasks
+
+- Remove unused dependencies by @jost-s in [#100](https://github.com/holochain/peerkit/pull/100)
+
+### Testing
+
+- Typecheck tests & fix all existing errors by @jost-s in [#95](https://github.com/holochain/peerkit/pull/95)
+
+### Refactor
+
+- \[**BREAKING**\] _(api)_ Rename authored-data-sync to authored-data by @jost-s
+- \[**BREAKING**\] Move data store to own package by @jost-s
+- \[**BREAKING**\] Rename authored-data-sync to authored-data-pull by @jost-s
+- \[**BREAKING**\] Support multiple relays and multiple node addresses by @jost-s in [#91](https://github.com/holochain/peerkit/pull/91)
+- \[**BREAKING**\] Remove unused addresses parameter from relay connected callback by @jost-s
+- \[**BREAKING**\] Add callback for when node addresses change by @jost-s
+
+### Documentation
+
+- Add CAL license by @jost-s in [#98](https://github.com/holochain/peerkit/pull/98)
+
 ## \[[0.1.0-alpha.13](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.12...v0.1.0-alpha.13)\] - 2026-06-15
 
 ### Features
@@ -28,6 +69,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Miscellaneous Tasks
 
+- Release v0.1.0-alpha.13 by @veeso in [#92](https://github.com/holochain/peerkit/pull/92)
 - Remove implementation detail from comments by @veeso in [#81](https://github.com/holochain/peerkit/pull/81)
 
 ### Testing
