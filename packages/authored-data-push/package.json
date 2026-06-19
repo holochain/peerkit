@@ -42,9 +42,7 @@
     "cbor-x": "^1.6.4"
   },
   "devDependencies": {
-    "@peerkit/authored-data-pull": "^0.1.0-alpha.13",
     "@peerkit/peerkit": "^0.1.0-alpha.13",
-    "@peerkit/test-utils": "^0.1.0-alpha.13",
-    "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.13"
+    "@peerkit/test-utils": "^0.1.0-alpha.13"
   }
 }
