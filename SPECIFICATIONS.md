@@ -97,7 +97,12 @@ p2panda provides a similar layer of abstraction (structured data, gossip, access
 
 ## 5. Architecture: components and layers
 
-Peerkit is a set of packages composed by an orchestrator package. The transport (Layer 0) is the only component designated as a clearly encapsulated layer. Above it sit cross-cutting packages — agent module, data gossip, distribution strategy, storage — that collaborate through narrow contracts. They do not form a strict tower; the orchestrator owns their composition.
+Peerkit is a set of packages composed by an orchestrator package. Two layers are implemented today:
+
+- **Layer 0 — transport** (`@peerkit/transport-libp2p`): connections, network access control, and message routing over libp2p.
+- **Layer 1 — peerkit core** (`@peerkit/peerkit`): persistent agent identity, the mapping between agent IDs and transport node IDs, the agent store, signed agent-info exchange, and a host for pluggable modules.
+
+Data synchronization capabilities are provided by modules registered for a node. The full-replication push and pull modules for authored data shipped today are one such example.
 
 Higher-level concerns (structured data, indexing, state changes / CRDTs) build on these primitives but are speculative at this stage. They are sketched below as future direction.
 
@@ -141,18 +146,16 @@ The local agent's public identity is accessible after initialization through the
 
 #### Storage
 
-Storage is opinionated and platform-dependent. Pluggable storage lets developers choose a backend that fits their app's constraints and deployment environment.
+Storage is pluggable so developers can choose a backend that fits their app's constraints and deployment environment. Different components persist different things, so the framework defines several storage interfaces rather than one: `IAgentStore` for agent records, `IAgentKeyStore` for the local private key, and `IAuthoredDataSyncStore` as an example for synchronized data blobs.
 
-Storage is injected as a dependency. The framework defines a storage interface; applications provide an implementation. Peerkit ships SurrealDB as the default implementation, which runs in both Node.js and browser environments.
-
-Different components persist different things. The exact storage interface is documented at the package level.
+Stores are injected as dependencies. Peerkit ships in-memory implementations as the working default (`MemoryAgentStore`, `MemoryBlobStore`), a persisted backend is planned. The in-memory blob store is one implementation of the data-store interface, and an app can supply its own. The exact interface for each store is documented at the package level.
 
 ### Infrastructure
 
 Peerkit's network architecture distinguishes regular nodes — the participants — from infrastructure that supports them. Infrastructure serves two distinct roles:
 
-- **Relay**: provides NAT traversal so regular nodes behind restrictive routers can be reached. Most consumer devices cannot accept incoming connections directly; relays bridge this gap. The relay is transport-only infrastructure: its address is passed as configuration at construction and it is never exposed to the layer above as a `NodeId`. How the relay is used is an implementation detail of the transport (libp2p uses a circuit-relay peer; iroh uses relay servers contacted over HTTPS). It is ignorant about agent identity and messages and just stores and passes through bytes.
-- **Bootstrap node**: an addressable node with a `NodeId` that distributes the current set of known agents to new joiners. A node freshly connecting to the network contacts the bootstrap peer, exchanges agent infos with it, and through those infos learns about and connects to other peers. The bootstrap peer is a regular node, the layer above sends agent infos to it by `NodeId` just like any other peer.
+- **Relay**: provides NAT traversal so regular nodes behind restrictive routers can be reached. Most consumer devices cannot accept incoming connections directly. Relays bridge this gap. A second role of relays is relaying data traffic as a fallback when direct connections between peers fail to be established. The relay is transport-only infrastructure: its address is passed as configuration at construction and it is never exposed to the layer above as a `NodeId`. It is ignorant about agent identity and messages and just stores and passes through bytes. A relay can be given a persisted `RelayCertificate`, so its dial address stays stable across restarts, and can announce a public IP when it is bound behind NAT. It can also expose a liveness ping that is deliberately not gated by network access, so an external monitor can health-check the relay without holding access bytes.
+- **Bootstrap node**: an addressable node that distributes the current set of connected agents to new joiners. A node freshly connecting to the network contacts the bootstrap peer, exchanges agent infos with it, and through those infos learns about other peers. The bootstrap peer is a regular node, the layer above sends agent infos to it by `NodeId` just like any other peer. When a node sends fresh agent info, the bootstrap node forwards it to the other peers it is connected to, so peers that joined after the original publish still learn about it.
 
 These two roles are logically independent. They can be hosted on the same machine at the same public address (as in the MVP, where a single infrastructure node serves both), or split across separate nodes.
 
@@ -178,17 +181,19 @@ The only externally-supplied address in the transport's public API is the relay 
 
 #### Two construction modes
 
-The transport package supports being run as part of the infrastructure or as a regular node. The two modes share access gating and the AgentId↔internal-id mapping; they differ in their networking-library configuration: infrastructure nodes run a relay service, regular nodes use a relay client. Infrastructure-mode transports do not handle application messaging — peers attempting to send application data to infrastructure see a clean protocol-unsupported error.
+The transport package supports being run as part of the infrastructure or as a regular node. The two modes share access gating; they differ in their networking-library configuration: infrastructure nodes run a relay service, regular nodes use a relay client. Infrastructure-mode transports do not handle application messaging — peers attempting to send application data to infrastructure see a clean protocol-unsupported error. Relay mode adds the optional liveness ping and certificate persistence described under Infrastructure. Node mode runs a renewal timer that re-signs and re-sends the node's agent info before its TTL expires.
 
 The mode is fixed at construction because the underlying networking library cannot reconfigure relay services at runtime.
 
 #### Message routing
 
-The transport handles three types of messages between peers:
+The transport has three built-in protocols:
 
 - **Network access handshake**: the first message on every new connection. Carries the connecting agent's `NetworkAccessBytes`. Policy enforcement lives in the transport package.
 - **Agent-info messages**: opaque routing for agent-info exchange. Wire format being owned by core peerkit, the transport routes payload bytes between connected peers and peers and relays.
-- **Application messages**: opaque routing for application data. Wire format owned by application code (or higher-level components like data gossip). Available on regular nodes only.
+- **Application messages**: opaque routing for application data, sent fire-and-forget as "signals" via `send`. Wire format owned by application code. Available on regular nodes only.
+
+Beyond these three, the transport opens arbitrary named protocol streams. A caller registers a handler with `registerStreamHandler(protocol, …)` and opens an outgoing stream with `createStream(nodeId, protocol)`; each side gets an `IStream` for bidirectional bytes. The data synchronization modules ride on these custom streams rather than the application-message path. Incoming custom streams are subject to the same access check as everything else.
 
 Concrete protocol identifiers and wire formats are documented in the transport package, not here.
 
@@ -257,72 +262,94 @@ A second implementation (iroh, future) would replace the library-specific intern
 **Types**:
 
 ```typescript
-/**
- * Opaque node identifier string
- *
- * The transport uses this type across its public surface to identify peers.
- *
- * Mapping to peerkit AgentId is the responsibility of the caller.
- */
+// Opaque node identifier string. The transport uses this across its public
+// surface to identify peers. Mapping to peerkit AgentId is the caller's job.
 export type NodeId = string;
 
-/**
- * Opaque node address string
- *
- * Every transport implementation parses it according to its own convention,
- * to connect to other nodes.
- */
+// Opaque dialable node address, parsed by each transport implementation.
 export type NodeAddress = string;
 
-/**
- * Peerkit-native address for a relay node
- *
- * Every transport implementation parses it according to its own convention.
- */
-export type RelayAddress = string;
+// A relay's dial address (how peers reach it), parsed by the transport.
+export type RelayDialAddress = string;
 
-/**
- * Byte sequence to prove access to a network has been granted
- */
+// Byte sequence proving access to a network has been granted.
 export type NetworkAccessBytes = Uint8Array;
 
 /**
- * Interface to handle incoming access streams
- *
- * An access stream expects the Network Access Bytes as the first and only message,
- * to check if a peer has access to the network.
+ * A TLS certificate for a relay's listener, supplied by the caller instead of
+ * being auto-generated. Persisting it keeps the relay's dial address stable
+ * across restarts.
  */
+export interface RelayCertificate {
+  readonly privateKeyPem: string;
+  readonly certificatePem: string;
+  readonly certhash: string;
+}
+
+// Return false to deny access, true to grant it. The transport awaits this.
 export type NetworkAccessHandler = (
   nodeId: NodeId,
   bytes: NetworkAccessBytes,
 ) => Promise<boolean>;
 
-/**
- * Interface to handle incoming messages from a message stream
- */
+// Hook for incoming application messages ("signals").
 export type MessageHandler = (
   fromNode: NodeId,
   message: Uint8Array,
+  transport: ITransport,
 ) => Promise<void>;
 
-/**
- * Called when a connection to the relay is complete, including the network
- * access handshake, and the node can be contacted through the relay.
- *
- * Provides the relay's address and node ID for full address construction.
- */
-export type ConnectedToRelayCallback = (
-  relayAddress: RelayAddress,
-  relayNodeId: NodeId,
-) => void;
-
-/**
- * Called when agents have been received from another node
- */
+// Hook for incoming agent-info bytes.
 export type AgentsReceivedCallback = (
   fromNode: NodeId,
   bytes: Uint8Array,
 ) => Promise<void>;
+
+// Fire-and-forget notifications about connection lifecycle. The transport does
+// not await these but logs errors.
+export type PeerConnectedCallback = (
+  nodeId: NodeId,
+  transport: ITransport,
+) => Promise<void>;
+export type PeerDisconnectedCallback = (nodeId: NodeId) => Promise<void>;
+export type ConnectedToRelayCallback = (
+  relayNodeId: NodeId,
+  transport: ITransport,
+) => Promise<void>;
+export type AddressesChangedCallback = (
+  addresses: NodeAddress[],
+  transport: ITransport,
+) => Promise<void>;
+
+// Called once per incoming custom-protocol stream, after the access check.
+export type CustomStreamCreatedCallback = (
+  nodeId: NodeId,
+  stream: IStream,
+) => void;
+
+interface PeerkitStreamEvents {
+  // Data received from the remote end of the stream.
+  message: (message: Uint8Array) => void;
+  // The remote closed their end of the stream.
+  remoteClose: (event: Event) => void;
+  // The stream is closed; no further events, no further sends or receives.
+  close: (error?: Error) => void;
+}
+
+// A bidirectional byte stream for sending and receiving arbitrary data.
+interface IStream {
+  send(data: Uint8Array): void;
+  addEventListener<T extends keyof PeerkitStreamEvents>(
+    type: T,
+    listener: PeerkitStreamEvents[T],
+  ): void;
+  removeEventListener<T extends keyof PeerkitStreamEvents>(
+    type: T,
+    listener: PeerkitStreamEvents[T],
+  ): void;
+  isOpen(): boolean;
+  close(): Promise<void>;
+}
 ```
 
 **API**:
@@ -331,163 +358,168 @@ The transport is injected as a dependency. The orchestrator interacts with it th
 
 ```typescript
 interface ITransport {
-  /**
-   * Get the transport-level identifier of this node.
-   */
+  // Transport-level identifier of this node.
   getNodeId(): NodeId;
 
-  /**
-   * Establish a connection to a known peer by its full address.
-   *
-   * If the connection is routed through a relay, the address must include the
-   * relay address.
-   */
-  connect(nodeAddress: NodeAddress): Promise<void>;
+  // Connect to a peer by its dialable addresses. A relayed address must
+  // include the relay address. Throws on an empty list.
+  connect(nodeAddresses: NodeAddress[]): Promise<void>;
 
-  /**
-   * Send opaque agent-info bytes to a peer.
-   * The peer must be connected and have been granted access.
-   */
+  // Send opaque agent-info bytes to a connected, access-granted peer.
   sendAgents(nodeId: NodeId, agents: Uint8Array): Promise<void>;
 
-  /**
-   * Send an opaque application message to a peer.
-   * The peer must be connected and have been granted access.
-   */
+  // Send an opaque application message ("signal") to a connected,
+  // access-granted peer.
   send(nodeId: NodeId, message: Uint8Array): Promise<void>;
 
-  /**
-   * Is the connection to the provided node a direct connection?
-   *
-   * `false` means the connection is relayed.
-   */
+  // Is there an active connection to this node?
+  isConnected(nodeId: NodeId): boolean;
+
+  // Node IDs of all currently connected peers.
+  getConnectedPeers(): NodeId[];
+
+  // Is the connection to this node direct? `false` means relayed.
   isDirectConnection(nodeId: NodeId): boolean;
 
-  /**
-   * Disconnect from the peer.
-   */
+  // Open an outgoing bidirectional stream on a custom protocol.
+  createStream(nodeId: NodeId, protocol: string): Promise<IStream>;
+
+  // Register a handler for incoming streams on a custom protocol. Called once
+  // per incoming stream, after the access check passes.
+  registerStreamHandler(
+    protocol: string,
+    handler: CustomStreamCreatedCallback,
+  ): void;
+
+  // Disconnect from the peer.
   disconnect(nodeId: NodeId): Promise<void>;
 
-  /**
-   * Shut down the transport and all underlying connections.
-   */
+  // The transport's actual dial addresses after startup, including any
+  // identity suffix peers need to connect. Use this to obtain a relay's dial
+  // address rather than constructing it from config.
+  getListenAddresses(): string[];
+
+  // Shut down the transport and all underlying connections.
   shutDown(): Promise<void>;
 }
 ```
 
 This interface enables replacement of js-libp2p with iroh or another networking library without affecting higher layers.
 
-### Peerkit core
+### Layer 1: Peerkit core
 
-Routing opaque blobs to the right peers so that layers above can create eventually consistent shared state. This package introduces the notion of a persistent agent identity that survives transport restarts.
+Peerkit core (`@peerkit/peerkit`) sits directly on the transport. It owns the agent's persistent identity, which survives transport restarts, maps that identity to transport node IDs, exchanges signed agent-info between peers, and hosts the modules that do the actual data work. It does not store or distribute application data itself.
 
-**Capabilities**:
+**Responsibilities**:
 
-- Peer responsibility coverage tracking and automatic management for adequate coverage
-- Generic data and agent identifiers (future-proofing)
-- Does not store blobs itself, but tracks what blobs have been received and integrated
-- Implements evaluation of incoming network access bytes to allow or deny connections
-- Resource budgets (future): each peer advertises its willingness to relay data
+- Persistent agent identity (`AgentKeyPair`) and its key lifecycle, loaded from or created in an injected `IAgentKeyStore`.
+- The mapping between an `AgentId` and the transport's `NodeId`, in both directions.
+- The agent store (`IAgentStore`): the set of known, non-expired peers and their dial addresses.
+- Building, signing, verifying, serializing, and renewing `AgentInfo` records.
+- Evaluating incoming network access bytes to allow or deny connections.
+- Node and relay construction via `PeerkitNodeBuilder` and `PeerkitRelayBuilder`.
+- Hosting pluggable modules through the node's module interface.
 
 #### Agent identity
 
-Operations between peers make use of the agent ID instead of the transport's node ID. Mapping between both is the responsibility of the core package. When a node learns about peers, their agent ID will be known from the agent info, as well as the node address. Outbound connections are thus possible by knowing the agent info of the peer.
+Operations between peers use the agent ID, not the transport's node ID. The mapping between the two lives in core. When a node learns of a peer from agent info, it has that peer's agent ID and dial addresses, so it can open an outbound connection and immediately associate the connection with the agent.
 
-Inbound connections, however, are only aware of the node ID at the transport level. The agent ID is not known to the remote, and incoming messages can not be associated to an agent. Therefore it becomes a contract of the access handshake to exchange agent ID along with the network access bytes. Not encoded at the transport level which has no notion of agents, but at the core level that holds agent identity and manages mappings from node ID to agent ID.
+Inbound connections are different: at the transport level the remote is only a node ID, and the transport has no notion of agents. So the agent ID travels with the network access bytes in the access handshake. The transport treats those bytes as opaque; core reads the agent ID out of them and records the node-ID-to-agent-ID mapping. This is why agent identity is a core concern, not a transport one.
 
-The core package therefore exposes a `send(agentId, bytes)` method to enable consumers to address messages to agents instead of transport-level node IDs.
+On top of this mapping, core lets consumers address peers by agent ID — sending a message, opening a stream, or checking connectivity — and translates to the underlying node ID.
 
-#### Data distribution interface
+#### Module host
 
-Layer 1 provides blob distribution across peers. It does not prescribe how blobs are routed — the distribution strategy is pluggable via dependency injection. Peerkit ships a full replication default in the MVP.
-
-**Core concept**: Every blob has a content hash (its identity). Layer 1 ensures blobs reach the peers that should have them, according to the active distribution strategy. Layer 1 does not define a key space or routing topology — those are concerns of the distribution strategy.
-
-**Distribution strategy interface** (injected by developer):
-
-- `willStore(peerId: PeerId, blob: Uint8Array) -> bool` — should this peer store the given blob?
-
-The strategy inspects the blob to determine routing. The caller does not specify a target — routing is entirely the strategy's responsibility.
-**Example strategies**:
-
-1. **Full replication** (MVP, built-in): every peer stores everything. `willStore()` always returns true. No coordination needed. Works for small networks (tens or hundreds of peers).
-2. **DHT / key-based**: defines a 256-bit hash ring. `willStore()` maps the blob's content hash to a position on the ring and returns a value according to the proximity of the peer. Peers claim responsibility for portions of the key space. The classic Kademlia/Chord approach, suited for large open networks.
-3. **Direct replication**: `willStore()` returns true for a fixed set of peers configured by the app. For backup apps, personal sync, or any scenario where the author decides exactly who gets the data.
-4. **Topic-based**: the strategy maps blobs to topics (e.g. by schema type). Peers subscribe to topics and receive blobs published to them. Pub/sub pattern.
-
-#### Gossip
-
-Gossip is the mechanism by which blobs propagate across the network. It operates in two phases:
-
-**Push (new blob propagation)**: When a peer publishes or integrates a new blob, it immediately forwards it to connected peers for whom `willStore()` returns true.
-
-**Pull**: When two peers connect, they reconcile their stored blobs to repair any gaps. Each peer advertises a compact summary of the blobs it holds; the other peer responds with any blobs the first is missing. This handles blob exchange with peers that didn't receive pushed blobs for whatever reason.
-
-A summary must be compact enough to exchange on every connection. The exact representation depends on the gossip strategy.
-
-**Gossip and the distribution strategy**: gossip push uses `willStore()` to decide which peers to forward a blob to. Anti-entropy pull is scoped to the blobs a peer is responsible for under the active strategy. The gossip mechanism itself is strategy-agnostic.
-
-**Open question**: The MVP gossip strategy is unresolved. Simple push to all connected peers is the simplest implementation.
-
-#### Connection management
-
-Each peer maintains connections to a bounded number of peers. The connection management strategy is pluggable via dependency injection, like the distribution strategy. Peerkit ships a default that connects to all peers.
-
-Example strategies:
-
-- **Persistent connections** (default): maintain long-lived connections to all peers.
-- **Ephemeral connections**: open connections on demand (connect-fire-close), maintaining only a small number of persistent connections. The persistent connections can rotate through neighbors to maintain coverage. Suited for large networks where holding many connections is expensive.
-
-#### Module boundary
-
-**Types**:
+Core exposes a small interface to modules so they can be packaged and distributed without depending on the `@peerkit/peerkit` package directly. A module is attached to a node with `register`; the node calls `init` to wire it up, then `start`, and `stop` on shutdown. Modules reach the network through the node — opening and handling custom protocol streams, and sending signals — all keyed by agent ID.
 
 ```typescript
-// Hash value of a data blob
-type Hash = Uint8Array;
-// Blobs of data
-type Blob = Uint8Array;
-```
+interface INodeModule {
+  // Called immediately on registration to wire up the module.
+  init(node: IPeerkitNode): void;
+  start?(): Promise<void>;
+  stop?(): Promise<void>;
+}
 
-**API**:
+interface IPeerkitNode {
+  // The local node's stable agent identity.
+  readonly ownAgentId: AgentId;
 
-```typescript
-interface INetworking {
-  // Publish a blob. The distribution strategy determines which peers receive it.
-  publish(blob: Blob): Promise<void>;
+  // AgentIds of all currently connected peers.
+  getConnectedAgents(): AgentId[];
 
-  // Retrieve a blob by its content hash.
-  // Only supported by strategies that can locate peers by hash (e.g. full replication, DHT).
-  // Push-only strategies (e.g. pub-sub) cannot support this — returns null if unavailable.
-  get(hash: Hash): Promise<Blob | null>;
+  // Open an outgoing stream to a connected agent. Throws if not connected.
+  createStream(agentId: AgentId, protocol: string): Promise<IStream>;
 
-  // Block or unblock a peer connection
-  block(peer: PeerId): void;
-  unblock(peer: PeerId): void;
+  // Register a handler for incoming streams on a protocol. Called once per
+  // incoming stream, after the access check passes.
+  registerStreamHandler(
+    protocol: string,
+    handler: (fromAgent: AgentId, stream: IStream) => void,
+  ): void;
 
-  // Send an opaque message to a peer (fire-and-forget)
-  send(peer: PeerId, data: Uint8Array): Promise<void>;
+  // Attach a module: init(this), then start() if defined.
+  register(module: INodeModule): void;
 }
 ```
 
-**Note on `get(hash)`**: Not all distribution strategies support targeted retrieval by hash. Full replication and DHT-based strategies can locate responsible peers from a hash alone. Push-only strategies (e.g. topic-based pub-sub) have no reverse lookup — blobs are received when pushed, not fetched on demand. Callers should not rely on `get()` being available unless the active strategy supports it.
+#### Data synchronization modules
 
-**Hooks** (called by Layer 1 into the layer above or into injected storage):
+Distributing application data is the job of modules, not of core. The full-replication push and pull modules shipped today are one example of how to do it — appropriate for small networks where every peer can hold everything, but not the right choice for every app. Other distribution policies (DHT, direct, topic-based) are possible against the same hook, and an app can attach its own modules instead.
+
+These modules operate on **authored data**: each blob carries its author and an author-assigned timestamp. The data store owns the content-hash algorithm and a per-author monotonic clock, so an author's blobs have a well-defined order. Local authoring goes through `store`; blobs received from peers go through `accept`, which the store may decline (e.g. when the distribution policy says this node should not hold the blob).
 
 ```typescript
-interface INetworkingHooks {
-  // Called when a new blob arrives from the network.
-  // The callee is responsible for persisting accepted blobs via injected storage.
-  onIntegrate(peerId: PeerId, blob: Blob): "accepted" | "rejected";
+type Hash = Uint8Array; // content-addressable identity of a blob
+type Blob = Uint8Array; // opaque blob bytes
 
-  // Retrieve a blob by hash from local storage.
-  // Called when a peer requests a blob this node is responsible for.
-  getBlob(hash: Hash): Promise<Uint8Array | null>;
+type StoredBlob = {
+  hash: Hash;
+  blob: Blob;
+  author: AgentId;
+  authoredAt: number; // author-assigned, monotonic per author
+};
 
-  // Handle an incoming message from a peer
-  onMessage(peer: PeerId, data: Uint8Array): void;
+interface IAuthoredDataSyncStore {
+  // Author a local blob: hash it, stamp it from the store's clock, persist it
+  // under `author`, and notify onAuthored subscribers. Returns its hash.
+  store(blob: Blob, author: AgentId): Hash;
+
+  // Persist a blob received from a peer at their authoredAt. Returns the hash
+  // if stored, or null if the policy declined it or it is too large.
+  accept(blob: Blob, author: AgentId, authoredAt: number): Hash | null;
+
+  // Subscribe to locally authored blobs; returns an unsubscribe function.
+  onAuthored(listener: (entry: StoredBlob) => void): () => void;
+
+  get(hash: Hash, author: AgentId): StoredBlob | undefined;
+
+  // The author's most recently authored blob this node holds.
+  getLastKnownByAuthor(author: AgentId): StoredBlob | undefined;
+
+  // Blobs by author with authoredAt >= since (recent delta), ascending.
+  getByAuthorSince(author: AgentId, since: number): StoredBlob[];
+
+  // Blobs by author with authoredAt < before (historical), ascending.
+  getByAuthorBefore(author: AgentId, before: number): StoredBlob[];
 }
 ```
+
+The distribution policy decides which blobs a given peer should hold. It receives the content hash — enough for hash-based routing such as a DHT — rather than the blob itself.
+
+```typescript
+interface IDataDistributionPolicy {
+  willStore(peerId: AgentId, blobHash: Hash): boolean;
+}
+```
+
+`FullReplicationPolicy` is the default: `willStore` always returns `true`, so every peer keeps everything.
+
+Two modules use this together:
+
+- **Push** (`/peerkit/authored-data-push/v1`): fire-and-forget. The module subscribes to `onAuthored` and streams newly authored blobs to connected peers, who run them through `accept`. No acknowledgement.
+- **Pull** (`/peerkit/authored-data-pull/v1`): periodic anti-entropy that repairs whatever push missed. Each exchange is segmented by an **epoch** boundary. The requester asks for two things: a **recent** delta (blobs with `authoredAt >= epochStart`, since the last one it has seen) and a **historical** segment (blobs before the epoch). The historical segment is reconciled by XOR-ing the hashes of the blobs each side holds: if the two XOR summaries match, the history is in sync and nothing is sent; if they differ, the responder sends its historical blobs. This keeps the common case — unchanged history — down to a single hash comparison instead of a full listing.
+
+Connection management is still pluggable in principle, but the shipped default simply maintains connections to all peers, which is adequate at the scale full replication targets.
 
 ### Layer 2: structured data (blob + schema)
 
@@ -759,13 +791,14 @@ Not every app needs all 4 layers. The layers are additive — each builds on the
 
 **What's included:**
 
-- js-libp2p transport with manual bootstrap address entry
-- Encrypted connections (Noise protocol)
+- js-libp2p transport with manual bootstrap address entry, encrypted connections, and relay/bootstrap infrastructure
 - Network access bytes handshake (closed networks by default)
-- Publish and get opaque blobs (full replication — every peer stores everything)
-- Block/unblock peers
-- Gossip to propagate new blobs to connected peers
-- Peer messaging (signals)
+- Peerkit core: persistent agent identity, agent-ID-to-node-ID mapping, the agent store, and signed agent-info exchange with TTL renewal
+- A module host on the node, so data behavior is attached rather than baked in
+- Authored-data push and pull modules with the full-replication policy — every peer stores everything, kept in sync by push on author and periodic anti-entropy pull
+- An in-memory data store for authored blobs (the persisted store comes later)
+- Peer messaging (signals) and arbitrary custom protocol streams
+- A developer CLI for running nodes and relays
 
 **What's deliberately excluded from MVP:**
 
