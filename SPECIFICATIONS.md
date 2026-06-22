@@ -259,152 +259,19 @@ A second implementation (iroh, future) would replace the library-specific intern
 
 #### Module boundary
 
-**Types**:
+The transport is injected as a dependency. The orchestrator interacts with it through the `ITransport` interface, and the transport package exposes two construction paths — one for infrastructure nodes, one for regular nodes — both producing instances that satisfy `ITransport`. On infrastructure nodes, application messaging (`send`) is not serviced; peers attempting to use it see a clean protocol-unsupported error.
 
-```typescript
-// Opaque node identifier string. The transport uses this across its public
-// surface to identify peers. Mapping to peerkit AgentId is the caller's job.
-export type NodeId = string;
+The vocabulary the boundary deals in:
 
-// Opaque dialable node address, parsed by each transport implementation.
-export type NodeAddress = string;
+- `NodeId` — an opaque string identifying a peer at the transport level. Mapping to a peerkit `AgentId` is the caller's job.
+- `NodeAddress` and `RelayDialAddress` — opaque dialable addresses, parsed by each transport implementation.
+- `NetworkAccessBytes` — the byte sequence that proves access to a network has been granted.
+- `RelayCertificate` — a caller-supplied TLS certificate for a relay's listener; persisting it keeps the relay's dial address stable across restarts.
+- `IStream` — a bidirectional byte stream for arbitrary data, with `message` / `remoteClose` / `close` events.
 
-// A relay's dial address (how peers reach it), parsed by the transport.
-export type RelayDialAddress = string;
+`ITransport` exposes: `getNodeId`; `connect` (to a list of dialable addresses); `sendAgents` and `send` (opaque agent-info and application bytes to a connected, access-granted peer); `isConnected`, `getConnectedPeers`, and `isDirectConnection` (connection state, where a non-direct connection is relayed); `createStream` and `registerStreamHandler` (custom protocol streams); `disconnect`; `getListenAddresses` (the transport's real dial addresses after startup, including any identity suffix); and `shutDown`. Construction takes the access handler plus the lifecycle callbacks (peer connected/disconnected, connected-to-relay, addresses-changed, agents-received, and the message handler on regular nodes).
 
-// Byte sequence proving access to a network has been granted.
-export type NetworkAccessBytes = Uint8Array;
-
-/**
- * A TLS certificate for a relay's listener, supplied by the caller instead of
- * being auto-generated. Persisting it keeps the relay's dial address stable
- * across restarts.
- */
-export interface RelayCertificate {
-  readonly privateKeyPem: string;
-  readonly certificatePem: string;
-  readonly certhash: string;
-}
-
-// Return false to deny access, true to grant it. The transport awaits this.
-export type NetworkAccessHandler = (
-  nodeId: NodeId,
-  bytes: NetworkAccessBytes,
-) => Promise<boolean>;
-
-// Hook for incoming application messages ("signals").
-export type MessageHandler = (
-  fromNode: NodeId,
-  message: Uint8Array,
-  transport: ITransport,
-) => Promise<void>;
-
-// Hook for incoming agent-info bytes.
-export type AgentsReceivedCallback = (
-  fromNode: NodeId,
-  bytes: Uint8Array,
-) => Promise<void>;
-
-// Fire-and-forget notifications about connection lifecycle. The transport does
-// not await these but logs errors.
-export type PeerConnectedCallback = (
-  nodeId: NodeId,
-  transport: ITransport,
-) => Promise<void>;
-export type PeerDisconnectedCallback = (nodeId: NodeId) => Promise<void>;
-export type ConnectedToRelayCallback = (
-  relayNodeId: NodeId,
-  transport: ITransport,
-) => Promise<void>;
-export type AddressesChangedCallback = (
-  addresses: NodeAddress[],
-  transport: ITransport,
-) => Promise<void>;
-
-// Called once per incoming custom-protocol stream, after the access check.
-export type CustomStreamCreatedCallback = (
-  nodeId: NodeId,
-  stream: IStream,
-) => void;
-
-interface PeerkitStreamEvents {
-  // Data received from the remote end of the stream.
-  message: (message: Uint8Array) => void;
-  // The remote closed their end of the stream.
-  remoteClose: (event: Event) => void;
-  // The stream is closed; no further events, no further sends or receives.
-  close: (error?: Error) => void;
-}
-
-// A bidirectional byte stream for sending and receiving arbitrary data.
-interface IStream {
-  send(data: Uint8Array): void;
-  addEventListener<T extends keyof PeerkitStreamEvents>(
-    type: T,
-    listener: PeerkitStreamEvents[T],
-  ): void;
-  removeEventListener<T extends keyof PeerkitStreamEvents>(
-    type: T,
-    listener: PeerkitStreamEvents[T],
-  ): void;
-  isOpen(): boolean;
-  close(): Promise<void>;
-}
-```
-
-**API**:
-
-The transport is injected as a dependency. The orchestrator interacts with it through the `ITransport` interface. The transport package exposes two construction paths — one for infrastructure nodes, one for regular nodes — both producing instances that satisfy `ITransport`. On infrastructure nodes, application messaging (`send`) is not serviced; peers attempting to use it see a clean protocol-unsupported error.
-
-```typescript
-interface ITransport {
-  // Transport-level identifier of this node.
-  getNodeId(): NodeId;
-
-  // Connect to a peer by its dialable addresses. A relayed address must
-  // include the relay address. Throws on an empty list.
-  connect(nodeAddresses: NodeAddress[]): Promise<void>;
-
-  // Send opaque agent-info bytes to a connected, access-granted peer.
-  sendAgents(nodeId: NodeId, agents: Uint8Array): Promise<void>;
-
-  // Send an opaque application message ("signal") to a connected,
-  // access-granted peer.
-  send(nodeId: NodeId, message: Uint8Array): Promise<void>;
-
-  // Is there an active connection to this node?
-  isConnected(nodeId: NodeId): boolean;
-
-  // Node IDs of all currently connected peers.
-  getConnectedPeers(): NodeId[];
-
-  // Is the connection to this node direct? `false` means relayed.
-  isDirectConnection(nodeId: NodeId): boolean;
-
-  // Open an outgoing bidirectional stream on a custom protocol.
-  createStream(nodeId: NodeId, protocol: string): Promise<IStream>;
-
-  // Register a handler for incoming streams on a custom protocol. Called once
-  // per incoming stream, after the access check passes.
-  registerStreamHandler(
-    protocol: string,
-    handler: CustomStreamCreatedCallback,
-  ): void;
-
-  // Disconnect from the peer.
-  disconnect(nodeId: NodeId): Promise<void>;
-
-  // The transport's actual dial addresses after startup, including any
-  // identity suffix peers need to connect. Use this to obtain a relay's dial
-  // address rather than constructing it from config.
-  getListenAddresses(): string[];
-
-  // Shut down the transport and all underlying connections.
-  shutDown(): Promise<void>;
-}
-```
-
-This interface enables replacement of js-libp2p with iroh or another networking library without affecting higher layers.
+The exact signatures, callback shapes, and TSDoc live in `@peerkit/api` and are published via typedoc; they are the authoritative reference and are not duplicated here. This boundary is what enables replacing js-libp2p with iroh or another networking library without affecting higher layers.
 
 ### Layer 1: Peerkit core
 
@@ -430,89 +297,15 @@ On top of this mapping, core lets consumers address peers by agent ID — sendin
 
 #### Module host
 
-Core exposes a small interface to modules so they can be packaged and distributed without depending on the `@peerkit/peerkit` package directly. A module is attached to a node with `register`; the node calls `init` to wire it up, then `start`, and `stop` on shutdown. Modules reach the network through the node — opening and handling custom protocol streams, and sending signals — all keyed by agent ID.
-
-```typescript
-interface INodeModule {
-  // Called immediately on registration to wire up the module.
-  init(node: IPeerkitNode): void;
-  start?(): Promise<void>;
-  stop?(): Promise<void>;
-}
-
-interface IPeerkitNode {
-  // The local node's stable agent identity.
-  readonly ownAgentId: AgentId;
-
-  // AgentIds of all currently connected peers.
-  getConnectedAgents(): AgentId[];
-
-  // Open an outgoing stream to a connected agent. Throws if not connected.
-  createStream(agentId: AgentId, protocol: string): Promise<IStream>;
-
-  // Register a handler for incoming streams on a protocol. Called once per
-  // incoming stream, after the access check passes.
-  registerStreamHandler(
-    protocol: string,
-    handler: (fromAgent: AgentId, stream: IStream) => void,
-  ): void;
-
-  // Attach a module: init(this), then start() if defined.
-  register(module: INodeModule): void;
-}
-```
+Core exposes a small interface to modules so they can be packaged and distributed without depending on the `@peerkit/peerkit` package directly. A module (`INodeModule`) is attached to a node with `register`; the node calls `init` to wire it up, then `start`, and `stop` on shutdown. Through the node interface (`IPeerkitNode`) a module reads its own `ownAgentId`, lists connected agents, opens custom protocol streams (`createStream`), handles incoming ones (`registerStreamHandler`), and sends signals — all keyed by agent ID rather than transport node ID. The exact signatures live in `@peerkit/api` and are published via typedoc.
 
 #### Data synchronization modules
 
 Distributing application data is the job of modules, not of core. The full-replication push and pull modules shipped today are one example of how to do it — appropriate for small networks where every peer can hold everything, but not the right choice for every app. Other distribution policies (DHT, direct, topic-based) are possible against the same hook, and an app can attach its own modules instead.
 
-These modules operate on **authored data**: each blob carries its author and an author-assigned timestamp. The data store owns the content-hash algorithm and a per-author monotonic clock, so an author's blobs have a well-defined order. Local authoring goes through `store`; blobs received from peers go through `accept`, which the store may decline (e.g. when the distribution policy says this node should not hold the blob).
+These modules operate on **authored data**: each stored blob (`StoredBlob`) carries its content `hash`, the `blob` bytes, its `author`, and an `authoredAt` timestamp that is monotonic per author, so an author's blobs have a well-defined order. The store (`IAuthoredDataSyncStore`) owns the content-hash algorithm and that per-author clock. Local authoring goes through `store` (which hashes, stamps, persists, and notifies `onAuthored` subscribers); blobs received from peers go through `accept`, which the store may decline — for example when the distribution policy says this node should not hold the blob, or the blob is too large. The store also answers the queries the sync protocols need: by hash and author, the author's most recent blob, and the recent (`authoredAt >= since`) and historical (`authoredAt < before`) segments.
 
-```typescript
-type Hash = Uint8Array; // content-addressable identity of a blob
-type Blob = Uint8Array; // opaque blob bytes
-
-type StoredBlob = {
-  hash: Hash;
-  blob: Blob;
-  author: AgentId;
-  authoredAt: number; // author-assigned, monotonic per author
-};
-
-interface IAuthoredDataSyncStore {
-  // Author a local blob: hash it, stamp it from the store's clock, persist it
-  // under `author`, and notify onAuthored subscribers. Returns its hash.
-  store(blob: Blob, author: AgentId): Hash;
-
-  // Persist a blob received from a peer at their authoredAt. Returns the hash
-  // if stored, or null if the policy declined it or it is too large.
-  accept(blob: Blob, author: AgentId, authoredAt: number): Hash | null;
-
-  // Subscribe to locally authored blobs; returns an unsubscribe function.
-  onAuthored(listener: (entry: StoredBlob) => void): () => void;
-
-  get(hash: Hash, author: AgentId): StoredBlob | undefined;
-
-  // The author's most recently authored blob this node holds.
-  getLastKnownByAuthor(author: AgentId): StoredBlob | undefined;
-
-  // Blobs by author with authoredAt >= since (recent delta), ascending.
-  getByAuthorSince(author: AgentId, since: number): StoredBlob[];
-
-  // Blobs by author with authoredAt < before (historical), ascending.
-  getByAuthorBefore(author: AgentId, before: number): StoredBlob[];
-}
-```
-
-The distribution policy decides which blobs a given peer should hold. It receives the content hash — enough for hash-based routing such as a DHT — rather than the blob itself.
-
-```typescript
-interface IDataDistributionPolicy {
-  willStore(peerId: AgentId, blobHash: Hash): boolean;
-}
-```
-
-`FullReplicationPolicy` is the default: `willStore` always returns `true`, so every peer keeps everything.
+The distribution policy (`IDataDistributionPolicy`) decides which blobs a given peer should hold. Its one method, `willStore(peerId, blobHash)`, receives the content hash — enough for hash-based routing such as a DHT — rather than the blob itself. `FullReplicationPolicy` is the default: `willStore` always returns `true`, so every peer keeps everything. Signatures for the store and the policy live in `@peerkit/api`.
 
 Two modules use this together:
 
