@@ -10,10 +10,10 @@ Peerkit is a TypeScript peer-to-peer data synchronization framework. It sits abo
 
 `SPECIFICATIONS.md` is the source of truth for all architecture and task decisions. Follow it strictly.
 
-- Read the relevant section before writing or modifying code in a layer. Layer 0 (transport), Layer 1 (networking), Layer 2 (schemas), Layer 3 (indexing), Layer 4 (state changes/CRDT) each have fixed module boundaries, type signatures, and hook contracts in the spec — match them exactly.
-- Do not invent APIs, types, or layer responsibilities the spec does not describe. Do not cross layer boundaries (e.g. transport must not know about schemas, Layer 1 must not prescribe routing topology).
+- Read the relevant section before writing or modifying code in a layer. Layer 0 (platform-specific transport), Layer 1 (peerkit transport), Layer 2 (peerkit core), Layer 3 (schemas), Layer 4 (indexing), Layer 5 (state changes/CRDT) each have fixed module boundaries, type signatures, and hook contracts in the spec — match them exactly.
+- Do not invent APIs, types, or layer responsibilities the spec does not describe. Do not cross layer boundaries (e.g. transport must not know about schemas, Layer 2 must not prescribe routing topology).
 - Preserve spec-mandated defaults and invariants: closed networks by default, `NetworkAccessBytes` gating before any app data, blob content-addressing, `AgentId = public key`, signatures on state changes, pluggable distribution/connection strategies, no "get all" on unbounded collections.
-- Stay within MVP scope (Layer 0 + 1, desktop, full replication) unless the task explicitly extends it.
+- Stay within MVP scope (Layer 0 + 1 + 2, desktop, full replication) unless the task explicitly extends it.
 - If requirements and spec conflict, stop and flag the conflict — do not silently deviate. If the spec has an open question relevant to the task, surface it rather than guess.
 - When spec terminology exists (`AgentId`, `NetworkAccessBytes`, `Blob`, `Hash`, `willStore`, epoch, tombstone, etc.), use it verbatim.
 

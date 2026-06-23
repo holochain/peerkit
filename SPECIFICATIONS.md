@@ -97,10 +97,11 @@ p2panda provides a similar layer of abstraction (structured data, gossip, access
 
 ## 5. Architecture: components and layers
 
-Peerkit is a set of packages composed by an orchestrator package. Two layers are implemented today:
+Peerkit is a set of packages composed by an orchestrator package. Three layers are implemented today:
 
-- **Layer 0 — transport** (`@peerkit/transport-libp2p`): connections, network access control, and message routing over libp2p.
-- **Layer 1 — peerkit core** (`@peerkit/peerkit`): persistent agent identity, the mapping between agent IDs and transport node IDs, the agent store, signed agent-info exchange, and a host for pluggable modules.
+- **Layer 0 — platform-specific transport** (`@peerkit/transport-libp2p` facade resolving to the `-nodejs` / `-react-native` builds): data transmission over the wire, specific to each target platform.
+- **Layer 1 — peerkit transport** (`@peerkit/transport-libp2p-core`): the platform-independent transport contract — establishing connections, enforcing network access control, and routing messages, all behind an opaque `NodeId`.
+- **Layer 2 — peerkit core** (`@peerkit/peerkit`): persistent agent identity, the mapping between agent IDs and transport node IDs, the agent store, signed agent-info exchange, and a host for pluggable modules.
 
 Data synchronization capabilities are provided by modules registered for a node. The full-replication push and pull modules for authored data shipped today are one such example.
 
@@ -117,7 +118,7 @@ Design principles:
 
 #### Authentication and data security
 
-- Network access management for group membership (see Layer 0: network access control)
+- Network access management for group membership (see Layer 1: network access control)
 - With network access security in place and a single set of data per app, additional data access security isn't required.
 - Encryption of data at rest and in transit
 
@@ -167,13 +168,19 @@ Infrastructure is openly runnable: there is no privileged operator, no central a
 - Support multiple relays so load can be spread
 - Automatically prefer direct connections once established (the relay drops out of the path)
 
-### Layer 0: transport
+### Layer 0: platform-specific transport
 
-Layer 0 is responsible for establishing connections between peers, enforcing network access control, and routing application-level messages. The reference implementation is `@peerkit/transport-libp2p`, built on libp2p.
+Layer 0 is the layer of data transmission over the wire, specific to the target platform. Desktop, mobile and browser platforms have different requirements and permissions that allow or deny apps access to low-level networking features of the operating system. Also since Peerkit is written in TypeScript and executed in a JavaScript runtime, the various platforms impose more or less restrictions on the framework.
+
+This has to be considered for each platform individually. Transports meeting the requirements of the target platform live on layer 0.
+
+### Layer 1: peerkit transport
+
+Layer 1 is responsible for establishing connections between peers, enforcing network access control, and routing application-level messages. The reference implementation is `@peerkit/transport-libp2p-core`, built on libp2p.
 
 #### Public API: NodeId only
 
-The transport's public API uses a single opaque `NodeId` type (a string) across every method, callback, and event. Library-specific identifiers (libp2p `NodeId`, libp2p `Connection`, multiformats `Multiaddr`) never cross the public boundary. The transport translates internally so the networking library can be swapped without affecting any caller.
+The transport's public API uses a single opaque `NodeId` type (a string) across every method, callback, and event. Library-specific identifiers (libp2p `PeerId`, libp2p `Connection`, multiformats `Multiaddr`) never cross the public boundary. The transport translates internally, so the networking library can be swapped without affecting any caller.
 
 Mapping between peerkit `AgentId` (public key) and the transport's `NodeId` is the responsibility of the layer above the transport.
 
@@ -273,7 +280,7 @@ The vocabulary the boundary deals in:
 
 The exact signatures, callback shapes, and TSDoc live in `@peerkit/api` and are published via typedoc; they are the authoritative reference and are not duplicated here. This boundary is what enables replacing js-libp2p with iroh or another networking library without affecting higher layers.
 
-### Layer 1: Peerkit core
+### Layer 2: Peerkit core
 
 Peerkit core (`@peerkit/peerkit`) sits directly on the transport. It owns the agent's persistent identity, which survives transport restarts, maps that identity to transport node IDs, exchanges signed agent-info between peers, and hosts the modules that do the actual data work. It does not store or distribute application data itself.
 
@@ -314,7 +321,7 @@ Two modules use this together:
 
 Connection management is still pluggable in principle, but the shipped default simply maintains connections to all peers, which is adequate at the scale full replication targets.
 
-### Layer 2: structured data (blob + schema)
+### Layer 3: structured data (blob + schema)
 
 Adds semantic meaning to blobs through schemas.
 
@@ -340,15 +347,15 @@ interface IStructuredData {
 }
 ```
 
-### Layer 3: indexed data (blob + schema + metadata)
+### Layer 4: indexed data (blob + schema + metadata)
 
-Adds queryability through deterministic metadata and distributed indexes. Layer 2 provides the "detail view" (fetch a specific blob by hash). Layer 3 provides the "list view" (browse and search blobs by their properties).
+Adds queryability through deterministic metadata and distributed indexes. Layer 3 provides the "detail view" (fetch a specific blob by hash). Layer 4 provides the "list view" (browse and search blobs by their properties).
 
 #### Index mechanism: metadata as distributed data
 
 When a blob is created, metadata is deterministically extracted according to its schema's `METADATA_FIELDS` definition and published as separate blobs via `publish()`. `METADATA_FIELDS` is a list of field names declared in the schema that should be indexed — each named field gets its own metadata blob per value. The distribution strategy routes metadata blobs like any other blob. This means index lookups use the same `get()` mechanism as any other data retrieval — no special query protocol is needed.
 
-> **Open question**: the schema format is not yet specified. Either the schema definition format is hardcoded (e.g. a JSON Schema dialect with a `metadata_fields` key), or an additional hook is needed (e.g. `get_metadata_fields(schema) => string[]`) to let schemas express this dynamically. This has implications for Layer 2 as well.
+> **Open question**: the schema format is not yet specified. Either the schema definition format is hardcoded (e.g. a JSON Schema dialect with a `metadata_fields` key), or an additional hook is needed (e.g. `get_metadata_fields(schema) => string[]`) to let schemas express this dynamically. This has implications for Layer 3 as well.
 
 Metadata must be a separate blob because it needs to be routed independently of its source blob. In a DHT, `hash("tag:meeting-notes")` routes to different peers than the content blob itself — that's what makes index lookups efficient without scanning. If metadata were embedded in the source blob, it would be co-located with the content and distributed lookup would be impossible.
 
@@ -363,7 +370,7 @@ To find all documents tagged "meeting-notes", a peer queries for metadata entrie
 #### Properties
 
 - **Deterministic**: Metadata is derived from the blob itself using rules defined in the schema. Any peer can independently verify that a metadata entry is correct by re-deriving it from the source blob. Forged index entries can be detected and rejected.
-- **Distributed**: Metadata entries are blobs distributed via Layer 1 like any other — they are replicated and gossiped using the active distribution strategy. No peer needs a global index.
+- **Distributed**: Metadata entries are blobs distributed via Layer 2 like any other — they are replicated and gossiped using the active distribution strategy. No peer needs a global index.
 - **Composable**: Queries on multiple fields can be resolved by intersecting results from multiple lookups.
 - **Prunable**: When a blob is pruned, its associated metadata entries can be pruned too.
 
@@ -374,7 +381,7 @@ interface IIndexedData {
   // Get all metadata entries for a blob
   getMetadata(blobId: Hash): Promise<Metadata[]>;
 
-  // Find blobs matching field criteria (translates to Layer 1 lookups)
+  // Find blobs matching field criteria (translates to Layer 2 lookups)
   query(metadataQuery: MetadataQuery): Promise<Hash[]>;
 
   // Verify that a metadata entry was correctly derived from the given blob
@@ -382,15 +389,15 @@ interface IIndexedData {
 }
 ```
 
-### Layer 4: State changes (blob + schema + indexing)
+### Layer 5: State changes (blob + schema + indexing)
 
-Layers 1-3 deal with immutable blobs: you publish a blob, it gets distributed, it can be queried. But real applications need mutable state — a document that gets edited, a counter that increments, a list with items added and removed. In a P2P system without a central authority, multiple peers can mutate the same logical entity concurrently. Layer 4 defines how those concurrent mutations are expressed, linked, and resolved.
+Layers 2-4 deal with immutable blobs: you publish a blob, it gets distributed, it can be queried. But real applications need mutable state — a document that gets edited, a counter that increments, a list with items added and removed. In a P2P system without a central authority, multiple peers can mutate the same logical entity concurrently. Layer 5 defines how those concurrent mutations are expressed, linked, and resolved.
 
 > **Open question**: A CRDT definition needs to be declared somewhere — grouping a set of state change schemas that belong to the same CRDT, declaring the merge function, and optionally defining CRDT-level operations (e.g. deduplicating redundant state changes). The format and location of this definition is not yet specified.
 
 #### State changes as blobs
 
-State changes are blobs. They use Layer 2 schemas and Layer 3 indexing. No fundamentally new storage or networking mechanism is introduced — Layer 4 adds conventions and semantics on top of what exists below.
+State changes are blobs. They use Layer 3 schemas and Layer 4 indexing. No fundamentally new storage or networking mechanism is introduced — Layer 5 adds conventions and semantics on top of what exists below.
 
 Each state change blob contains:
 
@@ -467,7 +474,7 @@ This bounds tombstone storage to one epoch's worth of deletions (proportional to
 When an entity is deleted:
 
 1. A DeleteEntry state change is published
-2. Peers that integrate the delete may prune the original CreateEntry blob, all UpdateEntry blobs, and the associated Layer 3 metadata entries
+2. Peers that integrate the delete may prune the original CreateEntry blob, all UpdateEntry blobs, and the associated Layer 4 metadata entries
 3. The DeleteEntry is retained as a compact tombstone record for the current epoch
 4. After the epoch boundary, the tombstone is dropped — snapshot-based sync handles any peers that missed it
 
@@ -494,7 +501,7 @@ Update chain pruning is an open problem. Two structural issues make it difficult
 
 For real-time collaborative editing (e.g. the knowledge base showcase app), the framework supports CRDT library integration. Instead of coarse-grained UpdateEntry state changes, an app can use fine-grained CRDT operations (e.g. Yjs operations for text editing).
 
-These operations are still blobs, published and synced through Layers 1-3. The CRDT library handles merge semantics — the framework just transports the operations. This keeps Peerkit agnostic to the specific CRDT implementation while enabling rich collaborative features.
+These operations are still blobs, published and synced through Layers 2-4. The CRDT library handles merge semantics — the framework just transports the operations. This keeps Peerkit agnostic to the specific CRDT implementation while enabling rich collaborative features.
 
 #### API
 
@@ -512,7 +519,7 @@ interface IStateChanges {
   // Get the current resolved state of an entity, applying merge if concurrent branches exist
   getEntry(entityId: Hash): Promise<unknown | null>;
 
-  // Query entities via Layer 3 metadata
+  // Query entities via Layer 4 metadata
   queryEntries(metadataQuery: MetadataQuery): Promise<Hash[]>;
 
   // Get the full causal history (DAG of state changes) for an entity
@@ -520,7 +527,7 @@ interface IStateChanges {
 }
 ```
 
-### Layer 5+: higher-level features (future)
+### Layer 6+: higher-level features (future)
 
 Not yet specified. Potential areas:
 
@@ -533,7 +540,7 @@ Not yet specified. Potential areas:
 
 Upgrading apps in a P2P network is fundamentally harder than in client-server: there is no central point to deploy updates to. Peers update independently, at different times, and the network will have peers running different versions simultaneously — potentially for a long time. Peerkit must make this easy and smooth.
 
-**Schema versioning**: Schemas (Layer 2) carry a version number. When a schema evolves (new fields, changed structure), the new version is published as a new schema blob. Old schema blobs remain in the network. Peers on the new version must handle data created under old schemas.
+**Schema versioning**: Schemas (Layer 3) carry a version number. When a schema evolves (new fields, changed structure), the new version is published as a new schema blob. Old schema blobs remain in the network. Peers on the new version must handle data created under old schemas.
 
 **Backward-compatible by default**: Schema changes should be additive where possible — new fields with defaults, new optional metadata. Blobs created under an older schema version remain valid and readable. A peer running a newer app version can read old data without migration. A peer running an older app version that receives data with an unknown schema version can choose to store it opaquely (for gossiping to others) without processing it.
 
@@ -549,9 +556,9 @@ Target: millions of nodes over time. Scalability is addressed at three levels:
 
 **Connections**: Each peer maintains a bounded number of connections (O(log N) or a configured maximum). No operation requires contacting all peers.
 
-**Data distribution**: Peerkit defines a pluggable distribution strategy interface but does not prescribe a routing topology. The distribution strategy is injected by the developer. Peerkit ships full replication as the built-in default. See Layer 1 for the interface and example strategies (DHT, direct replication, topic-based).
+**Data distribution**: Peerkit defines a pluggable distribution strategy interface but does not prescribe a routing topology. The distribution strategy is injected by the developer. Peerkit ships full replication as the built-in default. See Layer 2 for the interface and example strategies (DHT, direct replication, topic-based).
 
-**Destructive edits**: This is critical for long-term storage scalability. Peerkit is not append-only at the protocol level. Data that has been superseded, deleted, or pruned can be fully removed over time. Without destructive edits, storage grows monotonically regardless of sharding, and networks eventually become unusable on constrained devices. Higher layers define the semantics of when pruning is appropriate. Tombstone storage is bounded through epoch-based compaction combined with snapshot-based anti-entropy for returning peers. See Layer 4's "Destructive edits and pruning" section for the full design.
+**Destructive edits**: This is critical for long-term storage scalability. Peerkit is not append-only at the protocol level. Data that has been superseded, deleted, or pruned can be fully removed over time. Without destructive edits, storage grows monotonically regardless of sharding, and networks eventually become unusable on constrained devices. Higher layers define the semantics of when pruning is appropriate. Tombstone storage is bounded through epoch-based compaction combined with snapshot-based anti-entropy for returning peers. See Layer 5's "Destructive edits and pruning" section for the full design.
 
 **Resource budgets** (future): Each peer advertises its capacity (storage, bandwidth, connection count). The framework respects these limits and distributes load accordingly. Constrained devices (mobile, old hardware) take on less responsibility without being excluded from the network.
 
@@ -578,9 +585,9 @@ Target: millions of nodes over time. Scalability is addressed at three levels:
 
 ## 8. MVP definition
 
-Not every app needs all 4 layers. The layers are additive — each builds on the one below but is independently useful. The MVP ships Layer 0 + 1 to get a working P2P library as quickly as possible.
+Not every app needs every layer. The layers are additive — each builds on the one below but is independently useful. The MVP ships Layer 0 + 1 + 2 to get a working P2P library as quickly as possible.
 
-### MVP scope: Layer 0 + 1
+### MVP scope: Layer 0 + 1 + 2
 
 **What's included:**
 
@@ -596,10 +603,10 @@ Not every app needs all 4 layers. The layers are additive — each builds on the
 **What's deliberately excluded from MVP:**
 
 - Custom data distribution — **full replication** is the built-in default (every peer stores everything). The distribution interface is exposed for developers to provide their own strategy.
-- Layer 2 (schemas) — app structures its own blobs
-- Layer 3 (indexing) — app builds its own local indexes
-- Layer 4 (state changes, conflict resolution) — app handles its own state change semantics
-- Pruning / destructive edits — requires epoch-based compaction and snapshot sync (see Layer 4). MVP storage is append-only; full replication on small networks makes this acceptable.
+- Layer 3 (schemas) — app structures its own blobs
+- Layer 4 (indexing) — app builds its own local indexes
+- Layer 5 (state changes, conflict resolution) — app handles its own state change semantics
+- Pruning / destructive edits — requires epoch-based compaction and snapshot sync (see Layer 5). MVP storage is append-only; full replication on small networks makes this acceptable.
 - Browser support — desktop only initially
 - Mobile support — desktop only initially
 
@@ -612,7 +619,7 @@ The MVP gives developers: encrypted P2P connections, closed networks, and a shar
 - Configuration or state sync between devices
 - Any app where the data set is small enough for every peer to hold
 
-The app developer handles data structure, indexing, and conflict resolution in their own code. The developer experience improves as Layers 2-4 are added, but the MVP is functional.
+The app developer handles data structure, indexing, and conflict resolution in their own code. The developer experience improves as Layers 3-5 are added, but the MVP is functional.
 
 ## 9. Open questions
 
