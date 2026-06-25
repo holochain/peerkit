@@ -4,13 +4,25 @@ import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { identify } from "@libp2p/identify";
 import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import type { ConnectionGater } from "@libp2p/interface";
+import { dns } from "@multiformats/dns";
+import { dnsJsonOverHttps } from "@multiformats/dns/resolvers";
 import type { NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
+  webRtcDirectDnsResolver,
   type NodeOptions,
 } from "@peerkit/transport-libp2p-core";
-import { createLibp2p } from "libp2p";
+import { createLibp2p, dnsaddrResolver } from "libp2p";
 import { quickCryptoNoise } from "./quick-crypto-noise.js";
+
+/**
+ * Public DNS-over-HTTPS endpoints queried, in order, to resolve relay
+ * hostnames. Hermes has no `node:dns`, so name resolution must go over HTTPS.
+ */
+const DEFAULT_DOH_ENDPOINTS: readonly string[] = [
+  "https://cloudflare-dns.com/dns-query",
+  "https://dns.google/resolve",
+];
 
 /**
  * Default libp2p listen addresses for a React Native peerkit node.
@@ -101,6 +113,21 @@ export async function createNode(options: CreateNodeOptions) {
     streamMuxers: [yamux()],
     services: { identify: identify() },
     connectionGater: options.connectionGater,
+    // Hermes has no node:dns, so resolve names over DNS-over-HTTPS.
+    dns: dns({
+      resolvers: {
+        ".": DEFAULT_DOH_ENDPOINTS.map((endpoint) =>
+          dnsJsonOverHttps(endpoint),
+        ),
+      },
+    }),
+    connectionManager: {
+      // Providing resolvers replaces libp2p's default, so re-include dnsaddr.
+      resolvers: {
+        dnsaddr: dnsaddrResolver,
+        webRtcDirect: webRtcDirectDnsResolver,
+      },
+    },
     addresses: {
       listen: options.addrs ?? defaultNodeListenAddrs,
     },

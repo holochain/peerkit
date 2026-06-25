@@ -30,6 +30,8 @@ vi.mock("libp2p", () => ({
     // The fake node only needs the `start` method `createNode` calls.
     return { start: startSpy };
   }),
+  // `createNode` registers this default resolver alongside webRtcDirect.
+  dnsaddrResolver: { canResolve: () => false, resolve: async () => [] },
 }));
 
 vi.mock("@libp2p/webrtc", () => ({
@@ -63,6 +65,8 @@ vi.mock("@peerkit/transport-libp2p-core", () => ({
       order.push("construct");
     }
   },
+  // `createNode` registers this resolver on the connection manager.
+  webRtcDirectDnsResolver: { canResolve: () => false, resolve: async () => [] },
 }));
 
 const { createNode, defaultNodeListenAddrs } =

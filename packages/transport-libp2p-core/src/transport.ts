@@ -478,6 +478,8 @@ export class TransportLibp2p implements ITransport {
   }
 
   private async connectToRelay(relay: RelayDialAddress): Promise<PeerId> {
+    // libp2p resolves the relay address (incl. WebRTC Direct DNS) via the
+    // multiaddr resolvers registered on the connection manager.
     const addr = multiaddr(relay);
     this.logger.info("Connecting to relay {*}", { relay });
     const connection = await this.libp2p.dial(addr);

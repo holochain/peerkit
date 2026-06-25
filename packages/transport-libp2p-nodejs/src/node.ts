@@ -7,9 +7,10 @@ import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import type { NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
+  webRtcDirectDnsResolver,
   type NodeOptions,
 } from "@peerkit/transport-libp2p-core";
-import { createLibp2p } from "libp2p";
+import { createLibp2p, dnsaddrResolver } from "libp2p";
 
 /**
  * Default libp2p listen addresses for a peerkit node.
@@ -80,6 +81,13 @@ export async function createNode(
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     services: { identify: identify(), dcutr: dcutr() },
+    connectionManager: {
+      // Providing resolvers replaces libp2p's default, so re-include dnsaddr.
+      resolvers: {
+        dnsaddr: dnsaddrResolver,
+        webRtcDirect: webRtcDirectDnsResolver,
+      },
+    },
     addresses: {
       listen: options?.addrs ?? defaultNodeListenAddrs,
     },
