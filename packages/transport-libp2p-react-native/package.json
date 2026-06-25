@@ -51,6 +51,7 @@
     "@libp2p/circuit-relay-v2": "^4.2.3",
     "@libp2p/identify": "^4.1.0",
     "@libp2p/webrtc": "^6.0.23",
+    "@multiformats/dns": "^1.0.13",
     "@peerkit/api": "^0.1.0-alpha.14",
     "@peerkit/transport-libp2p-core": "^0.1.0-alpha.14",
     "libp2p": "^3.2.0"
