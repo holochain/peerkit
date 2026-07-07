@@ -1,0 +1,17 @@
+{
+  "name": "peerkit-iroh-native",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "napi": {
+    "binaryName": "peerkit-iroh"
+  },
+  "scripts": {
+    "build": "napi build --platform --release --esm",
+    "build:debug": "napi build --platform --esm",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  }
+}
