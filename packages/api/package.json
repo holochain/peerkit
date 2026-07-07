@@ -34,7 +34,8 @@
     }
   },
   "scripts": {
-    "test": "echo \"No tests to run\""
+    "test": "echo \"No tests to run\"",
+    "version": "node ../../scripts/version-bump.mjs"
   },
   "devDependencies": {}
 }

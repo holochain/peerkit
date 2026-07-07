@@ -5,67 +5,11 @@ on:
     branches: [main]
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    outputs:
-      is-release: ${{ steps.label.outputs.result }}
-    steps:
-      - name: Check for release label on merged PR
-        id: label
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          RESULT=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/pulls \
-            --jq 'any(.[].labels[].name; . == "release")' 2>/dev/null || echo "false")
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
-
   publish:
-    needs: check
-    if: needs.check.outputs.is-release == 'true'
-    runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false
-          token: ""
-
-      - run: npm ci
-      - run: npm run build:dist
-
-      - name: Get version
-        id: version
-        run: echo "value=$(node -p "require('./packages/api/package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Create and push tag
-        env:
-          RELEASE_VERSION: ${{ steps.version.outputs.value }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git ls-remote --tags origin "v$RELEASE_VERSION" | grep -q .; then
-            echo "Tag v$RELEASE_VERSION already exists, skipping."
-          else
-            git tag "v$RELEASE_VERSION"
-            git push origin "v$RELEASE_VERSION"
-          fi
-
-      - name: Publish to npm
-        env:
-          RELEASE_VERSION: ${{ steps.version.outputs.value }}
-        run: |
-          if npm view "@peerkit/api@$RELEASE_VERSION" > /dev/null 2>&1; then
-            echo "Version $RELEASE_VERSION already published, skipping."
-          else
-            if [[ "$RELEASE_VERSION" == *"-"* ]]; then
-              npm publish --workspaces --access public --provenance --tag next
-            else
-              npm publish --workspaces --access public --provenance
-            fi
-          fi
+    uses: holochain/actions/.github/workflows/nodejs-publish-release.yml@v1.16.0
+    with:
+      build_script: build:dist
+      workspace_main_package: ./packages/api/package.json
