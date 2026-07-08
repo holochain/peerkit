@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.15](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.14...v0.1.0-alpha.15)\] - 2026-07-08
+
+### Bug Fixes
+
+- _(transport)_ Resolve DNS relay hosts before WebRTC Direct dial by @veeso in [#107](https://github.com/holochain/peerkit/pull/107)
+  - The @libp2p/webrtc WebRTC Direct dialer only accepts ip4/ip6 hosts and libp2p auto-resolves dnsaddr only, so a /dns4|dns6|dns relay over webrtc-direct failed with "was not an IPv4 or IPv6 address". Add an optional dnsResolver to the core transport and rewrite the DNS relay host to its resolved IP in connectToRelay. The Node factory defaults to node:dns; the React Native factory defaults to DNS-over-HTTPS via @multiformats/dns.
+
+### CI
+
+- Use reusable workflow from actions repo for releases by @cdunster in [#108](https://github.com/holochain/peerkit/pull/108)
+- Make release publish resilient to PR-association lag by @veeso in [#102](https://github.com/holochain/peerkit/pull/102)
+  - The publish job randomly skipped because GitHub's commit->PR association is eventually consistent and often unindexed when the push event fires on merge, so the release-label check returned false. Retry the lookup to ride out the lag, distinguishing an unindexed response (retry) from a real no-label result (final). Add a workflow_dispatch trigger as a manual force-publish fallback. Also pin actions, set least-privilege permissions, and add a zizmor config (ref-pin for actions/\*, artipacked ignore for the checkout token reused to push the release tag).
+
+### Refactor
+
+- _(docs)_ Split transport layer into 0 (platform-specific) and 1 (general) by @jost-s in [#104](https://github.com/holochain/peerkit/pull/104)
+
+### Documentation
+
+- _(specs)_ Remove type and interface details to avoid drift from API by @jost-s
+- _(specs)_ Update layer 0 + 1 to reflect current code state by @jost-s
+
+### Other Changes
+
+- Restore previous workflow by @veeso in [#103](https://github.com/holochain/peerkit/pull/103)
+
+### First-time Contributors
+
+- @cdunster made their first contribution in [#108](https://github.com/holochain/peerkit/pull/108)
+
 ## \[[0.1.0-alpha.14](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.13...v0.1.0-alpha.14)\] - 2026-06-19
 
 ### Features
