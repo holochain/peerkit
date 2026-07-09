@@ -37,6 +37,7 @@
     { "path": "packages/transport-libp2p-nodejs" },
     { "path": "packages/transport-libp2p-react-native" },
     { "path": "packages/transport-libp2p" },
+    { "path": "packages/transport-iroh-core" },
     { "path": "packages/peerkit" },
     { "path": "packages/authored-data-pull" },
     { "path": "packages/authored-data-push" },
