@@ -34,6 +34,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "@peerkit/api": "^0.1.0-alpha.14"
+    "@peerkit/api": "^0.1.0-alpha.14",
+    "@peerkit/transport-shared": "^0.1.0-alpha.14"
   }
 }
