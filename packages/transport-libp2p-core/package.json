@@ -38,7 +38,8 @@
     "@multiformats/dns": "^1.0.13",
     "@multiformats/multiaddr": "^13.0.1",
     "@opentelemetry/api": "^1.9.0",
-    "@peerkit/api": "^0.1.0-alpha.15"
+    "@peerkit/api": "^0.1.0-alpha.15",
+    "@peerkit/transport-shared": "^0.1.0-alpha.15"
   },
   "peerDependencies": {
     "@libp2p/interface": "^3.0.0",

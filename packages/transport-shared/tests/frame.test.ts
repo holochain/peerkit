@@ -89,7 +89,7 @@ describe("FrameDecoder", () => {
 
   test("round-trips a large payload", () => {
     const decoder = new FrameDecoder();
-    // yamux has a 256 KiB max frame size
+    // Bigger than a typical single stream chunk, to exercise reassembly.
     const payload = new Uint8Array(1024 * 300).fill(7);
     const msgs = decoder.feed(encodeFrame(payload));
 

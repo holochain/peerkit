@@ -32,6 +32,7 @@
     { "path": "packages/agent-store" },
     { "path": "packages/data-store" },
     { "path": "packages/metrics" },
+    { "path": "packages/transport-shared" },
     { "path": "packages/transport-libp2p-core" },
     { "path": "packages/transport-libp2p-nodejs" },
     { "path": "packages/transport-libp2p-react-native" },

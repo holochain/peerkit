@@ -1,0 +1,35 @@
+{
+  "name": "@peerkit/transport-shared",
+  "version": "0.1.0-alpha.15",
+  "description": "Substrate-agnostic building blocks shared by peerkit transports",
+  "author": "Holochain Dev Team <devcore@holochain.org>",
+  "keywords": [
+    "peerkit",
+    "p2p",
+    "data",
+    "sync",
+    "transport"
+  ],
+  "license": "CAL-1.0",
+  "files": [
+    "dist"
+  ],
+  "bugs": {
+    "url": "https://github.com/holochain/peerkit/issues"
+  },
+  "homepage": "https://github.com/holochain/peerkit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holochain/peerkit.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "test": "vitest --run"
+  }
+}

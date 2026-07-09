@@ -26,6 +26,7 @@
     "packages/agent-store",
     "packages/data-store",
     "packages/metrics",
+    "packages/transport-shared",
     "packages/transport-libp2p-core",
     "packages/transport-libp2p-nodejs",
     "packages/transport-libp2p-react-native",
