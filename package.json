@@ -22,6 +22,7 @@
     "doc": "docs"
   },
   "workspaces": [
+    "crates/peerkit-iroh",
     "packages/api",
     "packages/agent-store",
     "packages/data-store",
@@ -32,6 +33,7 @@
     "packages/transport-libp2p-react-native",
     "packages/transport-libp2p",
     "packages/transport-iroh-core",
+    "packages/transport-iroh-nodejs",
     "packages/peerkit",
     "packages/authored-data-pull",
     "packages/authored-data-push",
@@ -49,6 +51,7 @@
     "fmt": "prettier . --write",
     "fmt:check": "prettier . --check",
     "test": "vitest --run",
+    "build:native": "npm --workspace peerkit-iroh-native run build",
     "build:dist": "tsc --build",
     "check:tests": "tsc --build && tsc -p tsconfig.tests.json",
     "prebuild:docs": "npm run build:dist",
