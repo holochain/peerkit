@@ -24,6 +24,7 @@ function makeTransport(
   const events: Events = { connected: [], disconnected: [] };
   const transport = new TransportIroh(new MockDriver(id, network), {
     networkAccessHandler,
+    agentsReceivedCallback: async () => {},
     peerConnectedCallback: async (nodeId) => {
       events.connected.push(nodeId);
     },
