@@ -70,6 +70,12 @@ class MockStream implements IrohStream {
     this.end();
   }
 
+  // End the read side because the connection was closed, so a pending read
+  // returns null (end of stream) rather than hanging.
+  terminate(): void {
+    this.end();
+  }
+
   private deliver(data: Uint8Array): void {
     this.inbound.push(data);
     this.wake();
@@ -90,6 +96,7 @@ class MockStream implements IrohStream {
 class MockConnection implements IrohConnection {
   private peer!: MockConnection;
   private incoming: MockStream[] = [];
+  private streams: MockStream[] = [];
   private waiters: (() => void)[] = [];
   private closed = false;
 
@@ -116,6 +123,7 @@ class MockConnection implements IrohConnection {
   async openStream(): Promise<IrohStream> {
     if (this.closed) throw new Error("connection closed");
     const [near, far] = MockStream.pair();
+    this.streams.push(near);
     this.peer.receiveStream(far);
     return near;
   }
@@ -130,15 +138,21 @@ class MockConnection implements IrohConnection {
   }
 
   close(): void {
+    this.teardown();
+    this.peer.teardown();
+  }
+
+  private teardown(): void {
     if (this.closed) return;
     this.closed = true;
+    // End every stream on this side so pending reads see the end of the stream.
+    for (const stream of this.streams) stream.terminate();
     this.wake();
-    this.peer.closed = true;
-    this.peer.wake();
   }
 
   private receiveStream(stream: MockStream): void {
     this.incoming.push(stream);
+    this.streams.push(stream);
     this.wake();
   }
 

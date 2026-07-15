@@ -4,7 +4,7 @@ import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { dcutr } from "@libp2p/dcutr";
 import { identify } from "@libp2p/identify";
 import { webRTC, webRTCDirect } from "@libp2p/webrtc";
-import type { NodeAddress, RelayDialAddress } from "@peerkit/api";
+import type { ITransport, NodeAddress, RelayDialAddress } from "@peerkit/api";
 import {
   TransportLibp2p,
   webRtcDirectDnsResolver,
@@ -60,7 +60,7 @@ export interface CreateNodeOptions extends NodeOptions {
  */
 export async function createNode(
   options: CreateNodeOptions,
-): Promise<TransportLibp2p> {
+): Promise<ITransport> {
   // Build array of ICE servers if provided or leave undefined to use
   // libp2p default.
   const iceServers =
