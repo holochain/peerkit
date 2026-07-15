@@ -4,6 +4,7 @@ import type {
   CustomStreamCreatedCallback,
   IStream,
   ITransport,
+  MessageHandler,
   NetworkAccessBytes,
   NetworkAccessHandler,
   NodeAddress,
@@ -38,6 +39,16 @@ export const CURRENT_ACCESS_PROTOCOL = "/peerkit/access/v1";
  */
 export const CURRENT_AGENTS_PROTOCOL = "/peerkit/agents/v1";
 
+/**
+ * Current peerkit message protocol.
+ *
+ * The first peer to send opens one stream, named by the preamble. It is
+ * long-lived and shared for the connection's lifetime: both peers write framed
+ * messages on it and read the other's via their {@link MessageHandler}. Relays
+ * do not handle messages, so they do not register this protocol.
+ */
+export const CURRENT_MESSAGE_PROTOCOL = "/peerkit/message/v1";
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -65,6 +76,11 @@ export interface IrohTransportOptions {
   networkAccessHandler: NetworkAccessHandler;
   /** Called with agent-info bytes received from a peer. */
   agentsReceivedCallback: AgentsReceivedCallback;
+  /**
+   * Called with application messages received from a peer. Omit on relays, which
+   * do not handle messages.
+   */
+  messageHandler?: MessageHandler;
   /** Called once a peer has completed the access handshake. Fire-and-forget. */
   peerConnectedCallback?: PeerConnectedCallback;
   /** Called when a peer disconnects. Fire-and-forget. */
@@ -91,6 +107,7 @@ export class TransportIroh implements ITransport {
   private readonly localNetworkAccessBytes: NetworkAccessBytes;
   private readonly networkAccessHandler: NetworkAccessHandler;
   private readonly agentsReceivedCallback: AgentsReceivedCallback;
+  private readonly messageHandler?: MessageHandler;
   private readonly peerConnectedCallback?: PeerConnectedCallback;
   private readonly peerDisconnectedCallback?: PeerDisconnectedCallback;
   private readonly handshakeTimeoutMs: number;
@@ -102,6 +119,8 @@ export class TransportIroh implements ITransport {
   private readonly nodeAccess = new Map<NodeId, boolean>();
   // Stream handlers keyed by protocol id, chosen by each stream's preamble.
   private readonly streamHandlers = new Map<string, StreamHandler>();
+  // The long-lived message stream per peer, shared for sending and receiving.
+  private readonly messageStreams = new Map<NodeId, IrohStream>();
 
   constructor(driver: IrohDriver, options: IrohTransportOptions) {
     this.driver = driver;
@@ -109,6 +128,7 @@ export class TransportIroh implements ITransport {
       options.networkAccessBytes ?? new Uint8Array([0]);
     this.networkAccessHandler = options.networkAccessHandler;
     this.agentsReceivedCallback = options.agentsReceivedCallback;
+    this.messageHandler = options.messageHandler;
     this.peerConnectedCallback = options.peerConnectedCallback;
     this.peerDisconnectedCallback = options.peerDisconnectedCallback;
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 10_000;
@@ -119,6 +139,14 @@ export class TransportIroh implements ITransport {
 
     this.streamHandlers.set(CURRENT_ACCESS_PROTOCOL, this.handleAccessStream);
     this.streamHandlers.set(CURRENT_AGENTS_PROTOCOL, this.handleAgentsStream);
+    // Relays do not handle messages, so only register the protocol when a
+    // message handler is configured.
+    if (this.messageHandler) {
+      this.streamHandlers.set(
+        CURRENT_MESSAGE_PROTOCOL,
+        this.handleMessageStream,
+      );
+    }
 
     void this.acceptConnections();
     this.logger.info("Transport created {*}", { nodeId: driver.getNodeId() });
@@ -179,10 +207,13 @@ export class TransportIroh implements ITransport {
     await stream.finishWrite();
   }
 
-  // The message and custom-stream protocols are not built yet.
-  async send(): Promise<void> {
-    throw new Error("send is not implemented yet");
+  async send(nodeId: NodeId, message: Uint8Array): Promise<void> {
+    const connection = this.requireConnection(nodeId, "send");
+    const stream = await this.messageStream(connection);
+    await writeMessage(stream, message);
   }
+
+  // The custom-stream protocol is not built yet.
   async createStream(): Promise<IStream> {
     throw new Error("createStream is not implemented yet");
   }
@@ -327,6 +358,20 @@ export class TransportIroh implements ITransport {
     await stream.finishWrite();
   };
 
+  // Handles an incoming message stream the peer opened. The same stream carries
+  // both directions, so we keep it for our own sends too.
+  private handleMessageStream: StreamHandler = async (
+    connection,
+    stream,
+    reader,
+  ) => {
+    const remote = connection.remoteNodeId();
+    if (!this.messageStreams.has(remote)) {
+      this.messageStreams.set(remote, stream);
+    }
+    await this.readMessageStream(remote, stream, reader);
+  };
+
   // Initiates the access handshake on a freshly dialed connection.
   private async performAccessHandshake(
     connection: IrohConnection,
@@ -419,12 +464,57 @@ export class TransportIroh implements ITransport {
     return stream;
   }
 
+  // The message stream for a peer: reuse the open one, or open it and start
+  // reading the replies the peer writes back on it.
+  private async messageStream(connection: IrohConnection): Promise<IrohStream> {
+    const remote = connection.remoteNodeId();
+    const existing = this.messageStreams.get(remote);
+    if (existing) return existing;
+
+    const stream = await this.openProtocolStream(
+      connection,
+      CURRENT_MESSAGE_PROTOCOL,
+    );
+    this.messageStreams.set(remote, stream);
+    if (this.messageHandler) {
+      void this.readMessageStream(remote, stream, readMessages(stream));
+    }
+    return stream;
+  }
+
+  // Deliver every message read from a message stream to the message handler,
+  // until the stream ends.
+  private async readMessageStream(
+    remote: NodeId,
+    stream: IrohStream,
+    reader: AsyncGenerator<Uint8Array>,
+  ): Promise<void> {
+    const messageHandler = this.messageHandler;
+    if (!messageHandler) return;
+    try {
+      for await (const message of reader) {
+        this.logger.debug("Incoming message {*}", {
+          remote,
+          byteLength: message.byteLength,
+        });
+        await messageHandler(remote, message, this);
+      }
+    } catch (error) {
+      this.logger.debug("Message stream ended {*}", { remote, error });
+    } finally {
+      if (this.messageStreams.get(remote) === stream) {
+        this.messageStreams.delete(remote);
+      }
+    }
+  }
+
   private registerConnection(connection: IrohConnection): void {
     this.connections.set(connection.remoteNodeId(), connection);
   }
 
   private deregisterConnection(remote: NodeId): void {
     if (!this.connections.delete(remote)) return;
+    this.messageStreams.delete(remote);
     this.logger.info("Peer disconnected {*}", { remote });
     this.peerDisconnectedCallback?.(remote).catch((error) => {
       this.logger.error("PeerDisconnectedCallback produced an error {*}", {
