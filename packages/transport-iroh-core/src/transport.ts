@@ -17,8 +17,10 @@ import {
   runInitiatorHandshake,
   runResponderHandshake,
 } from "@peerkit/transport-shared";
+import { CustomStream } from "./custom-stream.js";
 import type { IrohConnection, IrohDriver, IrohStream } from "./driver.js";
 import { readMessages, writeMessage } from "./messages.js";
+import { createTransportMetrics, type TransportMetrics } from "./metrics.js";
 
 /**
  * Current peerkit network access protocol.
@@ -111,6 +113,7 @@ export class TransportIroh implements ITransport {
   private readonly peerConnectedCallback?: PeerConnectedCallback;
   private readonly peerDisconnectedCallback?: PeerDisconnectedCallback;
   private readonly handshakeTimeoutMs: number;
+  private readonly metrics: TransportMetrics;
 
   // Live connections keyed by the remote node id.
   private readonly connections = new Map<NodeId, IrohConnection>();
@@ -132,6 +135,8 @@ export class TransportIroh implements ITransport {
     this.peerConnectedCallback = options.peerConnectedCallback;
     this.peerDisconnectedCallback = options.peerDisconnectedCallback;
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 10_000;
+    // Built here, not at module scope, so the app's MeterProvider is in effect.
+    this.metrics = createTransportMetrics();
     this.logger = getLogger(["peerkit", "transport"]).with({
       nodeId: driver.getNodeId(),
       id: options.id,
@@ -211,17 +216,23 @@ export class TransportIroh implements ITransport {
     const connection = this.requireConnection(nodeId, "send");
     const stream = await this.messageStream(connection);
     await writeMessage(stream, message);
+    this.metrics.bytesTotal.add(message.byteLength, { direction: "sent" });
   }
 
-  // The custom-stream protocol is not built yet.
-  async createStream(): Promise<IStream> {
-    throw new Error("createStream is not implemented yet");
+  async createStream(nodeId: NodeId, protocol: string): Promise<IStream> {
+    const connection = this.requireConnection(nodeId, "createStream");
+    const stream = await this.openProtocolStream(connection, protocol);
+    return new CustomStream(stream, readMessages(stream));
   }
+
   registerStreamHandler(
-    _protocol: string,
-    _handler: CustomStreamCreatedCallback,
+    protocol: string,
+    handler: CustomStreamCreatedCallback,
   ): void {
-    throw new Error("registerStreamHandler is not implemented yet");
+    // The dispatch loop already gates on access before calling this.
+    this.streamHandlers.set(protocol, async (connection, stream, reader) => {
+      handler(connection.remoteNodeId(), new CustomStream(stream, reader));
+    });
   }
 
   // Accept inbound connections until the driver is closed.
@@ -496,6 +507,9 @@ export class TransportIroh implements ITransport {
         this.logger.debug("Incoming message {*}", {
           remote,
           byteLength: message.byteLength,
+        });
+        this.metrics.bytesTotal.add(message.byteLength, {
+          direction: "received",
         });
         await messageHandler(remote, message, this);
       }

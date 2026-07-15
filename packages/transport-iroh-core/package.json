@@ -35,10 +35,13 @@
   },
   "dependencies": {
     "@logtape/logtape": "^2.0.5",
+    "@opentelemetry/api": "^1.9.0",
     "@peerkit/api": "^0.1.0-alpha.14",
     "@peerkit/transport-shared": "^0.1.0-alpha.14"
   },
   "devDependencies": {
+    "@opentelemetry/sdk-metrics": "2.7.1",
+    "@peerkit/metrics": "^0.1.0-alpha.14",
     "@peerkit/test-utils": "^0.1.0-alpha.14"
   }
 }
