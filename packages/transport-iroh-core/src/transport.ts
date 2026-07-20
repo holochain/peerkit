@@ -194,7 +194,7 @@ export class TransportIroh implements ITransport {
   async disconnect(nodeId: NodeId): Promise<void> {
     const connection = this.requireConnection(nodeId, "disconnect");
     connection.close();
-    this.deregisterConnection(nodeId);
+    this.deregisterConnection(connection);
   }
 
   async shutDown(): Promise<void> {
@@ -260,7 +260,7 @@ export class TransportIroh implements ITransport {
       }
     } catch (error) {
       this.logger.debug("Connection closed {*}", { remote, error });
-      this.deregisterConnection(remote);
+      this.deregisterConnection(connection);
     }
   }
 
@@ -526,8 +526,13 @@ export class TransportIroh implements ITransport {
     this.connections.set(connection.remoteNodeId(), connection);
   }
 
-  private deregisterConnection(remote: NodeId): void {
-    if (!this.connections.delete(remote)) return;
+  private deregisterConnection(connection: IrohConnection): void {
+    const remote = connection.remoteNodeId();
+    // A peer may briefly have more than one connection (e.g. iroh racing paths).
+    // Only forget the peer if the connection that closed is the current one, so
+    // a losing path's teardown can't drop a newer, working connection.
+    if (this.connections.get(remote) !== connection) return;
+    this.connections.delete(remote);
     this.messageStreams.delete(remote);
     this.logger.info("Peer disconnected {*}", { remote });
     this.peerDisconnectedCallback?.(remote).catch((error) => {
