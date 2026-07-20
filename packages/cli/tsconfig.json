@@ -11,6 +11,7 @@
     { "path": "../api" },
     { "path": "../peer-session" },
     { "path": "../peerkit" },
+    { "path": "../transport-iroh-nodejs" },
     { "path": "../transport-libp2p-nodejs" }
   ]
 }

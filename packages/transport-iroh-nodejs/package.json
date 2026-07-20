@@ -37,6 +37,7 @@
     "test": "vitest --run"
   },
   "dependencies": {
+    "@logtape/logtape": "^2.0.5",
     "@peerkit/api": "^0.1.0-alpha.14",
     "@peerkit/transport-iroh-core": "^0.1.0-alpha.14",
     "peerkit-iroh-native": "*"
