@@ -9,7 +9,6 @@
 import { createHash } from "node:crypto";
 import { expect, vi } from "vitest";
 import { createNode } from "@peerkit/transport-libp2p-nodejs";
-import type { TransportLibp2p } from "@peerkit/transport-libp2p-core";
 import {
   AgentKeyPair,
   serializeAgentInfoCanonical,
@@ -20,6 +19,7 @@ import { MemoryAgentKeyStore } from "@peerkit/test-utils";
 import type {
   AgentInfoSigned,
   IAgentStore,
+  ITransport,
   NetworkAccessBytes,
   NodeAddress,
   NodeId,
@@ -140,7 +140,7 @@ export interface ReceivedMessage {
 
 /** Test handle returned by {@link startTestNode}. */
 export interface TestNode {
-  readonly node: TransportLibp2p;
+  readonly node: ITransport;
   readonly nodeId: string;
   readonly received: ReceivedMessage[];
   readonly receivedAgents: ReceivedMessage[];
