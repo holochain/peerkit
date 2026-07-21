@@ -9,15 +9,14 @@ import type {
   MessageHandler,
   ITransport,
 } from "@peerkit/api";
-import { createNode } from "@peerkit/transport-iroh-nodejs";
-import { MemoryAgentKeyStore } from "@peerkit/test-utils";
-import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
-import { setupTestLogger } from "../../../test-utils/dist/test-logger.js";
 import {
   startNode,
   type NodeEventCallbacks,
   type NodeSession,
-} from "../../src/index.js";
+} from "@peerkit/peer-session";
+import { MemoryAgentKeyStore, setupTestLogger } from "@peerkit/test-utils";
+import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
+import { createNode } from "../src/node.js";
 
 beforeEach(setupTestLogger);
 afterEach(reset);

@@ -4,7 +4,16 @@ import tseslint from "typescript-eslint";
 import { defineConfig } from "eslint/config";
 
 export default defineConfig([
-  { ignores: ["**/dist/**", "docs/**", "**/proto/**"] },
+  // crates/*/index.* is the napi-generated binding, not hand-written source.
+  {
+    ignores: [
+      "**/dist/**",
+      "docs/**",
+      "**/proto/**",
+      "crates/*/index.js",
+      "crates/*/index.d.ts",
+    ],
+  },
   {
     files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
     plugins: { js },

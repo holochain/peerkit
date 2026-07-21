@@ -5,7 +5,7 @@ import {
   FullReplicationPolicy,
 } from "@peerkit/authored-data-pull";
 import { startNode } from "@peerkit/peer-session";
-import { createNode as createIrohNode } from "@peerkit/transport-iroh-nodejs";
+import type { PeerkitNodeTransportFactory } from "@peerkit/peerkit";
 import { defaultNodeListenAddrs } from "@peerkit/transport-libp2p-nodejs";
 import type { Command } from "commander";
 import { createWriteStream } from "node:fs";
@@ -164,11 +164,15 @@ export function addNodeCommand(program: Command): void {
           join(defaultDataDir(), "peerkit", "identity.key");
         const agentKeyStore = new FileAgentKeyStore(identityPath);
 
+        const transportFactory = useIroh
+          ? await loadIrohTransportFactory()
+          : undefined;
+
         const session = await startNode({
           agentKeyStore,
           bootstrapRelays: relayAddrs,
           addresses,
-          transportFactory: useIroh ? createIrohNode : undefined,
+          transportFactory,
           modules: [dataSync],
           callbacks: {
             onRelayConnected: (nodeId) => {
@@ -246,3 +250,15 @@ const defaultDataDir = (): string => {
   }
   return process.env["XDG_DATA_HOME"] ?? join(homedir(), ".local", "share");
 };
+
+// Load the iroh transport lazily so its native binding is only required when the
+// iroh transport is actually selected — libp2p-only users never need it. The
+// dynamic specifier keeps this out of the CLI's type graph, so the main build
+// does not pull in the native crate.
+async function loadIrohTransportFactory(): Promise<PeerkitNodeTransportFactory> {
+  const irohPackage = "@peerkit/transport-iroh-nodejs";
+  const module = (await import(irohPackage)) as {
+    createNode: PeerkitNodeTransportFactory;
+  };
+  return module.createNode;
+}

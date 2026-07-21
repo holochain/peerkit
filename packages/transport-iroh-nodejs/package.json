@@ -43,6 +43,7 @@
     "peerkit-iroh-native": "*"
   },
   "devDependencies": {
+    "@peerkit/peer-session": "^0.1.0-alpha.14",
     "@peerkit/test-utils": "^0.1.0-alpha.14"
   }
 }

@@ -55,6 +55,26 @@ jobs:
       - run: npm run check:tests # type check test files
       - run: npm test
 
+  # The iroh transport needs the native binding, so it builds Rust and runs its
+  # tests in a dedicated job, keeping the main matrix above TS-only.
+  iroh:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/peerkit-iroh"
+      - run: npm ci
+      - run: npm run build:native
+      - run: npm run build:dist # builds the TS packages the tests import
+      - run: npm run build:iroh # type check the iroh transport
+      - run: npm run test:iroh
+
   publish-check:
     runs-on: "ubuntu-latest"
     permissions:
