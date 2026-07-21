@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["crates/*/index.js", "crates/*/index.d.ts"],
   "workspaces": {
     "packages/transport-libp2p": {
       "ignoreDependencies": ["@peerkit/transport-libp2p-react-native"]

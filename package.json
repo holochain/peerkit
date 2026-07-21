@@ -60,7 +60,7 @@
     "build:docs": "typedoc",
     "build": "npm run build:docs",
     "check:knip": "knip --strict --include unlisted",
-    "check:publint": "npm exec --workspaces -- publint",
+    "check:publint": "npm exec --workspace packages -- publint",
     "prepare": "husky"
   },
   "lint-staged": {
