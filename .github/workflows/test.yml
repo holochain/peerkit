@@ -87,8 +87,16 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
+      # publint checks every published package, including the iroh transport,
+      # so this job needs the native binding to build its dist.
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/peerkit-iroh"
       - run: npm ci
+      - run: npm run build:native
       - run: npm run build:dist
+      - run: npm run build:iroh
       - run: npm run check:knip
       - run: npm run check:publint
 
