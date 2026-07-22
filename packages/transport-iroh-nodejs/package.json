@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-iroh-nodejs",
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "description": "Node.js iroh transport for peerkit",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [

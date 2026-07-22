@@ -1,6 +1,6 @@
 {
   "name": "@peerkit/transport-iroh-core",
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "description": "Platform-agnostic iroh transport core for peerkit",
   "author": "Holochain Dev Team <devcore@holochain.org>",
   "keywords": [
