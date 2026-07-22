@@ -1,0 +1,25 @@
+{
+  "name": "peerkit-iroh-native",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "napi": {
+    "binaryName": "peerkit-iroh"
+  },
+  "scripts": {
+    "build": "napi build --platform --release --esm",
+    "build:debug": "napi build --platform --esm",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0"
+  }
+}

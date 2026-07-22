@@ -9,7 +9,11 @@ import type {
   RelayDialAddress,
   NodeId,
 } from "@peerkit/api";
-import { PeerkitNodeBuilder, type PeerkitNode } from "@peerkit/peerkit";
+import {
+  PeerkitNodeBuilder,
+  type PeerkitNode,
+  type PeerkitNodeTransportFactory,
+} from "@peerkit/peerkit";
 import { createTextMessageHandler, sendTextMessage } from "./messaging.js";
 
 export interface NodeEventCallbacks {
@@ -60,6 +64,8 @@ export async function startNode(options: {
   agentKeyStore: IAgentKeyStore;
   /** Extra node modules to register (e.g. AuthoredDataSync). */
   modules?: INodeModule[];
+  /** Transport factory to build the node's transport. Defaults to libp2p. */
+  transportFactory?: PeerkitNodeTransportFactory;
 }): Promise<NodeSession> {
   let nextAlias = 1;
   const aliasToAgent = new Map<string, AgentId>();
@@ -129,6 +135,9 @@ export async function startNode(options: {
     });
   if (options.addresses) {
     builder.withAddresses(options.addresses);
+  }
+  if (options.transportFactory) {
+    builder.withTransportFactory(options.transportFactory);
   }
   for (const module of options.modules ?? []) {
     builder.withModule(module);

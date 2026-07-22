@@ -4,7 +4,7 @@ import type {
   StreamMessageEvent,
 } from "@libp2p/interface";
 import type { IStream, PeerkitStreamEvents } from "@peerkit/api";
-import { encodeFrame, FrameDecoder } from "./frame.js";
+import { encodeFrame, FrameDecoder } from "@peerkit/transport-shared";
 
 /**
  * Stream with a custom protocol that can be created on existing connections

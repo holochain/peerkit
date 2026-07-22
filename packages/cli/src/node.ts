@@ -5,6 +5,7 @@ import {
   FullReplicationPolicy,
 } from "@peerkit/authored-data-pull";
 import { startNode } from "@peerkit/peer-session";
+import type { PeerkitNodeTransportFactory } from "@peerkit/peerkit";
 import { defaultNodeListenAddrs } from "@peerkit/transport-libp2p-nodejs";
 import type { Command } from "commander";
 import { createWriteStream } from "node:fs";
@@ -18,9 +19,16 @@ import { MemoryBlobStore } from "@peerkit/data-store";
 
 export function addNodeCommand(program: Command): void {
   program
-    .command("node <relay-addrs...>")
+    .command("node [relay-addrs...]")
     .description(
-      "Start a peer node connected to the given relay address(es). Opens an interactive REPL.",
+      "Start a peer node. With libp2p, pass relay address(es) to bootstrap through; " +
+        "with --transport iroh, pass peer address(es) to dial directly (optional). " +
+        "Opens an interactive REPL.",
+    )
+    .option(
+      "--transport <kind>",
+      "Transport substrate: 'libp2p' (default) or 'iroh'.",
+      "libp2p",
     )
     .option(
       "--listen <addrs>",
@@ -42,6 +50,7 @@ export function addNodeCommand(program: Command): void {
       async (
         relayAddrs: string[],
         opts: {
+          transport?: string;
           listen?: string;
           identity?: string;
           epoch?: string;
@@ -49,6 +58,19 @@ export function addNodeCommand(program: Command): void {
           pullInterval?: string;
         },
       ) => {
+        const useIroh = opts.transport === "iroh";
+        if (opts.transport !== "libp2p" && opts.transport !== "iroh") {
+          console.error(
+            `Invalid --transport value: ${opts.transport} (expected 'libp2p' or 'iroh')`,
+          );
+          process.exit(1);
+        }
+        if (!useIroh && relayAddrs.length === 0) {
+          console.error(
+            "The libp2p transport requires at least one relay address.",
+          );
+          process.exit(1);
+        }
         // Create a temporary log file.
         const stderrLog = join(tmpdir(), `peerkit-${process.pid}.log`);
         // Pipe all outputs from stderr to the log file. That enables libraries
@@ -95,9 +117,12 @@ export function addNodeCommand(program: Command): void {
           rl.prompt(true); // Redraw prompt
         }
 
+        // iroh binds its own addresses, so only default to libp2p's when unset.
         const addresses = opts.listen
           ? opts.listen.split(",").map((a) => a.trim())
-          : defaultNodeListenAddrs;
+          : useIroh
+            ? undefined
+            : defaultNodeListenAddrs;
 
         let epochDurationMs: number | undefined;
         if (opts.epoch !== undefined) {
@@ -139,10 +164,15 @@ export function addNodeCommand(program: Command): void {
           join(defaultDataDir(), "peerkit", "identity.key");
         const agentKeyStore = new FileAgentKeyStore(identityPath);
 
+        const transportFactory = useIroh
+          ? await loadIrohTransportFactory()
+          : undefined;
+
         const session = await startNode({
           agentKeyStore,
           bootstrapRelays: relayAddrs,
           addresses,
+          transportFactory,
           modules: [dataSync],
           callbacks: {
             onRelayConnected: (nodeId) => {
@@ -193,6 +223,10 @@ export function addNodeCommand(program: Command): void {
         // Startup output
         console.log();
         console.log(`Node session started with agent ID ${session.myAgentId}`);
+        console.log(`Transport: ${useIroh ? "iroh" : "libp2p"}`);
+        for (const address of session.node.transport.getListenAddresses()) {
+          console.log(`  address: ${address}`);
+        }
         console.log(`Epoch window ${dataSync.epochDuration} ms`);
         console.log(
           `Auto-sync ${
@@ -216,3 +250,15 @@ const defaultDataDir = (): string => {
   }
   return process.env["XDG_DATA_HOME"] ?? join(homedir(), ".local", "share");
 };
+
+// Load the iroh transport lazily so its native binding is only required when the
+// iroh transport is actually selected — libp2p-only users never need it. The
+// dynamic specifier keeps this out of the CLI's type graph, so the main build
+// does not pull in the native crate.
+async function loadIrohTransportFactory(): Promise<PeerkitNodeTransportFactory> {
+  const irohPackage = "@peerkit/transport-iroh-nodejs";
+  const module = (await import(irohPackage)) as {
+    createNode: PeerkitNodeTransportFactory;
+  };
+  return module.createNode;
+}

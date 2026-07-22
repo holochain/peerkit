@@ -23,10 +23,10 @@ import type {
   PeerDisconnectedCallback,
   RelayDialAddress,
 } from "@peerkit/api";
+import { encodeFrame, FrameDecoder } from "@peerkit/transport-shared";
 import type { Libp2p } from "libp2p";
 import { getDialableAddresses } from "./address.js";
 import { CustomStream } from "./custom-stream.js";
-import { encodeFrame, FrameDecoder } from "./frame.js";
 import { createTransportMetrics, type TransportMetrics } from "./metrics.js";
 
 /**

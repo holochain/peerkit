@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     testTimeout: 30_000,
-    projects: ["packages/*"],
+    // transport-iroh-nodejs needs the native binding; it runs via
+    // vitest.iroh.config.ts in a dedicated CI job, not the main TS matrix.
+    projects: ["packages/*", "!packages/transport-iroh-nodejs"],
   },
 });

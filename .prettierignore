@@ -1,3 +1,8 @@
 # Ignore artifacts:
 build
 coverage
+
+# Rust build output and the napi-generated binding.
+crates/*/target
+crates/*/index.js
+crates/*/index.d.ts

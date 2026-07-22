@@ -5,10 +5,13 @@
     "rootDir": "."
   },
   "include": ["packages/*/src", "packages/*/tests"],
+  "exclude": ["packages/transport-iroh-nodejs"],
   "references": [
     { "path": "packages/api" },
     { "path": "packages/agent-store" },
     { "path": "packages/metrics" },
+    { "path": "packages/transport-shared" },
+    { "path": "packages/transport-iroh-core" },
     { "path": "packages/transport-libp2p-core" },
     { "path": "packages/transport-libp2p-nodejs" },
     { "path": "packages/transport-libp2p-react-native" },

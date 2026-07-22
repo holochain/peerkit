@@ -8,8 +8,8 @@ import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import {
   CURRENT_ACCESS_PROTOCOL,
   CURRENT_MESSAGE_PROTOCOL,
-  encodeFrame,
 } from "@peerkit/transport-libp2p-core";
+import { encodeFrame } from "@peerkit/transport-shared";
 import type { MessageHandler, NetworkAccessHandler } from "@peerkit/api";
 import { createNode, uniqueTxAddress } from "./util.js";
 import { isDeepStrictEqual } from "node:util";

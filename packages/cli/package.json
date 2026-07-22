@@ -34,6 +34,7 @@
     "@peerkit/data-store": "^0.1.0-alpha.15",
     "@peerkit/peer-session": "^0.1.0-alpha.15",
     "@peerkit/peerkit": "^0.1.0-alpha.15",
+    "@peerkit/transport-iroh-nodejs": "^0.1.0-alpha.15",
     "@peerkit/transport-libp2p-nodejs": "^0.1.0-alpha.15",
     "commander": "^14.0.0"
   }
