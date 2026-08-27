@@ -109,6 +109,7 @@ export function runNodeCommands(
         }
         try {
           await session.sendText(alias, text);
+          console.log(`Sent to ${alias}`);
         } catch (error) {
           console.log(`Send failed: ${error}`);
         }
