@@ -27,6 +27,7 @@ import type { Libp2p } from "libp2p";
 import { getDialableAddresses } from "./address.js";
 import { CustomStream } from "./custom-stream.js";
 import { encodeFrame, FrameDecoder } from "./frame.js";
+import { MessageStream } from "./message-stream.js";
 import { createTransportMetrics, type TransportMetrics } from "./metrics.js";
 
 /**
@@ -162,6 +163,8 @@ export class TransportLibp2p implements ITransport {
   private connectedToRelayCallback?: ConnectedToRelayCallback;
   private peerConnectedCallback?: PeerConnectedCallback;
   private readonly metrics: TransportMetrics;
+  private readonly messageSendQueueTails: Map<NodeId, Promise<void>> =
+    new Map();
 
   // Keyed by NodeId string. true = granted, false = denied.
   // Both entries are sticky for the session.
@@ -334,7 +337,36 @@ export class TransportLibp2p implements ITransport {
     await stream.close();
   }
 
-  async send(nodeId: NodeId, data: Uint8Array): Promise<void> {
+  send(nodeId: NodeId, data: Uint8Array): Promise<void> {
+    return this.enqueueMessageSend(nodeId, async () => {
+      const stream = await this.getOrCreateMessageStream(nodeId);
+      await new MessageStream(stream).send(encodeFrame(data));
+      this.metrics.bytesTotal.add(data.byteLength, {
+        direction: "sent",
+      });
+    });
+  }
+
+  private enqueueMessageSend(
+    nodeId: NodeId,
+    operation: () => Promise<void>,
+  ): Promise<void> {
+    const previousTail = this.messageSendQueueTails.get(nodeId);
+    const queuedOperation = (previousTail ?? Promise.resolve()).then(
+      () => operation(),
+      () => operation(),
+    );
+    const queueTail = queuedOperation.catch(() => undefined);
+    this.messageSendQueueTails.set(nodeId, queueTail);
+    void queueTail.finally(() => {
+      if (this.messageSendQueueTails.get(nodeId) === queueTail) {
+        this.messageSendQueueTails.delete(nodeId);
+      }
+    });
+    return queuedOperation;
+  }
+
+  private async getOrCreateMessageStream(nodeId: NodeId): Promise<Stream> {
     const connections = this.libp2p.getConnections(peerIdFromString(nodeId));
     if (connections.length === 0 || !connections[0]) {
       this.logger.error("No open connection to node when trying to send {*}", {
@@ -365,10 +397,7 @@ export class TransportLibp2p implements ITransport {
         });
       }
     }
-    stream.send(encodeFrame(data));
-    this.metrics.bytesTotal.add(data.byteLength, {
-      direction: "sent",
-    });
+    return stream;
   }
 
   isConnected(nodeId: NodeId): boolean {

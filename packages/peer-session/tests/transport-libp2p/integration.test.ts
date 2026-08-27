@@ -51,6 +51,13 @@ test(
       { timeout: 10_000 },
     );
 
+    // Connection state can change between a peer poll and an explicit
+    // command. Repeating an already-completed transition is idempotent.
+    await expect(sessionB.connect("harold")).rejects.toThrow(/Unknown alias/);
+    await expect(sessionB.connect("1")).resolves.toBeUndefined();
+    await expect(sessionB.disconnect("1")).resolves.toBeUndefined();
+    await expect(sessionB.disconnect("1")).resolves.toBeUndefined();
+
     await sessionA.shutdown();
     await sessionB.shutdown();
     await relaySession.shutdown();

@@ -203,6 +203,9 @@ export interface ITransport {
    * Send an opaque application message to a peer.
    * The peer must be connected and have been granted access.
    *
+   * Resolves once the local libp2p stream has accepted and drained the frame.
+   * It does not confirm that the remote application has handled the message.
+   *
    * @param nodeId The ID of the target node
    * @param message The message to send to the node
    */
