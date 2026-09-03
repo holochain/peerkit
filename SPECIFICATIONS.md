@@ -597,7 +597,7 @@ Not every app needs every layer. The layers are additive — each builds on the 
 - A module host on the node, so data behavior is attached rather than baked in
 - Authored-data push and pull modules with the full-replication policy — every peer stores everything, kept in sync by push on author and periodic anti-entropy pull
 - An in-memory data store for authored blobs (the persisted store comes later)
-- Peer messaging (signals) and arbitrary custom protocol streams
+- Peer messaging (application messages) and arbitrary custom protocol streams
 - A developer CLI for running nodes and relays
 
 **What's deliberately excluded from MVP:**
