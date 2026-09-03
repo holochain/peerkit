@@ -215,3 +215,43 @@ test("Concurrent large sends reuse one ordered message stream", async () => {
   await sender.shutDown();
   await receiver.shutDown();
 });
+
+test("A reply travels back on the stream the remote opened", async () => {
+  // A opens the message stream to B. When B answers, it must reuse that
+  // inbound stream rather than open a second one.
+  let resolveReply: (message: Uint8Array) => void = () => {};
+  const replyReceived = new Promise<Uint8Array>((resolve) => {
+    resolveReply = resolve;
+  });
+  const { node: nodeA } = await createNode({
+    id: "A",
+    messageHandler: async (_fromNode, message) => {
+      resolveReply(message);
+    },
+  });
+  const { node: nodeB, address: addressB } = await createNode({
+    id: "B",
+    messageHandler: async (fromNode, message, transport) => {
+      await transport.send(fromNode, new Uint8Array([...message, 0xff]));
+    },
+  });
+  await nodeA.connect([addressB]);
+
+  await nodeA.send(nodeB.getNodeId(), new Uint8Array([1, 2]));
+
+  expect(await replyReceived).toEqual(new Uint8Array([1, 2, 0xff]));
+
+  const libp2pB = Reflect.get(nodeB, "libp2p") as Libp2p;
+  const connectionB = libp2pB.getConnections(
+    peerIdFromString(nodeA.getNodeId()),
+  )[0];
+  assert(connectionB);
+  expect(
+    connectionB.streams.filter(
+      (stream) => stream.protocol === CURRENT_MESSAGE_PROTOCOL,
+    ),
+  ).toHaveLength(1);
+
+  await nodeA.shutDown();
+  await nodeB.shutDown();
+});

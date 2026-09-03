@@ -163,7 +163,11 @@ export class TransportLibp2p implements ITransport {
   private connectedToRelayCallback?: ConnectedToRelayCallback;
   private peerConnectedCallback?: PeerConnectedCallback;
   private readonly metrics: TransportMetrics;
-  private readonly messageSendQueueTails: Map<NodeId, Promise<void>> =
+  // One wrapper per libp2p message stream, whichever side opened it.
+  private readonly messageStreams: WeakMap<Stream, MessageStream> =
+    new WeakMap();
+  // In-flight stream opens, so concurrent sends share one newStream() call.
+  private readonly pendingMessageStreams: Map<NodeId, Promise<Stream>> =
     new Map();
 
   // Keyed by NodeId string. true = granted, false = denied.
@@ -337,36 +341,15 @@ export class TransportLibp2p implements ITransport {
     await stream.close();
   }
 
-  send(nodeId: NodeId, data: Uint8Array): Promise<void> {
-    return this.enqueueMessageSend(nodeId, async () => {
-      const stream = await this.getOrCreateMessageStream(nodeId);
-      await new MessageStream(stream).send(encodeFrame(data));
-      this.metrics.bytesTotal.add(data.byteLength, {
-        direction: "sent",
-      });
+  async send(nodeId: NodeId, data: Uint8Array): Promise<void> {
+    const stream = await this.getOrOpenMessageStream(nodeId);
+    await this.messageStreamFor(stream, nodeId).send(encodeFrame(data));
+    this.metrics.bytesTotal.add(data.byteLength, {
+      direction: "sent",
     });
   }
 
-  private enqueueMessageSend(
-    nodeId: NodeId,
-    operation: () => Promise<void>,
-  ): Promise<void> {
-    const previousTail = this.messageSendQueueTails.get(nodeId);
-    const queuedOperation = (previousTail ?? Promise.resolve()).then(
-      () => operation(),
-      () => operation(),
-    );
-    const queueTail = queuedOperation.catch(() => undefined);
-    this.messageSendQueueTails.set(nodeId, queueTail);
-    void queueTail.finally(() => {
-      if (this.messageSendQueueTails.get(nodeId) === queueTail) {
-        this.messageSendQueueTails.delete(nodeId);
-      }
-    });
-    return queuedOperation;
-  }
-
-  private async getOrCreateMessageStream(nodeId: NodeId): Promise<Stream> {
+  private async getOrOpenMessageStream(nodeId: NodeId): Promise<Stream> {
     const connections = this.libp2p.getConnections(peerIdFromString(nodeId));
     if (connections.length === 0 || !connections[0]) {
       this.logger.error("No open connection to node when trying to send {*}", {
@@ -376,28 +359,49 @@ export class TransportLibp2p implements ITransport {
     }
     // Prefer a direct connection; fall back to a relayed one.
     const connection = connections.find((c) => c.direct) ?? connections[0];
-    let stream = connection.streams.find(
-      (stream) => stream.protocol === CURRENT_MESSAGE_PROTOCOL,
+    const existing = connection.streams.find(
+      (stream) =>
+        stream.protocol === CURRENT_MESSAGE_PROTOCOL &&
+        stream.status === "open",
     );
-    if (!stream || stream.status !== "open") {
-      stream = await connection.newStream(CURRENT_MESSAGE_PROTOCOL);
-      // Register a listener so the remote end can write back on this stream.
-      if (this.messageHandler) {
-        const messageHandler = this.messageHandler;
-        const decoder = new FrameDecoder();
-        const nodeId = connection.remotePeer.toString();
-        stream.addEventListener("message", async (message) => {
-          const chunk = message.data.subarray();
-          for (const msg of decoder.feed(chunk)) {
-            this.metrics.bytesTotal.add(msg.byteLength, {
-              direction: "received",
-            });
-            await messageHandler(nodeId, msg, this);
-          }
-        });
-      }
+    if (existing) {
+      return existing;
     }
-    return stream;
+    let pending = this.pendingMessageStreams.get(nodeId);
+    if (!pending) {
+      pending = connection.newStream(CURRENT_MESSAGE_PROTOCOL).finally(() => {
+        this.pendingMessageStreams.delete(nodeId);
+      });
+      this.pendingMessageStreams.set(nodeId, pending);
+    }
+    return pending;
+  }
+
+  private messageStreamFor(stream: Stream, nodeId: NodeId): MessageStream {
+    let messageStream = this.messageStreams.get(stream);
+    if (!messageStream) {
+      messageStream = new MessageStream(
+        stream,
+        async (message) => {
+          this.logger.debug(
+            `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
+            { peerId: nodeId, byteLength: message.byteLength },
+          );
+          this.metrics.bytesTotal.add(message.byteLength, {
+            direction: "received",
+          });
+          await this.messageHandler?.(nodeId, message, this);
+        },
+        (error) => {
+          this.logger.error("Message handler produced an error {*}", {
+            nodeId,
+            error,
+          });
+        },
+      );
+      this.messageStreams.set(stream, messageStream);
+    }
+    return messageStream;
   }
 
   isConnected(nodeId: NodeId): boolean {
@@ -735,26 +739,9 @@ export class TransportLibp2p implements ITransport {
         "Handling message protocol without a message handler configured",
       );
     }
-    // Assign to another variable to preserve that `messageHandler` is defined.
-    const messageHandler = this.messageHandler;
-
     await this.accessCheck(CURRENT_MESSAGE_PROTOCOL, connection);
 
-    const decoder = new FrameDecoder();
-    stream.addEventListener("message", async (message) => {
-      const chunk = message.data.subarray();
-      const remoteNodeId = connection.remotePeer.toString();
-      for (const msg of decoder.feed(chunk)) {
-        this.logger.debug(
-          `Incoming message on stream ${CURRENT_MESSAGE_PROTOCOL} {*}`,
-          { peerId: connection.remotePeer, byteLength: msg.byteLength },
-        );
-        this.metrics.bytesTotal.add(msg.byteLength, {
-          direction: "received",
-        });
-        await messageHandler(remoteNodeId, msg, this);
-      }
-    });
+    this.messageStreamFor(stream, connection.remotePeer.toString());
   };
 
   private accessCheck = async (protocol: string, connection: Connection) => {
