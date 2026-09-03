@@ -38,25 +38,6 @@ export interface NodeSession {
   shutdown(): Promise<void>;
 }
 
-/**
- * Treat an operation failure as success when a subsequent state check shows
- * that the requested state was reached. This closes the race between a
- * caller's state poll and the operation without hiding unrelated failures.
- */
-export async function completeWhenStateConfirmed(
-  operation: () => Promise<void>,
-  stateConfirmed: () => boolean,
-): Promise<void> {
-  try {
-    await operation();
-  } catch (error) {
-    if (stateConfirmed()) {
-      return;
-    }
-    throw error;
-  }
-}
-
 // AgentStore subclass that fires a callback whenever agents are stored,
 // enabling alias assignment for peers discovered via relay broadcast.
 class ObservableAgentStore extends MemoryAgentStore {
@@ -206,16 +187,15 @@ export async function startNode(options: {
       if (agentId === undefined) {
         throw new Error(`Unknown alias: ${alias}`);
       }
-      if (node.isConnected(agentId)) return;
+      if (node.isConnected(agentId)) {
+        throw new Error(`Already connected to ${alias}`);
+      }
       const info = agentStore.get(agentId);
       const addresses = info?.addresses;
       if (!addresses) {
         throw new Error(`No address known for ${alias}`);
       }
-      await completeWhenStateConfirmed(
-        () => node.transport.connect(addresses),
-        () => node.isConnected(agentId),
-      );
+      await node.transport.connect(addresses);
     },
 
     async disconnect(alias: string): Promise<void> {
@@ -223,11 +203,10 @@ export async function startNode(options: {
       if (agentId === undefined) {
         throw new Error(`Unknown alias: ${alias}`);
       }
-      if (!node.isConnected(agentId)) return;
-      await completeWhenStateConfirmed(
-        () => node.disconnect(agentId),
-        () => !node.isConnected(agentId),
-      );
+      if (!node.isConnected(agentId)) {
+        throw new Error(`Not connected to ${alias}`);
+      }
+      await node.disconnect(agentId);
     },
 
     async shutdown(): Promise<void> {
