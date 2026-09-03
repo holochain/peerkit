@@ -76,6 +76,48 @@ describe("MessageStream inbound", () => {
     expect(received).toEqual([new Uint8Array([1, 2, 3, 4])]);
   });
 
+  test("serializes handlers across separate message events", async () => {
+    const stream = new FakeStream();
+    const events: string[] = [];
+    let activeHandlers = 0;
+    let maxActiveHandlers = 0;
+    let releaseFirst = (): void => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    new MessageStream(
+      asStream(stream),
+      async (message) => {
+        const value = message[0];
+        activeHandlers += 1;
+        maxActiveHandlers = Math.max(maxActiveHandlers, activeHandlers);
+        events.push(`start ${value}`);
+        if (value === 1) {
+          await firstGate;
+        }
+        events.push(`finish ${value}`);
+        activeHandlers -= 1;
+      },
+      () => {},
+    );
+
+    stream.receive(encodeFrame(new Uint8Array([1])));
+    await flushMicrotasks();
+    stream.receive(encodeFrame(new Uint8Array([2])));
+    await flushMicrotasks();
+
+    // Capture the gated state before cleanup releases the first handler.
+    const eventsBeforeRelease = [...events];
+    const maxActiveBeforeRelease = maxActiveHandlers;
+    releaseFirst();
+    await flushMicrotasks();
+
+    expect(eventsBeforeRelease).toEqual(["start 1"]);
+    expect(maxActiveBeforeRelease).toBe(1);
+    expect(events).toEqual(["start 1", "finish 1", "start 2", "finish 2"]);
+    expect(activeHandlers).toBe(0);
+  });
+
   test("reports listener failures through onError instead of rejecting unhandled", async () => {
     const stream = new FakeStream();
     const onError = vi.fn();
@@ -92,6 +134,65 @@ describe("MessageStream inbound", () => {
 
     expect(onError).toHaveBeenCalledOnce();
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+  });
+
+  test("continues after a handler rejects one frame from a message event", async () => {
+    const stream = new FakeStream();
+    const handled: number[] = [];
+    const errors: unknown[] = [];
+    new MessageStream(
+      asStream(stream),
+      async (message) => {
+        const value = message[0];
+        if (value !== undefined) {
+          handled.push(value);
+        }
+        if (value === 1) {
+          throw new Error("first handler failed");
+        }
+      },
+      (error) => {
+        errors.push(error);
+      },
+    );
+    const first = encodeFrame(new Uint8Array([1]));
+    const second = encodeFrame(new Uint8Array([2]));
+    const chunk = new Uint8Array(first.byteLength + second.byteLength);
+    chunk.set(first);
+    chunk.set(second, first.byteLength);
+
+    // Both frames arrive in one decoder feed.
+    stream.receive(chunk);
+    await flushMicrotasks();
+
+    expect(handled).toEqual([1, 2]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ message: "first handler failed" });
+  });
+
+  test("reports a malformed frame once and ignores later input", async () => {
+    const stream = new FakeStream();
+    const received: Uint8Array[] = [];
+    const onError = vi.fn();
+    new MessageStream(
+      asStream(stream),
+      (message) => {
+        received.push(message);
+      },
+      onError,
+    );
+
+    // 0x04000001 is one byte above FrameDecoder's 64 MiB limit.
+    stream.receive(new Uint8Array([4, 0, 0, 1]));
+    await flushMicrotasks();
+    stream.receive(encodeFrame(new Uint8Array([1])));
+    await flushMicrotasks();
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0]?.[0]).toMatchObject({
+      message: "Frame length 67108865 exceeds maximum 67108864",
+    });
+    expect(received).toEqual([]);
   });
 });
 
