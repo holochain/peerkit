@@ -18,20 +18,7 @@ interface DrainWaiter {
   reject: (error: Error) => void;
 }
 
-/**
- * Owns one long-lived libp2p message stream.
- *
- * Inbound: decodes length-prefixed frames and hands each message to the
- * listener, one at a time per chunk.
- *
- * Outbound: writes queued frames one at a time. `Stream.send()` returning
- * `false` means the stream buffered the frame but must not receive more until
- * `drain`; the queue waits for that event before the next write.
- *
- * Listeners are registered once and never removed because libp2p streams do
- * not reliably support `removeEventListener`. `Stream.onDrain()` is not used
- * because `@libp2p/utils` 7.2.1 never resets its promise after the first drain.
- */
+/** Owns inbound decoding and serialized outbound delivery for one stream. */
 export class MessageStream {
   private readonly queue: PendingSend[] = [];
   private pumping = false;
