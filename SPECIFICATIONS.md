@@ -198,7 +198,7 @@ The transport has three built-in protocols:
 
 - **Network access handshake**: the first message on every new connection. Carries the connecting agent's `NetworkAccessBytes`. Policy enforcement lives in the transport package.
 - **Agent-info messages**: opaque routing for agent-info exchange. Wire format being owned by core peerkit, the transport routes payload bytes between connected peers and peers and relays.
-- **Application messages**: opaque routing for application data, sent fire-and-forget as "signals" via `send`. Wire format owned by application code. Available on regular nodes only.
+- **Application messages**: opaque routing for application data via `send`. A call resolves once the transport has accepted the message and can take the next one, which applies backpressure to callers that await it; there is no delivery acknowledgement. Wire format owned by application code. Available on regular nodes only.
 
 Beyond these three, the transport opens arbitrary named protocol streams. A caller registers a handler with `registerStreamHandler(protocol, …)` and opens an outgoing stream with `createStream(nodeId, protocol)`; each side gets an `IStream` for bidirectional bytes. The data synchronization modules ride on these custom streams rather than the application-message path. Incoming custom streams are subject to the same access check as everything else.
 
@@ -304,7 +304,7 @@ On top of this mapping, core lets consumers address peers by agent ID — sendin
 
 #### Module host
 
-Core exposes a small interface to modules so they can be packaged and distributed without depending on the `@peerkit/peerkit` package directly. A module (`INodeModule`) is attached to a node with `register`; the node calls `init` to wire it up, then `start`, and `stop` on shutdown. Through the node interface (`IPeerkitNode`) a module reads its own `ownAgentId`, lists connected agents, opens custom protocol streams (`createStream`), handles incoming ones (`registerStreamHandler`), and sends signals — all keyed by agent ID rather than transport node ID. The exact signatures live in `@peerkit/api` and are published via typedoc.
+Core exposes a small interface to modules so they can be packaged and distributed without depending on the `@peerkit/peerkit` package directly. A module (`INodeModule`) is attached to a node with `register`; the node calls `init` to wire it up, then `start`, and `stop` on shutdown. Through the node interface (`IPeerkitNode`) a module reads its own `ownAgentId`, lists connected agents, opens custom protocol streams (`createStream`), handles incoming ones (`registerStreamHandler`), and sends application messages — all keyed by agent ID rather than transport node ID. The exact signatures live in `@peerkit/api` and are published via typedoc.
 
 #### Data synchronization modules
 
@@ -597,7 +597,7 @@ Not every app needs every layer. The layers are additive — each builds on the 
 - A module host on the node, so data behavior is attached rather than baked in
 - Authored-data push and pull modules with the full-replication policy — every peer stores everything, kept in sync by push on author and periodic anti-entropy pull
 - An in-memory data store for authored blobs (the persisted store comes later)
-- Peer messaging (signals) and arbitrary custom protocol streams
+- Peer messaging (application messages) and arbitrary custom protocol streams
 - A developer CLI for running nodes and relays
 
 **What's deliberately excluded from MVP:**

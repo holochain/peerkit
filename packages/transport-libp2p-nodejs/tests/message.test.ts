@@ -3,6 +3,7 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
+import { peerIdFromString } from "@libp2p/peer-id";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import {
@@ -14,6 +15,7 @@ import type { MessageHandler, NetworkAccessHandler } from "@peerkit/api";
 import { createNode, uniqueTxAddress } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
 import { setupTestLogger } from "@peerkit/test-utils";
+import type { Libp2p } from "libp2p";
 
 beforeEach(setupTestLogger);
 
@@ -166,4 +168,90 @@ test("Large messages are chunked and received correctly", async () => {
 
   await libp2pNode.stop();
   await node.shutDown();
+});
+
+test("Concurrent large sends reuse one ordered message stream", async () => {
+  const messageCount = 100;
+  const messageSize = 256 * 1024;
+  let receivedCount = 0;
+
+  const { node: receiver, address } = await createNode({
+    id: "receiver",
+    messageHandler: async (_fromNode, message) => {
+      expect(message.byteLength).toBe(messageSize);
+      expect(
+        new DataView(message.buffer, message.byteOffset).getUint32(0),
+      ).toBe(receivedCount);
+      expect(message.subarray(4).every((byte) => byte === receivedCount)).toBe(
+        true,
+      );
+      receivedCount += 1;
+    },
+  });
+  const { node: sender } = await createNode({ id: "sender" });
+  await sender.connect([address]);
+
+  const sends: Promise<void>[] = [];
+  for (let index = 0; index < messageCount; index += 1) {
+    const message = new Uint8Array(messageSize).fill(index);
+    new DataView(message.buffer).setUint32(0, index);
+    sends.push(sender.send(receiver.getNodeId(), message));
+  }
+  await Promise.all(sends);
+
+  await vi.waitFor(() => expect(receivedCount).toBe(messageCount));
+
+  const libp2p = Reflect.get(sender, "libp2p") as Libp2p;
+  const connection = libp2p.getConnections(
+    peerIdFromString(receiver.getNodeId()),
+  )[0];
+  assert(connection);
+  expect(
+    connection.streams.filter(
+      (stream) => stream.protocol === CURRENT_MESSAGE_PROTOCOL,
+    ),
+  ).toHaveLength(1);
+
+  await sender.shutDown();
+  await receiver.shutDown();
+});
+
+test("A reply travels back on the stream the remote opened", async () => {
+  // A opens the message stream to B. When B answers, it must reuse that
+  // inbound stream rather than open a second one.
+  let resolveReply: (message: Uint8Array) => void = () => {};
+  const replyReceived = new Promise<Uint8Array>((resolve) => {
+    resolveReply = resolve;
+  });
+  const { node: nodeA } = await createNode({
+    id: "A",
+    messageHandler: async (_fromNode, message) => {
+      resolveReply(message);
+    },
+  });
+  const { node: nodeB, address: addressB } = await createNode({
+    id: "B",
+    messageHandler: async (fromNode, message, transport) => {
+      await transport.send(fromNode, new Uint8Array([...message, 0xff]));
+    },
+  });
+  await nodeA.connect([addressB]);
+
+  await nodeA.send(nodeB.getNodeId(), new Uint8Array([1, 2]));
+
+  expect(await replyReceived).toEqual(new Uint8Array([1, 2, 0xff]));
+
+  const libp2pB = Reflect.get(nodeB, "libp2p") as Libp2p;
+  const connectionB = libp2pB.getConnections(
+    peerIdFromString(nodeA.getNodeId()),
+  )[0];
+  assert(connectionB);
+  expect(
+    connectionB.streams.filter(
+      (stream) => stream.protocol === CURRENT_MESSAGE_PROTOCOL,
+    ),
+  ).toHaveLength(1);
+
+  await nodeA.shutDown();
+  await nodeB.shutDown();
 });
