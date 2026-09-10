@@ -95,14 +95,14 @@ export class MessageStream {
     // A previous drain may have let libp2p re-saturate the stream from its
     // own buffer, so check before writing as well as after.
     if (this.stream.writableNeedsDrain) {
-      await this.drained();
+      await this.waitForDrain();
     }
     if (!this.stream.send(frame)) {
-      await this.drained();
+      await this.waitForDrain();
     }
   }
 
-  private drained(): Promise<void> {
+  private waitForDrain(): Promise<void> {
     if (this.closeError) {
       return Promise.reject(this.closeError);
     }
