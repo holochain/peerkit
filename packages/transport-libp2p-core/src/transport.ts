@@ -393,7 +393,7 @@ export class TransportLibp2p implements ITransport {
           await this.messageHandler?.(nodeId, message, this);
         },
         (error) => {
-          this.logger.error("Message stream produced an inbound error {*}", {
+          this.logger.error("Message handler produced an error {*}", {
             nodeId,
             error,
           });

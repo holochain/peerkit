@@ -18,13 +18,10 @@ interface DrainWaiter {
   reject: (error: Error) => void;
 }
 
-/** Owns inbound decoding and serialized outbound writes for one stream. */
+/** Owns inbound decoding and serialized outbound delivery for one stream. */
 export class MessageStream {
   private readonly queue: PendingSend[] = [];
-  private readonly inboundQueue: Uint8Array[] = [];
   private pumping = false;
-  private inboundPumping = false;
-  private decoderFailed = false;
   private drainWaiter?: DrainWaiter;
   private closeError?: Error;
 
@@ -34,17 +31,12 @@ export class MessageStream {
     onError: MessageStreamErrorListener,
   ) {
     const decoder = new FrameDecoder();
-    stream.addEventListener("message", (event) => {
-      if (this.decoderFailed) {
-        return;
-      }
+    stream.addEventListener("message", async (event) => {
       try {
         for (const message of decoder.feed(event.data.subarray())) {
-          this.inboundQueue.push(message);
+          await onMessage(message);
         }
-        void this.pumpInbound(onMessage, onError);
       } catch (error) {
-        this.decoderFailed = true;
         onError(error);
       }
     });
@@ -74,29 +66,6 @@ export class MessageStream {
       this.queue.push({ frame, resolve, reject });
       void this.pump();
     });
-  }
-
-  private async pumpInbound(
-    onMessage: MessageStreamListener,
-    onError: MessageStreamErrorListener,
-  ): Promise<void> {
-    if (this.inboundPumping) {
-      return;
-    }
-    this.inboundPumping = true;
-    try {
-      let next = this.inboundQueue.shift();
-      while (next !== undefined) {
-        try {
-          await onMessage(next);
-        } catch (error) {
-          onError(error);
-        }
-        next = this.inboundQueue.shift();
-      }
-    } finally {
-      this.inboundPumping = false;
-    }
   }
 
   private async pump(): Promise<void> {
