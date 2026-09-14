@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## \[[0.1.0-alpha.16](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.15...v0.1.0-alpha.16)\] - 2026-09-14
+
+### Bug Fixes
+
+- _(transport)_ Serialize inbound message processing by @veeso
+- _(transport)_ Serialize sends per stream and honor backpressure by @veeso
+  - Send() now awaits the per-stream MessageStream, which writes one frame at a time and waits for drain when libp2p reports a full buffer. Stream opening is single-flight per peer so concurrent sends share one message stream. Inbound streams register the same wrapper, so replies reuse the stream the remote opened.
+- _(transport)_ Stabilize heavy message workload by @veeso
+  - Serialize per-peer sends, honor local stream backpressure, and carry completion through the CLI so wind-tunnel can safely drive the 256 KiB workload.
+
+### Miscellaneous Tasks
+
+- Update the AI_POLICY.md with shared content in [#114](https://github.com/holochain/peerkit/pull/114)
+- Update the CONTRIBUTING.md with shared content
+- Update the CONTRIBUTING.md with shared content
+
+### Testing
+
+- Remove not relevant tests by @veeso in [#116](https://github.com/holochain/peerkit/pull/116)
+
+### Refactor
+
+- _(transport)_ Rename drained to waitForDrain by @veeso
+- _(transport)_ Simplify MessageStream class comment by @veeso
+- _(transport)_ Make MessageStream own one stream end to end by @veeso
+  - One MessageStream per libp2p message stream owns inbound decoding and an explicit outbound FIFO. A send that returns false waits for drain before the next write. Replaces the per-send promise-tail chaining.
+
+### Documentation
+
+- Update application message terminology by @veeso
+- Define send() as a backpressured async write by @veeso
+- _(readme)_ Add holochain foundation context by @jost-s in [#112](https://github.com/holochain/peerkit/pull/112)
+  - Added context and mission statement for Peerkit.
+
+### Automated Changes
+
+- Update CODEOWNERS with shared content in [#110](https://github.com/holochain/peerkit/pull/110)
+
+### Other Changes
+
+- Fix(transport): serialize inbound message processing by @veeso
+  - Inbound FIFO serialization was not part of the #115 fix and had no reproduced defect behind it. Tracked separately.
+- _(peer-session,cli)_ Drop wind-tunnel driven changes from #116 by @veeso
+  - The idempotent connect/disconnect helper and the CLI "Sent to" line only served the wind-tunnel scenario. They are unrelated to the transport backpressure fix and are removed from this PR.
+
+### First-time Contributors
+
+- @ made their first contribution in [#110](https://github.com/holochain/peerkit/pull/110)
+
 ## \[[0.1.0-alpha.15](https://github.com/holochain/peerkit/compare/v0.1.0-alpha.14...v0.1.0-alpha.15)\] - 2026-07-08
 
 ### Bug Fixes
