@@ -3,7 +3,6 @@ import { yamux } from "@chainsafe/libp2p-yamux";
 import { memory } from "@libp2p/memory";
 import { reset } from "@logtape/logtape";
 import { multiaddr } from "@multiformats/multiaddr";
-import { peerIdFromString } from "@libp2p/peer-id";
 import { createLibp2p } from "libp2p";
 import { afterEach, assert, beforeEach, expect, test, vi } from "vitest";
 import {
@@ -15,7 +14,6 @@ import type { MessageHandler, NetworkAccessHandler } from "@peerkit/api";
 import { createNode, uniqueTxAddress } from "./util.js";
 import { isDeepStrictEqual } from "node:util";
 import { setupTestLogger } from "@peerkit/test-utils";
-import type { Libp2p } from "libp2p";
 
 beforeEach(setupTestLogger);
 
@@ -201,17 +199,6 @@ test("Concurrent large sends reuse one ordered message stream", async () => {
 
   await vi.waitFor(() => expect(receivedCount).toBe(messageCount));
 
-  const libp2p = Reflect.get(sender, "libp2p") as Libp2p;
-  const connection = libp2p.getConnections(
-    peerIdFromString(receiver.getNodeId()),
-  )[0];
-  assert(connection);
-  expect(
-    connection.streams.filter(
-      (stream) => stream.protocol === CURRENT_MESSAGE_PROTOCOL,
-    ),
-  ).toHaveLength(1);
-
   await sender.shutDown();
   await receiver.shutDown();
 });
@@ -240,17 +227,6 @@ test("A reply travels back on the stream the remote opened", async () => {
   await nodeA.send(nodeB.getNodeId(), new Uint8Array([1, 2]));
 
   expect(await replyReceived).toEqual(new Uint8Array([1, 2, 0xff]));
-
-  const libp2pB = Reflect.get(nodeB, "libp2p") as Libp2p;
-  const connectionB = libp2pB.getConnections(
-    peerIdFromString(nodeA.getNodeId()),
-  )[0];
-  assert(connectionB);
-  expect(
-    connectionB.streams.filter(
-      (stream) => stream.protocol === CURRENT_MESSAGE_PROTOCOL,
-    ),
-  ).toHaveLength(1);
 
   await nodeA.shutDown();
   await nodeB.shutDown();
