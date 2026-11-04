@@ -100,8 +100,7 @@ export function installDataChannelEarlyMessagePolyfill(): void {
   }
 
   const prototype = captureDataChannelPrototype(RTCPeerConnectionCtor) as
-    | (Record<string, unknown> & object)
-    | null;
+    (Record<string, unknown> & object) | null;
   if (prototype == null || prototype[INSTALLED_FLAG] === true) {
     return;
   }
