@@ -113,9 +113,7 @@ import "@peerkit/transport-libp2p-react-native/polyfills";
 import { createNode } from "@peerkit/transport-libp2p-react-native";
 
 const transport = await createNode({
-  networkAccessBytes: new Uint8Array([
-    /* network access bytes */
-  ]),
+  networkAccessBytes: new Uint8Array([/* network access bytes */]),
   bootstrapRelays: ["/dns4/relay.example.com/tcp/443/wss/p2p/12D3Koo..."],
   // Optional: defaults to ["/p2p-circuit", "/webrtc"].
   addrs: ["/p2p-circuit", "/webrtc"],
