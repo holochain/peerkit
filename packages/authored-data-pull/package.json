@@ -37,11 +37,11 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "@logtape/logtape": "^2.0.5",
-    "@noble/hashes": "^2.2.0",
+    "@logtape/logtape": "^2.4.2",
+    "@noble/hashes": "^2.4.0",
     "@peerkit/api": "^0.1.0-alpha.16",
     "@peerkit/data-store": "^0.1.0-alpha.16",
-    "cbor-x": "^1.6.4"
+    "cbor-x": "^1.6.8"
   },
   "devDependencies": {
     "@peerkit/peerkit": "^0.1.0-alpha.16",
