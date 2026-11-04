@@ -34,20 +34,20 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "@logtape/logtape": "^2.0.5",
-    "@multiformats/dns": "^1.0.13",
-    "@multiformats/multiaddr": "^13.0.1",
-    "@opentelemetry/api": "^1.9.0",
+    "@logtape/logtape": "^2.4.2",
+    "@multiformats/dns": "^1.0.15",
+    "@multiformats/multiaddr": "^13.0.3",
+    "@opentelemetry/api": "^1.10.0",
     "@peerkit/api": "^0.1.0-alpha.16"
   },
   "peerDependencies": {
-    "@libp2p/interface": "^3.0.0",
-    "@libp2p/peer-id": "^6.0.0",
-    "libp2p": "^3.2.0"
+    "@libp2p/interface": "^3.4.0",
+    "@libp2p/peer-id": "^6.0.18",
+    "libp2p": "^3.5.1"
   },
   "devDependencies": {
-    "@libp2p/interface": "^3.0.0",
-    "@libp2p/peer-id": "^6.0.0",
-    "libp2p": "^3.2.0"
+    "@libp2p/interface": "^3.4.0",
+    "@libp2p/peer-id": "^6.0.18",
+    "libp2p": "^3.5.1"
   }
 }

@@ -32,11 +32,11 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "@logtape/logtape": "^2.0.5",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.218.0",
-    "@opentelemetry/resources": "2.7.1",
-    "@opentelemetry/sdk-metrics": "2.7.1",
-    "@opentelemetry/semantic-conventions": "^1.40.0"
+    "@logtape/logtape": "^2.4.2",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.300.0",
+    "@opentelemetry/resources": "3.0.0",
+    "@opentelemetry/sdk-metrics": "3.0.0",
+    "@opentelemetry/semantic-conventions": "^1.44.0"
   }
 }
