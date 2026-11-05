@@ -40,7 +40,7 @@
     "@libp2p/ping": "^3.1.17",
     "@libp2p/webrtc": "^7.0.2",
     "@multiformats/multiaddr": "^13.0.3",
-    "@peculiar/x509": "^3.1.0",
+    "@peculiar/x509": "^2.0.0",
     "@peerkit/api": "^0.1.0-alpha.16",
     "@peerkit/transport-libp2p-core": "^0.1.0-alpha.16",
     "libp2p": "^3.5.1",
